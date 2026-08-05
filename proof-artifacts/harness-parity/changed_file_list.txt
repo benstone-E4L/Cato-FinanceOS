@@ -1,0 +1,2 @@
+test-outputs/financeos-cato/authenticated_ws_harness.py
+test-outputs/financeos-cato/e2e_financeos_cato.py

@@ -14,7 +14,7 @@ const MODEL_META: Record<Model, { label: string; color: string; desc: string }> 
   claude: { label: "Claude",  color: "#3B82F6", desc: "Anthropic · Claude Code CLI" },
   codex:  { label: "Codex",   color: "#F59E0B", desc: "OpenAI · Codex CLI" },
   gemini: { label: "Gemini",  color: "#A855F7", desc: "Google · Gemini CLI" },
-  cursor: { label: "Cursor",  color: "#22D3EE", desc: "Cursor · cursor-agent CLI (--print mode)" },
+  cursor: { label: "Cursor",  color: "#8B5CF6", desc: "Cursor · cursor-agent CLI (--print mode)" },
 };
 
 interface Config {

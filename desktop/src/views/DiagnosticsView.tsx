@@ -6,6 +6,7 @@
  */
 import React, { useState, useCallback } from "react";
 import { sendChatSocketPayload } from "../lib/chatTransport";
+import { BUILD_IDENTITY, BUILD_IDENTITY_LABEL } from "../lib/buildIdentity";
 
 interface DiagnosticsViewProps {
   httpPort: number;
@@ -1105,9 +1106,18 @@ export function DiagnosticsView({ httpPort, wsPort, daemonToken }: DiagnosticsVi
   return (
     <div style={{ padding: "1.5rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "1.25rem" }}>
-        <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>
-          Diagnostics
-        </h2>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700 }}>
+            Diagnostics
+          </h2>
+          <div
+            aria-label="Application build identity"
+            title={BUILD_IDENTITY.sha === "development" ? "Local development build" : BUILD_IDENTITY.sha}
+            style={{ color: "var(--text-secondary, #aaa)", fontSize: "0.75rem", marginTop: "0.25rem" }}
+          >
+            Build {BUILD_IDENTITY_LABEL}
+          </div>
+        </div>
         <button className="btn-secondary" onClick={exportDiagnostics} disabled={exporting}>
           {exporting ? "Exporting..." : "Export Diagnostics"}
         </button>

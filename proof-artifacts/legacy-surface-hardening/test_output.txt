@@ -1,0 +1,13 @@
+Command: python -m pytest tests/test_dashboard_token_and_host.py tests/test_shipped_ui_security_and_colors.py tests/test_websocket_handler.py -q
+Result: PASS
+Tests: 105 passed
+Duration: 10.25s
+Warnings: 66 (existing aiohttp AppKey/deprecation warnings; no failures)
+
+Validated:
+- anonymous and invalid-token dashboard access fails closed
+- handoff is single-use and exchanges for HttpOnly SameSite=Strict session
+- browser session authenticates /api and /ws without daemon token in DOM or URL
+- daemon token and query-token strings are absent from legacy dashboard source
+- static scan covers dashboard plus desktop CSS/TSX and finds no prohibited green-family tokens
+- README contains launch-evidence qualification and omits audited absolute claims

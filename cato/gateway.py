@@ -12,6 +12,7 @@ cato/gateway.py — Central message bus for CATO.
 from __future__ import annotations
 
 import asyncio
+from collections import OrderedDict
 import json
 import logging
 import os
@@ -223,6 +224,11 @@ class Gateway:
         self._lanes:     dict[str, LaneQueue] = {}
         self._adapters:  list[Any] = []
         self._ws_clients: set[Any] = set()
+        # Bounded, process-local idempotency window for browser chat commands.
+        # A client-generated ID is accepted at most once, even when reconnects
+        # cause the same envelope to be replayed.
+        self._accepted_client_messages: OrderedDict[str, None] = OrderedDict()
+        self._accepted_client_messages_max: int = 4096
         self._start_time: float = 0.0
         self._bg_tasks:  list[asyncio.Task] = []
         self._agent_loop: Optional[Any] = None
@@ -1055,13 +1061,65 @@ class Gateway:
             })
         elif msg_type == "message":
             text = data.get("text", "").strip()
-            if text:
+            client_message_id = data.get("client_message_id", "")
+            has_delivery_contract = bool(client_message_id)
+            if has_delivery_contract and (
+                not isinstance(client_message_id, str) or not re.fullmatch(
+                r"[A-Za-z0-9._:-]{8,128}", client_message_id
+            )):
+                await self._ws_send(ws, {
+                    "type": "error",
+                    "code": "invalid_client_message_id",
+                    "text": "client_message_id must be 8-128 safe characters",
+                })
+                return
+            if not text:
+                await self._ws_send(ws, {
+                    "type": "error", "code": "empty_message", "text": "text required",
+                    "client_message_id": client_message_id,
+                })
+                return
+
+            if has_delivery_contract and client_message_id in self._accepted_client_messages:
+                self._accepted_client_messages.move_to_end(client_message_id)
+                await self._ws_send(ws, {
+                    "type": "accepted",
+                    "client_message_id": client_message_id,
+                    "duplicate": True,
+                })
+                return
+
+            # Reserve before awaiting queue ingestion so two concurrent socket
+            # deliveries cannot both execute the same command.
+            if has_delivery_contract:
+                self._accepted_client_messages[client_message_id] = None
+                while len(self._accepted_client_messages) > self._accepted_client_messages_max:
+                    self._accepted_client_messages.popitem(last=False)
+                # Confirm admission before downstream model or command work.
+                # The reservation above already makes a concurrent replay safe.
+                await self._ws_send(ws, {
+                    "type": "accepted",
+                    "client_message_id": client_message_id,
+                    "duplicate": False,
+                })
+            try:
                 await self.ingest(
                     data.get("session_id", "web-default"),
                     text,
                     data.get("channel", "web"),
                     data.get("agent_id", self._cfg.agent_name),
                 )
+            except Exception:
+                # Queue admission did not complete, so a retry must remain legal.
+                if has_delivery_contract:
+                    self._accepted_client_messages.pop(client_message_id, None)
+                    await self._ws_send(ws, {
+                        "type": "error",
+                        "code": "message_admission_failed",
+                        "client_message_id": client_message_id,
+                        "text": "message could not be queued; retry is permitted",
+                    })
+                raise
         elif msg_type == "set_vault_key":
             vault_key = data.get("vault_key", "").strip()
             value     = data.get("value", "").strip()

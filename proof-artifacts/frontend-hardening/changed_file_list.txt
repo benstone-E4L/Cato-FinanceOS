@@ -1,0 +1,6 @@
+desktop/package.json
+desktop/src/hooks/chatStreamPolicy.test.mjs
+desktop/src/hooks/chatStreamPolicy.ts
+desktop/src/hooks/useChatStream.ts
+proof-artifacts/frontend-hardening/changed_file_list.txt
+proof-artifacts/frontend-hardening/test_output.txt

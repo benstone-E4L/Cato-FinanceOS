@@ -3,6 +3,19 @@
 What this system does not do, cannot currently do, or does differently from how it
 reads. Written so an operator finds the gap here rather than in production.
 
+## Current launch boundary (2026-08-05)
+
+- The supported product surface is the Tauri desktop application. The legacy
+  loopback dashboard remains an operator/debug surface, not a second canonical
+  FinanceOS product.
+- No signed installer or published release is currently tied to the audited
+  GitHub commit. Local tests do not establish production parity.
+- The legacy dashboard exchanges its single-use CLI handoff for an expiring,
+  HttpOnly, SameSite browser session. The daemon token is not rendered into its
+  HTML or JavaScript and is not placed in its WebSocket URL.
+- UI status colors are informational only. A status label does not prove an
+  external integration is healthy unless the associated runtime check says so.
+
 Verified 2026-08-03 against Cato commit `8731f21`.
 
 **A runbook that hides a gap is worse than no runbook.** Everything below is a

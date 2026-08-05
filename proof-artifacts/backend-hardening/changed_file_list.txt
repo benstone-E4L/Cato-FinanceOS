@@ -1,0 +1,12 @@
+Owned backend-hardening changes:
+- cato/gateway.py
+- cato/ui/server.py
+- desktop/src/hooks/useChatStream.ts
+- desktop/src/lib/chatTransport.ts
+- tests/test_gateway_ws_delivery.py
+- proof-artifacts/backend-hardening/test_output.txt
+- proof-artifacts/backend-hardening/changed_file_list.txt
+
+Shared-worktree note:
+desktop/src/hooks/useChatStream.ts also contains concurrent frontend-hardening
+changes. They were preserved and passed lint/build with the auth/delivery changes.

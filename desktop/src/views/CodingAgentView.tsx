@@ -28,7 +28,7 @@ interface RecentTask {
 const ALL_MODELS = ["codex", "cursor", "claude", "gemini"] as const;
 const MODEL_CONFIG: Record<string, { label: string; color: string }> = {
   codex:  { label: "Codex",   color: "#F59E0B" },
-  cursor: { label: "Cursor",  color: "#22D3EE" },
+  cursor: { label: "Cursor",  color: "#8B5CF6" },
   claude: { label: "Claude",  color: "#3B82F6" },
   gemini: { label: "Gemini",  color: "#A855F7" },
 };

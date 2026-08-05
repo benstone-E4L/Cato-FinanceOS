@@ -105,7 +105,7 @@ export const InteractiveCLIView: React.FC<InteractiveCLIViewProps> = ({ httpPort
                 padding: "8px 14px",
                 borderRadius: 6,
                 border: "none",
-                background: "#0d9488",
+                background: "#2563eb",
                 color: "#fff",
                 cursor: loading ? "not-allowed" : "pointer",
               }}

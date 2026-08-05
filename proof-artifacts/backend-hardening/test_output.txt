@@ -1,0 +1,32 @@
+Backend hardening verification — 2026-08-05
+
+Command (repository root):
+  python -m pytest tests/test_gateway_ws_delivery.py tests/test_e2e_message_submission.py tests/test_port_fallback_integration.py tests/test_websocket_handler.py -q
+Result:
+  64 passed, 39 warnings in 25.57s
+  Exit code 0
+
+Focused delivery/security regression rerun:
+  python -m pytest tests/test_gateway_ws_delivery.py -q
+Result:
+  7 passed, 3 warnings in 1.07s
+  Exit code 0
+
+Commands (desktop/):
+  npm run lint
+  npm run build
+Result:
+  ESLint exit code 0.
+  TypeScript + Vite production build exit code 0; 81 modules transformed.
+
+Covered behavior:
+  - unique client_message_id accepted acknowledgement before downstream work
+  - duplicate IDs acknowledged without a second ingestion
+  - invalid IDs fail before ingestion
+  - browser auth via cato-auth.<token> WebSocket subprotocol
+  - query-only token authentication rejected with HTTP 401
+  - unapproved browser origin rejected with HTTP 403
+  - per-process token rotation and atomic file replacement
+  - existing fallback-port and WebSocket/API tests remain green
+
+Warnings are existing aiohttp NotAppKeyWarning diagnostics; no test failures.

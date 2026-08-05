@@ -1,0 +1,10 @@
+Source SHA: 32d75c81c1cb5a2464d1b6c09304581169cda8da
+Branch: e4l-runtime-hardening
+
+pytest native/auth boundary suite: 60 passed
+node reconnect lifecycle suite: 5 passed, 0 failed
+artifact custody validator: PASS
+
+External artifact status at verification time:
+GitHub returned HTTP 404 for windows-desktop-artifact.yml because the workflow
+was not yet present on the pushed branch. Exact-SHA installer proof remains pending.

@@ -8,6 +8,14 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { buildChatMessagePayload, sendChatSocketPayload } from "../lib/chatTransport";
+import {
+  decodeChatHistory,
+  decodeSocketFrame,
+  encodeChatHistory,
+  reconnectDelayMs,
+  scheduleReconnect,
+  type ReconnectTimer,
+} from "./chatStreamPolicy";
 
 export interface ChatMessage {
   id: string;
@@ -39,7 +47,9 @@ const MAX_STORED        = 500;
 function loadStored(): ChatMessage[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as ChatMessage[]) : [];
+    const messages = decodeChatHistory(raw);
+    if (raw && messages.length === 0) localStorage.removeItem(STORAGE_KEY);
+    return messages;
   } catch {
     return [];
   }
@@ -47,7 +57,7 @@ function loadStored(): ChatMessage[] {
 
 function saveStored(msgs: ChatMessage[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs.slice(-MAX_STORED)));
+    localStorage.setItem(STORAGE_KEY, encodeChatHistory(msgs.slice(-MAX_STORED)));
   } catch {
     // quota exceeded — silently ignore
   }
@@ -61,7 +71,9 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
   const wsRef       = useRef<WebSocket | null>(null);
   const retriesRef  = useRef(0);
   const mountedRef  = useRef(true);
+  const reconnectTimerRef = useRef<ReconnectTimer | null>(null);
   const sessionIdRef = useRef(crypto.randomUUID());
+  const pendingMessageIdsRef = useRef<Set<string>>(new Set());
   // Track IDs already in state so we don't double-add from history poll
   const knownIdsRef = useRef<Set<string>>(new Set(loadStored().map((m) => m.id)));
   // Latest sinceTs for incremental polling
@@ -136,14 +148,20 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
   }, [httpPort, daemonToken, addMessages]);
 
   const connect = useCallback(() => {
+    if (!mountedRef.current) return;
+    if (reconnectTimerRef.current !== null) {
+      reconnectTimerRef.current.cancel();
+      reconnectTimerRef.current = null;
+    }
     const rawHost = wsBase ?? "127.0.0.1:8080";
     const host = /^127\.0\.0\.1:\d+$/.test(rawHost) ? rawHost : "127.0.0.1:8080";
     const token = daemonToken || (window as Window & { __CATO_DAEMON_TOKEN__?: string }).__CATO_DAEMON_TOKEN__;
-    const qs = token ? `?token=${encodeURIComponent(token)}` : "";
-    const url = `ws://${host}/ws${qs}`;
+    const url = `ws://${host}/ws`;
 
     setConnectionStatus("connecting");
-    const ws = new WebSocket(url);
+    const ws = token
+      ? new WebSocket(url, [`cato-auth.${token}`])
+      : new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -153,19 +171,35 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
     };
 
     ws.onmessage = (ev: MessageEvent<string>) => {
-      try {
-        const data = JSON.parse(ev.data.trimEnd());
+      const decoded = decodeSocketFrame(ev.data);
+      if (!decoded.ok) {
+        addMessages([{
+          id: crypto.randomUUID(),
+          role: "system",
+          text: decoded.error,
+          timestamp: Date.now(),
+          source: "web",
+        }]);
+        setIsStreaming(false);
+        return;
+      }
+      const data = decoded.value;
 
         if (data.type === "health" || data.type === "heartbeat") return;
+
+        if (data.type === "accepted" && typeof data.client_message_id === "string") {
+          pendingMessageIdsRef.current.delete(data.client_message_id);
+          return;
+        }
 
         // Handle incoming user messages (from Telegram/WhatsApp)
         if (data.type === "message" && data.role === "user") {
           const msg: ChatMessage = {
             id:        crypto.randomUUID(),
             role:      "user",
-            text:      data.text ?? "",
+            text:      typeof data.text === "string" ? data.text : "",
             timestamp: Date.now(),
-            source:    data.channel ?? "web",
+            source:    typeof data.channel === "string" ? data.channel : "web",
           };
           addMessages([msg]);
           return;
@@ -173,7 +207,7 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
 
         // Handle assistant responses
         if (data.type === "response" || data.text || data.reply) {
-          const rawText = data.text ?? data.reply ?? data.message ?? "";
+          const rawText = [data.text, data.reply, data.message].find((value): value is string => typeof value === "string") ?? "";
           const text = rawText.trim()
             ? rawText
             : "I didn't get a response from the model. Please try again.";
@@ -182,24 +216,12 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
             role:      "assistant",
             text,
             timestamp: Date.now(),
-            source:    data.channel ?? "web",
-            model:     data.model,  // Include model attribution
+            source:    typeof data.channel === "string" ? data.channel : "web",
+            model:     typeof data.model === "string" ? data.model : undefined,
           };
           addMessages([msg]);
           setIsStreaming(false);
         }
-      } catch {
-        if (ev.data.trim()) {
-          addMessages([{
-            id:        crypto.randomUUID(),
-            role:      "assistant",
-            text:      ev.data.trim(),
-            timestamp: Date.now(),
-            source:    "web",
-          }]);
-          setIsStreaming(false);
-        }
-      }
     };
 
     ws.onerror = () => {
@@ -209,9 +231,12 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
     ws.onclose = () => {
       if (!mountedRef.current) return;
       retriesRef.current += 1;
-      const backoff = Math.min(INITIAL_BACKOFF_MS * Math.pow(2, retriesRef.current - 1), MAX_BACKOFF_MS);
+      const backoff = reconnectDelayMs(retriesRef.current, Math.random(), INITIAL_BACKOFF_MS, MAX_BACKOFF_MS);
       setConnectionStatus("reconnecting");
-      setTimeout(connect, backoff);
+      reconnectTimerRef.current = scheduleReconnect(() => {
+        reconnectTimerRef.current = null;
+        if (mountedRef.current) connect();
+      }, backoff);
     };
   }, [wsBase, daemonToken, addMessages]);
 
@@ -223,6 +248,10 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
     connect();
     return () => {
       mountedRef.current = false;
+      if (reconnectTimerRef.current !== null) {
+        reconnectTimerRef.current.cancel();
+        reconnectTimerRef.current = null;
+      }
       if (wsRef.current) {
         // Detaching every callback before an intentional teardown prevents a
         // CONNECTING socket (notably Strict Mode's first probe connection)
@@ -251,12 +280,17 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
     addMessages([userMsg]);
     setIsStreaming(true);
 
-    sendChatSocketPayload(wsRef.current, buildChatMessagePayload(text, sessionIdRef.current));
+    pendingMessageIdsRef.current.add(userMsg.id);
+    sendChatSocketPayload(
+      wsRef.current,
+      buildChatMessagePayload(text, sessionIdRef.current, userMsg.id),
+    );
   }, [addMessages]);
 
   const clearHistory = useCallback(() => {
     setMessages([]);
     knownIdsRef.current.clear();
+    contentKeysRef.current.clear();
     sinceRef.current = 0;
     localStorage.removeItem(STORAGE_KEY);
   }, []);

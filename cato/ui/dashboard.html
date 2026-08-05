@@ -31,8 +31,8 @@ pre,code{font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:
 .sidebar-logo span.logo-text{color:#3b82f6}
 .health-pill{display:flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:20px;background:#0f1117;border:1px solid #1e2433;margin:8px 16px 8px}
 .health-dot{width:7px;height:7px;border-radius:50%;background:#ef4444;flex-shrink:0;transition:background .3s}
-.health-dot.online{background:#22c55e;box-shadow:0 0 6px #22c55e88}
-.health-pill.online .health-label{color:#22c55e}
+.health-dot.online{background:#3b82f6;box-shadow:0 0 6px #3b82f688}
+.health-pill.online .health-label{color:#60a5fa}
 .health-label{font-weight:600;color:#ef4444}
 
 .nav-section{padding:8px 0}
@@ -78,7 +78,7 @@ pre,code{font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
 .badge-red{background:#7f1d1d44;color:#fca5a5;border:1px solid #7f1d1d}
 .badge-yellow{background:#78350f44;color:#fcd34d;border:1px solid #78350f}
-.badge-green{background:#14532d44;color:#86efac;border:1px solid #14532d}
+.badge-positive{background:#1e3a5f44;color:#93c5fd;border:1px solid #1d4ed8}
 .badge-blue{background:#1e3a5f44;color:#93c5fd;border:1px solid #1e3a5f}
 .badge-gray{background:#1e2433;color:#64748b;border:1px solid #374151}
 .form-group{margin-bottom:16px}
@@ -208,7 +208,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .wizard-subtitle{font-size:14px;color:#64748b;margin-bottom:28px}
 .wizard-progress{display:flex;gap:8px;margin-bottom:28px}
 .wizard-step-dot{width:8px;height:8px;border-radius:50%;background:#1e2433;border:1px solid #374151;transition:all .2s}
-.wizard-step-dot.done{background:#22c55e;border-color:#22c55e}
+.wizard-step-dot.done{background:#3b82f6;border-color:#3b82f6}
 .wizard-step-dot.active{background:#3b82f6;border-color:#3b82f6;box-shadow:0 0 0 3px #3b82f620}
 .wizard-actions{display:flex;justify-content:space-between;margin-top:24px}
 .wizard-step{display:none}
@@ -233,7 +233,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 
 /* ── CHUNK 2: SwarmSync + CLI auth + Vault ───────────────────────── */
 .swarmsync-dot{width:8px;height:8px;border-radius:50%;background:#4b5563;display:inline-block;flex-shrink:0}
-.swarmsync-dot.enabled{background:#22c55e;box-shadow:0 0 5px #22c55e88}
+.swarmsync-dot.enabled{background:#3b82f6;box-shadow:0 0 5px #3b82f688}
 .cli-status-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #1e2433}
 .cli-status-row:last-child{border-bottom:none}
 .cli-logo{font-size:20px;width:32px;text-align:center;flex-shrink:0}
@@ -244,7 +244,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .vault-key-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e2433}
 .vault-key-row:last-child{border-bottom:none}
 .vault-key-name{flex:1;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;color:#93c5fd}
-.vault-key-set{color:#22c55e;font-size:11px}
+.vault-key-set{color:#60a5fa;font-size:11px}
 .vault-key-missing{color:#64748b;font-size:11px}
 
 /* ── CHUNK 3: Dashboard home metrics ─────────────────────────────── */
@@ -254,7 +254,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .metric-label{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
 .metric-value{font-size:26px;font-weight:700;color:#f1f5f9;line-height:1}
 .metric-sub{font-size:11px;color:#4b5563;margin-top:4px}
-.metric-online{color:#22c55e}
+.metric-online{color:#60a5fa}
 .metric-offline{color:#ef4444}
 .dash-model-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .dash-model-label{width:130px;font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
@@ -273,7 +273,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .skill-toggle{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
 .skill-toggle input{opacity:0;width:0;height:0;position:absolute}
 .skill-toggle-track{position:absolute;inset:0;background:#374151;border-radius:20px;transition:background .2s}
-.skill-toggle input:checked + .skill-toggle-track{background:#22c55e}
+.skill-toggle input:checked + .skill-toggle-track{background:#3b82f6}
 .skill-toggle-thumb{position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s}
 .skill-toggle input:checked ~ .skill-toggle-thumb{transform:translateX(16px)}
 
@@ -283,10 +283,10 @@ textarea.form-input{resize:vertical;min-height:80px}
 .cron-history-row:last-child{border-bottom:none}
 
 /* ── CHUNK 6: Budget + Conduit ────────────────────────────────────── */
-.hard-cap-badge{background:#14532d44;border:1px solid #166534;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.hard-cap-badge{background:#1e3a5f44;border:1px solid #1d4ed8;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
 .hard-cap-badge-icon{font-size:18px;flex-shrink:0}
-.hard-cap-badge-text{font-size:13px;color:#86efac}
-.hard-cap-badge-title{font-weight:700;color:#4ade80;margin-bottom:2px}
+.hard-cap-badge-text{font-size:13px;color:#93c5fd}
+.hard-cap-badge-title{font-weight:700;color:#60a5fa;margin-bottom:2px}
 .budget-summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px}
 .budget-stat-card{background:#0f1117;border:1px solid #1e2433;border-radius:8px;padding:14px}
 .budget-stat-label{font-size:11px;color:#4b5563;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
@@ -317,7 +317,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .action-guard-desc{font-size:11px;color:#64748b;margin-top:2px}
 .audit-integrity-badge{display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid #374151;background:#0f1117;margin-top:8px;width:fit-content}
 .audit-integrity-dot{width:8px;height:8px;border-radius:50%;background:#4b5563;flex-shrink:0}
-.audit-integrity-dot.valid{background:#22c55e;box-shadow:0 0 5px #22c55e88}
+.audit-integrity-dot.valid{background:#3b82f6;box-shadow:0 0 5px #3b82f688}
 .audit-integrity-dot.invalid{background:#ef4444}
 </style>
 </head>
@@ -392,12 +392,12 @@ textarea.form-input{resize:vertical;min-height:80px}
     </div>
 
     <div id="wiz-step-4" class="wizard-step">
-      <div class="wizard-title" style="color:#22c55e">You're ready!</div>
+      <div class="wizard-title" style="color:#3b82f6">You're ready!</div>
       <div class="wizard-subtitle">Cato is configured and running. Open the dashboard to begin.</div>
       <div style="font-size:48px;text-align:center;padding:24px 0;opacity:.7">&#128512;</div>
       <div class="wizard-actions">
         <span></span>
-        <button class="btn btn-primary" onclick="dismissOnboarding()" style="background:#22c55e">Launch Dashboard &rarr;</button>
+        <button class="btn btn-primary" onclick="dismissOnboarding()" style="background:#3b82f6">Launch Dashboard &rarr;</button>
       </div>
     </div>
   </div>
@@ -717,7 +717,7 @@ textarea.form-input{resize:vertical;min-height:80px}
           <table class="table" id="usage-table">
             <thead><tr><th>Model</th><th>Calls</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost USD</th></tr></thead>
             <tbody id="usage-tbody"></tbody>
-            <tfoot><tr id="usage-total-row" style="background:#1e2433"><td colspan="4" style="padding:10px 12px;font-weight:600;color:#e2e8f0">Total</td><td id="usage-total-cost" style="padding:10px 12px;font-weight:700;color:#22c55e"></td></tr></tfoot>
+            <tfoot><tr id="usage-total-row" style="background:#1e2433"><td colspan="4" style="padding:10px 12px;font-weight:600;color:#e2e8f0">Total</td><td id="usage-total-cost" style="padding:10px 12px;font-weight:700;color:#3b82f6"></td></tr></tfoot>
           </table>
         </div>
       </div>
@@ -909,7 +909,7 @@ textarea.form-input{resize:vertical;min-height:80px}
           </div>
           <div class="metric-card">
             <div class="metric-label">Cost Today</div>
-            <div class="metric-value" id="dash-cost-today" style="font-size:20px;color:#22c55e">$0.00</div>
+            <div class="metric-value" id="dash-cost-today" style="font-size:20px;color:#3b82f6">$0.00</div>
             <div class="metric-sub" id="dash-cost-monthly">of $0.00 monthly cap</div>
           </div>
           <div class="metric-card">
@@ -1084,7 +1084,7 @@ textarea.form-input{resize:vertical;min-height:80px}
           <textarea id="identity-file-content" class="form-input" style="height:400px;font-family:monospace;font-size:12px;resize:vertical;width:100%;box-sizing:border-box" placeholder="File content will appear here..."></textarea>
           <div style="margin-top:12px;display:flex;gap:8px">
             <button class="btn btn-primary" onclick="saveIdentityFile()">Save</button>
-            <span id="identity-save-status" style="font-size:12px;color:#22c55e;align-self:center;display:none">Saved!</span>
+            <span id="identity-save-status" style="font-size:12px;color:#3b82f6;align-self:center;display:none">Saved!</span>
           </div>
         </div>
       </div>
@@ -1186,6 +1186,9 @@ textarea.form-input{resize:vertical;min-height:80px}
 /* ================================================================
    CATO DASHBOARD — vanilla JS SPA
    ================================================================ */
+
+// Remove the already-redeemed, short-lived handoff from browser history.
+try { history.replaceState(null, '', location.pathname + location.hash); } catch (_) {}
 
 // ── State ─────────────────────────────────────────────────────────
 const state = {
@@ -1488,14 +1491,14 @@ function renderMessages(sessionId) {
           'claude': '#9B5DE5',
           'codex': '#00D9FF',
           'gemini': '#F77F00',
-          'cursor': '#06FFA5',
+          'cursor': '#22D3EE',
           'swarmsync': '#FF006E',
         };
         const modelLower = (m.model || '').toLowerCase();
         const color = Object.keys(modelColors).find(k => modelLower.includes(k))
           ? modelColors[Object.keys(modelColors).find(k => modelLower.includes(k))]
           : '#64748B';
-        extra += `<div class="model-badge" style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600;background:${color}22;color:${color};border:1px solid ${color}55;margin-top:6px">${(m.model || 'unknown').toUpperCase()}</div>`;
+        extra += `<div class="model-badge" style="display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:600;background:${color}22;color:${color};border:1px solid ${color}55;margin-top:6px">${esc((m.model || 'unknown').toUpperCase())}</div>`;
       }
       if (m.routedTo) extra += `<div class="routed-to">Routed to: ${esc(m.routedTo)}</div>`;
       if (m.usage) {
@@ -1734,7 +1737,7 @@ function renderAgents() {
         <td style="color:#e2e8f0;font-weight:500">${esc(a.id)}</td>
         <td><code style="color:#93c5fd;font-size:12px">${esc(a.workspace)}</code></td>
         <td>${fileBadges || '<span style="color:#4b5563;font-size:12px">none</span>'}</td>
-        <td><span class="badge badge-green">Active</span></td>
+        <td><span class="badge badge-positive">Active</span></td>
       </tr>`;
     }).join('');
   }
@@ -2007,7 +2010,7 @@ async function showCronHistory(name) {
       }
       listEl.innerHTML = entries.map(e => {
         const ts = e.timestamp ? new Date(e.timestamp * 1000 || e.timestamp).toLocaleString() : '?';
-        const err = e.error ? ` <span style="color:#f87171">${esc(e.error)}</span>` : ' <span style="color:#22c55e">OK</span>';
+        const err = e.error ? ` <span style="color:#f87171">${esc(e.error)}</span>` : ' <span style="color:#3b82f6">OK</span>';
         return `<div class="cron-history-row">${ts} — ${esc(e.action_type||'run')}${err}</div>`;
       }).join('');
     } else {
@@ -2120,8 +2123,8 @@ async function refreshSessionsPage() {
     const ss = serverMap[id] || {};
     const ts = s.lastActivity ? new Date(s.lastActivity).toLocaleString() : '—';
     const ch = id.includes('tg') ? 'Telegram' : id.includes('wa') ? 'WhatsApp' : id.includes('cron') ? 'Cron' : 'Web';
-    const qd = ss.queue_depth != null ? ss.queue_depth : (s.messages ? s.messages.length : 0);
-    const running = ss.running ? '<span class="badge badge-green">Running</span>' : '<span class="badge badge-gray">Idle</span>';
+    const qd = Number(ss.queue_depth != null ? ss.queue_depth : (s.messages ? s.messages.length : 0)) || 0;
+    const running = ss.running ? '<span class="badge badge-positive">Running</span>' : '<span class="badge badge-gray">Idle</span>';
     return `<tr>
       <td style="color:#e2e8f0;font-weight:500;font-family:'Consolas',monospace;font-size:12px">${esc(id)}</td>
       <td><span class="badge badge-blue">${ch}</span></td>
@@ -2264,7 +2267,7 @@ function renderUsage(apiData) {
     <td>${d.calls}</td>
     <td>${d.inputTokens > 1000 ? (d.inputTokens/1000).toFixed(1)+'K' : d.inputTokens}</td>
     <td>${d.outputTokens > 1000 ? (d.outputTokens/1000).toFixed(1)+'K' : d.outputTokens}</td>
-    <td style="color:#22c55e">$${(d.cost||0).toFixed(4)}</td>
+    <td style="color:#3b82f6">$${(d.cost||0).toFixed(4)}</td>
   </tr>`).join('');
   const total = data.reduce((s, d) => s + (d.cost || 0), 0);
   document.getElementById('usage-total-cost').textContent = '$' + total.toFixed(4);
@@ -2376,7 +2379,7 @@ async function renderBudget() {
     <td style="color:#e2e8f0">${esc(m.model)}</td>
     <td style="color:#94a3b8">$${m.input.toFixed(2)}</td>
     <td style="color:#94a3b8">$${m.output.toFixed(2)}</td>
-    <td style="color:#22c55e">$${(m.used||0).toFixed(4)}</td>
+    <td style="color:#3b82f6">$${(m.used||0).toFixed(4)}</td>
   </tr>`).join('');
 }
 
@@ -2437,7 +2440,7 @@ function renderAlerts() {
     return `<div class="notification">
       <span class="notif-icon">${iconMap[a.level] || '&#8505;'}</span>
       <div class="notif-body">
-        <span class="badge ${badgeMap[a.level] || 'badge-gray'}" style="margin-bottom:4px">${a.level.toUpperCase()}</span>
+        <span class="badge ${badgeMap[a.level] || 'badge-gray'}" style="margin-bottom:4px">${esc(String(a.level).toUpperCase())}</span>
         <div class="notif-msg">${esc(a.message)}</div>
         <div class="notif-time">${a.ts}</div>
       </div>
@@ -2484,7 +2487,7 @@ async function loadVaultKeys() {
       <div class="vault-key-row">
         <span class="vault-key-name">${esc(k)}</span>
         <span class="vault-key-set">${esc(KNOWN[k] || '')}</span>
-        <span class="badge badge-green" style="margin-left:auto">Set</span>
+        <span class="badge badge-positive" style="margin-left:auto">Set</span>
         <button class="btn btn-danger btn-sm" onclick="deleteVaultKey('${esc(k)}')">&#128465;</button>
       </div>`).join('');
   } catch (e) {
@@ -2521,7 +2524,7 @@ async function loadCliStatus() {
           <div class="cli-name">${esc(c.name)}</div>
           <div class="cli-version">${esc(c.desc)}${version ? ' · v'+esc(version) : ''}</div>
           <div class="cli-badges">
-            ${installed ? '<span class="badge badge-green">Installed</span>' : '<span class="badge badge-gray">Not found</span>'}
+            ${installed ? '<span class="badge badge-positive">Installed</span>' : '<span class="badge badge-gray">Not found</span>'}
             ${authBadge}
           </div>
         </div>
@@ -2579,7 +2582,7 @@ async function testSwarmSync() {
     const r = await fetch('/health');
     if (r.ok) {
       const d = await r.json();
-      if (resultEl) { resultEl.textContent = 'Gateway reachable: ' + (d.status || 'ok'); resultEl.style.color = '#22c55e'; }
+      if (resultEl) { resultEl.textContent = 'Gateway reachable: ' + (d.status || 'ok'); resultEl.style.color = '#3b82f6'; }
     } else {
       if (resultEl) { resultEl.textContent = 'Gateway returned ' + r.status; resultEl.style.color = '#f87171'; }
     }
@@ -2657,7 +2660,7 @@ async function fetchDashboardMetrics() {
       const hd = await hr.json();
       const gEl = document.getElementById('dash-gateway-status');
       if (gEl) gEl.innerHTML = hd.status === 'ok'
-        ? '<span class="badge badge-green">Online</span>'
+        ? '<span class="badge badge-positive">Online</span>'
         : '<span class="badge badge-red">Offline</span>';
       const uptEl = document.getElementById('dash-uptime');
       if (uptEl && hd.uptime != null) {
@@ -2907,7 +2910,7 @@ async function renderConduitPage() {
         <div class="conduit-provider-key">${esc(p.vaultKey)}</div>
       </div>
       ${configured
-        ? '<span class="badge badge-green">Key configured</span>'
+        ? '<span class="badge badge-positive">Key configured</span>'
         : `<span class="badge badge-gray">Key missing</span>
            <a href="#vault" onclick="navigate(\'vault\');return false;" style="font-size:11px;color:#3b82f6;margin-left:6px">Add key</a>`
       }
@@ -3038,7 +3041,7 @@ function renderAuditEntries(entries) {
           <span style="font-size:12px;color:#93c5fd;font-family:monospace">${esc(e.tool_name||'')}</span>
           <span style="font-size:11px;color:#4b5563">${esc((e.session_id||'').slice(0,30))}</span>
           ${errHtml}
-          ${costCents ? `<span style="font-size:10px;color:#22c55e">$${(costCents/100).toFixed(4)}</span>` : ''}
+          ${costCents ? `<span style="font-size:10px;color:#3b82f6">$${(costCents/100).toFixed(4)}</span>` : ''}
         </div>
         <div class="audit-hash">hash: ${esc((e.row_hash||'').slice(0,16))}… prev: ${esc((e.prev_hash||'').slice(0,16))}…</div>
       </div>
@@ -3061,7 +3064,7 @@ async function verifyAuditChain() {
     if (resultEl) {
       if (d.ok) {
         resultEl.textContent = 'Chain VALID ✓';
-        resultEl.style.color = '#22c55e';
+        resultEl.style.color = '#3b82f6';
       } else {
         resultEl.textContent = 'Chain INVALID — tampering detected!';
         resultEl.style.color = '#ef4444';
@@ -3338,7 +3341,7 @@ async function loadActionGuardStatus() {
         <div class="action-guard-title">${esc(c.rule)}</div>
         <div class="action-guard-desc">${esc(c.description)}</div>
       </div>
-      <span class="badge ${c.active ? 'badge-green' : 'badge-gray'}" style="margin-left:auto">${c.active ? 'Active' : 'Inactive'}</span>
+      <span class="badge ${c.active ? 'badge-positive' : 'badge-gray'}" style="margin-left:auto">${c.active ? 'Active' : 'Inactive'}</span>
     </div>`).join('') +
     `<div style="margin-top:12px;font-size:12px;color:#64748b">Autonomy level: ${(d.autonomy_level*100).toFixed(0)}%
       <div class="progress-bar-wrap" style="margin-top:4px"><div class="progress-bar-fill" style="width:${d.autonomy_level*100}%"></div></div>
@@ -3367,7 +3370,7 @@ async function loadReversibilityEntries() {
       return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #1e2433">
         <span style="font-size:11px;color:#4b5563;min-width:140px">${ts}</span>
         <span style="font-size:12px;color:#94a3b8;flex:1">${esc(e.tool_name||'—')}</span>
-        <span class="badge ${isReversible ? 'badge-green' : 'badge-yellow'}">${isReversible ? 'Reversible' : 'Irreversible'}</span>
+        <span class="badge ${isReversible ? 'badge-positive' : 'badge-yellow'}">${isReversible ? 'Reversible' : 'Irreversible'}</span>
       </div>`;
     }).join('');
   } catch (_) {
@@ -3508,7 +3511,7 @@ async function loadDashHeartbeat() {
     const disk = d.disk_percent != null ? d.disk_percent.toFixed(1) + '%' : '—';
     el.innerHTML = `<div style="display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;align-items:center;gap:8px">
-        <span class="badge ${d.status === 'ok' ? 'badge-green' : 'badge-red'}">${esc(d.status || '?')}</span>
+        <span class="badge ${d.status === 'ok' ? 'badge-positive' : 'badge-red'}">${esc(d.status || '?')}</span>
         <span style="font-size:12px;color:#94a3b8">${esc(d.agent_name || 'cato')}</span>
       </div>
       <div style="font-size:11px;color:#4b5563">Uptime: <span style="color:#94a3b8">${uptime}</span></div>
@@ -3539,7 +3542,7 @@ async function loadDashAdapters() {
     }
     el.innerHTML = adapters.map(a => {
       const status = a.status || a.state || 'unknown';
-      const cls = status === 'active' || status === 'ok' || status === 'connected' ? 'badge-green' : status === 'error' || status === 'failed' ? 'badge-red' : 'badge-gray';
+      const cls = status === 'active' || status === 'ok' || status === 'connected' ? 'badge-positive' : status === 'error' || status === 'failed' ? 'badge-red' : 'badge-gray';
       return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0f111744">
         <span style="font-size:12px;color:#e2e8f0;flex:1">${esc(a.name || a.id || '?')}</span>
         <span class="badge ${cls}">${esc(status)}</span>
@@ -3574,7 +3577,7 @@ async function loadSystemCliPool() {
       if (!installed) {
         cls = 'badge-gray'; label = 'Not installed';
       } else if (loggedIn || status === 'warm') {
-        cls = 'badge-green'; label = status || 'Ready';
+        cls = 'badge-positive'; label = status || 'Ready';
       } else {
         // installed but not logged in = warm (yellow), NOT cold (red)
         cls = 'badge-yellow'; label = status || 'Installed';
@@ -3613,7 +3616,7 @@ async function loadSystemActionGuard() {
     if (autonomy !== null) {
       html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
         <span style="font-size:12px;color:#94a3b8">Autonomy level:</span>
-        <span class="badge ${autonomy >= 0.7 ? 'badge-green' : autonomy >= 0.4 ? 'badge-yellow' : 'badge-red'}">${(autonomy * 100).toFixed(0)}%</span>
+        <span class="badge ${autonomy >= 0.7 ? 'badge-positive' : autonomy >= 0.4 ? 'badge-yellow' : 'badge-red'}">${(autonomy * 100).toFixed(0)}%</span>
       </div>`;
     }
     html += checks.map(c => `<div class="action-guard-rule">
@@ -3622,7 +3625,7 @@ async function loadSystemActionGuard() {
         <div class="action-guard-title">${esc(c.rule)}</div>
         <div class="action-guard-desc">${esc(c.description || '')}</div>
       </div>
-      <span class="badge ${c.active ? 'badge-green' : 'badge-gray'}" style="margin-left:auto">${c.active ? 'Active' : 'Inactive'}</span>
+      <span class="badge ${c.active ? 'badge-positive' : 'badge-gray'}" style="margin-left:auto">${c.active ? 'Active' : 'Inactive'}</span>
     </div>`).join('');
     el.innerHTML = html || '<div style="color:#4b5563;font-size:12px">No guard rules configured.</div>';
   } catch (_) {
@@ -3664,7 +3667,7 @@ async function loadQueryTiers() {
     }
     el.innerHTML = `<table class="table"><thead><tr><th>Query</th><th>Tier</th><th>Reason</th><th>Time</th></tr></thead><tbody>` +
       entries.map(e => {
-        const tierCls = e.tier === 'A' ? 'badge-green' : e.tier === 'B' ? 'badge-yellow' : 'badge-blue';
+        const tierCls = e.tier === 'A' ? 'badge-positive' : e.tier === 'B' ? 'badge-yellow' : 'badge-blue';
         const ts = e.timestamp ? new Date(e.timestamp * 1000 || e.timestamp).toLocaleTimeString() : '?';
         return `<tr>
           <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(String(e.query||e.text||'?').slice(0,80))}</td>
@@ -3694,12 +3697,12 @@ async function loadContradictionHealth() {
       </div>
       <div class="budget-stat-card">
         <div class="budget-stat-label">Open</div>
-        <div class="budget-stat-value" style="color:${(d.open||0)>0?'#f87171':'#22c55e'}">${d.open != null ? d.open : '—'}</div>
+        <div class="budget-stat-value" style="color:${(d.open||0)>0?'#f87171':'#3b82f6'}">${d.open != null ? d.open : '—'}</div>
         <div class="budget-stat-sub">unresolved</div>
       </div>
       <div class="budget-stat-card">
         <div class="budget-stat-label">Resolved</div>
-        <div class="budget-stat-value" style="color:#22c55e">${d.resolved != null ? d.resolved : '—'}</div>
+        <div class="budget-stat-value" style="color:#3b82f6">${d.resolved != null ? d.resolved : '—'}</div>
         <div class="budget-stat-sub">resolved</div>
       </div>
       <div class="budget-stat-card">
@@ -3756,7 +3759,7 @@ async function loadDiagAnomalies() {
     }
     el.innerHTML = domains.map(dm => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1e2433">
       <span style="font-size:12px;color:#e2e8f0;flex:1">${esc(dm.domain || dm.name || '?')}</span>
-      <span class="badge ${dm.is_anomaly ? 'badge-red' : 'badge-green'}">${dm.is_anomaly ? 'Anomaly' : 'Normal'}</span>
+      <span class="badge ${dm.is_anomaly ? 'badge-red' : 'badge-positive'}">${dm.is_anomaly ? 'Anomaly' : 'Normal'}</span>
       <span style="font-size:11px;color:#64748b">score: ${dm.score != null ? dm.score.toFixed(3) : '—'}</span>
     </div>`).join('');
   } catch (_) {
@@ -3835,7 +3838,7 @@ async function loadDiagContextBudget() {
     const r = await fetch('/api/diagnostics/context-budget');
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
-    const colors = ['#3b82f6','#8b5cf6','#ec4899','#f97316','#22c55e','#06b6d4','#64748b'];
+    const colors = ['#3b82f6','#8b5cf6','#ec4899','#f97316','#3b82f6','#06b6d4','#64748b'];
     const slots = Object.entries(d).filter(([k]) => k !== 'total');
     const total = d.total || slots.reduce((s,[,v]) => s + (typeof v === 'number' ? v : 0), 0) || 1;
     el.innerHTML = `<div style="margin-bottom:12px;height:24px;border-radius:6px;overflow:hidden;display:flex;background:#1e2433">
@@ -3848,7 +3851,7 @@ async function loadDiagContextBudget() {
       ${slots.map(([k,v],i) => `<div style="display:flex;align-items:center;gap:6px;font-size:11px">
         <span style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></span>
         <span style="color:#94a3b8">${esc(k)}:</span>
-        <span style="color:#e2e8f0">${v}</span>
+        <span style="color:#e2e8f0">${esc(String(v))}</span>
       </div>`).join('')}
     </div>`;
   } catch (_) {
@@ -4021,8 +4024,8 @@ async function loadFlows() {
           ${f.description ? `<div style="font-size:12px;color:#64748b;margin-top:2px">${esc(f.description)}</div>` : ''}
         </div>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-primary btn-sm" onclick="runFlow(${JSON.stringify(f.name||f)})">Run</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteFlow(${JSON.stringify(f.name||f)})">Delete</button>
+          <button class="btn btn-primary btn-sm" onclick="runFlow(${esc(JSON.stringify(f.name||f))})">Run</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteFlow(${esc(JSON.stringify(f.name||f))})">Delete</button>
         </div>
       </div>
     </div>`).join('');
@@ -4074,7 +4077,7 @@ async function loadNodes() {
           <div style="font-size:12px;color:#64748b">ID: ${esc(n.node_id)} ${n.stale ? '&#9888; Stale' : ''}</div>
           ${n.capabilities && n.capabilities.length ? `<div style="font-size:12px;color:#64748b">Caps: ${n.capabilities.map(esc).join(', ')}</div>` : ''}
         </div>
-        <button class="btn btn-danger btn-sm" onclick="disconnectNode(${JSON.stringify(n.node_id)})">Disconnect</button>
+        <button class="btn btn-danger btn-sm" onclick="disconnectNode(${esc(JSON.stringify(n.node_id))})">Disconnect</button>
       </div>
     </div>`).join('');
   } catch (_) {

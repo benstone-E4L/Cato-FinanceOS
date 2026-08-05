@@ -89,8 +89,8 @@ const SourceBadge: React.FC<BadgeProps> = ({ source, model }) => {
     const modelLabel = normalizeModelLabel(model);
     if (modelLabel) {
       const modelColors: Record<string, string> = {
-        "CLAUDE": "#9B5DE5", "CODEX": "#00D9FF", "GEMINI": "#F77F00",
-        "CURSOR": "#06FFA5", "SWARMSYNC": "#FF006E",
+        "CLAUDE": "#9B5DE5", "CODEX": "#3B82F6", "GEMINI": "#F77F00",
+        "CURSOR": "#A855F7", "SWARMSYNC": "#FF006E",
       };
       const modelColor = Object.entries(modelColors).find(([key]) => modelLabel.includes(key))?.[1] || "#64748B";
       badges.push(

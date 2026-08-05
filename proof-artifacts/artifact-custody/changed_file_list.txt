@@ -1,0 +1,7 @@
+.github/workflows/windows-desktop-artifact.yml
+desktop/scripts/validate_artifact_custody.py
+desktop/src/lib/buildIdentity.ts
+desktop/src/vite-env.d.ts
+desktop/src/views/DiagnosticsView.tsx
+proof-artifacts/artifact-custody/test_output.txt
+proof-artifacts/artifact-custody/summary.md

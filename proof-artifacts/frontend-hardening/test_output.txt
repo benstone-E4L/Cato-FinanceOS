@@ -1,0 +1,20 @@
+2026-08-05 frontend hardening verification
+
+Command: npm run test:chat-policy
+Working directory: desktop
+Exit: 0
+Result: 5 passed, 0 failed
+- reconnect jitter is deterministic and bounded
+- expired chat history is rejected and current history survives
+- legacy array history migrates without data loss
+- non-JSON and non-object frames are protocol errors
+- a cancelled reconnect callback cannot open a socket after unmount
+
+Command: npm run lint
+Working directory: desktop
+Exit: 0
+
+Command: npm run build
+Working directory: desktop
+Exit: 0
+Result: TypeScript compile and Vite production build completed (81 modules transformed).

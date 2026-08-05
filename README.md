@@ -2,29 +2,37 @@
 
 > **Migrating from OpenClaw, ClawdBot, or MoltBot?** → [Jump to migration guide](#migrate-from-openclaw-clawdbot-or-moltbot)
 
-**~3,000 lines of auditable Python. No mystery dependencies. Budget-capped so it cannot bankrupt you overnight.**
+**A local-first Python agent daemon with explicit budget controls and inspectable source.**
+
+> **Verification status:** this repository is under active hardening. The current
+> evidence is local/offline; no signed installer, production deployment, live
+> Xero write, or complete packaged-app run has been proven. Read
+> [Known Limitations](docs/ops/LIMITATIONS.md) and
+> [Verification](docs/ops/VERIFICATION.md) before relying on it for financial or
+> security-sensitive work.
 
 - **Web UI always on when daemon runs** — `cato start` binds HTTP and WebSocket on `webchat_port` (default 8080); Telegram and WhatsApp use outbound polling only
-- **Hard budget caps** — session cap ($1.00) and monthly cap ($20.00) enforced before every LLM call; raises `BudgetExceeded` before your card is charged
-- **Auditable in an afternoon** — ~3,000 lines across 6 core modules, fully type-hinted, zero magic
-- **One-command migration** — `cato migrate --from-openclaw` copies your OpenClaw / ClawdBot / MoltBot workspaces and validates SKILL.md compatibility instantly
-- **Conduit headless browser** — cryptographically signed audit trail, VOIX protocol, Ed25519 agent identity, SHA-256 hash-chained action log — no other local AI daemon comes close
+- **Budget controls** — configured caps are checked in the model and browser paths covered by tests; see the known limitations for paths not runtime-proven
+- **Inspectable implementation** — source and tests are included; auditability still depends on reviewing the exact build and its dependencies
+- **Migration command** — `cato migrate --from-openclaw` supports the documented workspace formats; dry-run first and verify the result
+- **Conduit browser tooling** — includes Ed25519 identity and SHA-256 hash-chain mechanisms; unsigned proof bundles remain possible when the signing secret is absent
 
 ---
 
 ## Why Not OpenClaw, ClawdBot, or MoltBot?
 
-OpenClaw (also distributed as **ClawdBot** and **MoltBot** in earlier versions) has accumulated a pattern of undisclosed credential handling, silent telemetry, and a dependency tree that ships with known CVEs. Cato is the clean-room replacement.
+This project offers a local-first design for operators evaluating alternatives to
+OpenClaw-family agents. The comparison below describes design goals and must be
+verified against the exact upstream versions you evaluate.
 
-Specific issues with OpenClaw / ClawdBot / MoltBot:
+This repository does not audit or certify competing projects. Compare credential
+storage, network behavior, dependency provenance, budget controls, and runtime
+requirements against the exact upstream release and its primary documentation.
 
-- **Credential exposure**: API keys stored in plaintext JSON under `~/.openclaw/keys/` with 644 permissions — readable by any process on the machine
-- **Silent telemetry**: Usage data sent to `telemetry.openclaw.io` without opt-out in versions prior to 2.4.0 — OpenClaw phones home every session
-- **Supply-chain risk**: Transitive dependency `openclaw-native` bundles a pre-built C extension with no reproducible build — you cannot verify what you're running
-- **No budget enforcement**: OpenClaw / ClawdBot has no spend caps; a runaway agent loop can drain your API balance overnight
-- **PostgreSQL + Redis required**: OpenClaw's full stack requires Docker, PostgreSQL, and Redis just to run locally — Cato needs none of this
-
-Cato stores all credentials in AES-256-GCM encrypted vault (`vault.enc`), emits **zero telemetry**, and has **zero C extensions**. Every outbound connection is one you configured.
+Cato includes an AES-256-GCM vault implementation and does not include a dedicated
+telemetry client. A vault is not created automatically in every existing setup,
+credentials may remain in environment files until migrated, and enabled model,
+search, browser, marketplace, and messaging integrations can make outbound calls.
 
 ---
 
@@ -33,7 +41,7 @@ Cato stores all credentials in AES-256-GCM encrypted vault (`vault.enc`), emits 
 ### Install
 
 ```bash
-git clone https://github.com/bkauto3/cato
+git clone https://github.com/benstone-E4L/Cato-FinanceOS
 cd Cato
 pip install -e .
 patchright install chromium   # one-time browser download (~130 MB)
@@ -86,20 +94,20 @@ This command:
 What is NOT copied from OpenClaw / ClawdBot / MoltBot:
 - `config.json` — Cato uses YAML; re-run `cato init` to configure
 - `node_modules/`, Node binaries — not applicable to Cato
-- `.env` files — re-enter API keys via `cato init` (your OpenClaw plaintext keys are now encrypted in Cato's vault)
+- `.env` files — re-enter API keys via `cato init`, then verify the active installation uses the vault
 
 After migration, run `cato doctor` to audit token budgets and `cato init` to configure API keys.
 
-### What Cato fixes that OpenClaw / ClawdBot / MoltBot didn't
+### Design comparison checklist
 
 | Issue | OpenClaw / ClawdBot / MoltBot | Cato |
 |-------|-------------------------------|------|
-| API key storage | Plaintext JSON, 644 perms | AES-256-GCM vault, memory-only key |
-| Telemetry | Silent — phones home to `telemetry.openclaw.io` | Zero. No outbound connections except your LLMs |
-| Budget enforcement | None — agents can spend unlimited | Hard caps per-session and per-month |
-| Infrastructure | Docker + PostgreSQL + Redis required | SQLite only, runs anywhere Python does |
-| C extensions | `openclaw-native` pre-built binary | Zero C extensions, fully auditable |
-| Migration path | Locked in | `cato migrate --from-openclaw` one command |
+| API key storage | Verify selected release | AES-256-GCM vault available; migration must be verified |
+| Telemetry | Verify against the selected upstream release | No dedicated telemetry client found; enabled integrations make outbound calls |
+| Budget enforcement | Verify selected release | Configured caps in tested execution paths |
+| Infrastructure | Verify selected release | Local SQLite/Python runtime for core Cato |
+| Dependency provenance | Verify selected release | Review the lockfile and exact packaged build |
+| Migration path | Verify selected release | `cato migrate --from-openclaw` with dry-run |
 
 ---
 
@@ -133,7 +141,9 @@ When SwarmSync is disabled (the default), Cato uses `default_model` from config.
 
 ## Conduit — The Headless Browser Engine Nothing Else Has
 
-Conduit is Cato's built-in headless browser engine. It is **on by default** and replaces every other agent browser integration you've seen. No other local AI daemon — not OpenClaw, not ClawdBot, not MoltBot, not AutoGPT, not AgentGPT, not anything — ships with what Conduit ships with out of the box.
+Conduit is Cato's built-in headless browser engine. Its behavior depends on local
+configuration and installed browser dependencies; the repository has not yet
+proven the full feature set in a published production artifact.
 
 ```yaml
 # Already enabled by default in your config
@@ -143,12 +153,15 @@ conduit_enabled: true
 ### What makes Conduit different
 
 #### 1. Cryptographic Agent Identity (Ed25519)
-Every Cato instance generates a unique **Ed25519 keypair** on first run, stored at `{data_dir}/conduit_identity.key`. Every browser session is cryptographically tied to that identity. You can prove *which agent* performed *which action* at *which time* — forever.
-
-No other headless browser integration for local AI agents does this.
+The implementation can generate an **Ed25519 keypair**, stored at
+`{data_dir}/conduit_identity.key`, and associate browser records with that
+identity. Attribution requires protected key custody and signed proof
+configuration; an unsigned SHA-256 digest proves integrity, not origin.
 
 #### 2. SHA-256 Hash-Chained Audit Log
-Every browser action — navigate, click, type, extract, screenshot — is written to an **append-only, SHA-256 hash-chained audit log** in SQLite. Each row's hash includes the previous row's hash, making the entire chain tamper-evident. If anyone modifies or deletes a row, `cato audit --verify` detects it instantly.
+Supported browser actions can be written to a **SHA-256 hash-chained audit log**
+in SQLite. `cato audit --verify` checks chain continuity for the records it can
+read; coverage and trusted-anchor custody must be verified for the active build.
 
 ```bash
 cato audit --session <id>      # full action-by-action replay
@@ -156,23 +169,30 @@ cato audit --verify            # tamper detection across all sessions
 cato receipt --session <id>    # signed fare receipt with line-item log
 ```
 
-This is the same pattern used in blockchain and financial audit systems — brought to your local AI agent browser.
+This makes changes detectable when the chain and its trusted anchor are both
+preserved; it is not, by itself, an independent audit or non-repudiation proof.
 
 #### 3. VOIX Protocol Support
-Conduit automatically strips **VOIX `<tool>` and `<context>` tags** from all extracted page content before it reaches the agent. Pages built for agent consumption using the VOIX protocol are cleaned and normalized automatically — your agent never sees raw protocol tags in its context window.
+Conduit includes normalization for **VOIX `<tool>` and `<context>` tags** in
+extracted content. Treat this as a parser feature, not a security boundary.
 
 #### 4. Budget-Enforced Browser Actions
-Every browser action is checked against the session budget cap **before** it executes. If the action would exceed your cap, it raises `BudgetExceededError` and stops — it never executes the action first and asks forgiveness later. OpenClaw / ClawdBot / MoltBot have no browser budget enforcement at all.
+Covered browser-action paths check the session budget before execution and raise
+`BudgetExceededError` when the configured cap would be exceeded. See the test
+and runtime limitations before treating that as universal coverage.
 
 ```json
 {"error": "Conduit budget 100¢ would be exceeded", "budget_exceeded": true}
 ```
 
 #### 5. Sensitive Input Redaction
-Before any browser action is written to the audit log, Cato **automatically redacts** values whose keys match known sensitive patterns (`api_key`, `token`, `password`, `secret`, `authorization`, `bearer`, `credential`, etc.). Your keystrokes into password fields never appear in the audit trail.
+The audit path redacts values whose keys match known sensitive patterns
+(`api_key`, `token`, `password`, `secret`, `authorization`, `bearer`,
+`credential`, etc.). Pattern matching is not proof that arbitrary secret values
+cannot enter logs.
 
 #### 6. Safety Gate Integration
-Conduit is fully wired into Cato's **reversibility safety gate**. Actions are classified by risk tier before execution:
+Conduit includes a **reversibility safety gate** for the classified actions below:
 
 | Action | Risk Tier | Requires Confirmation |
 |--------|-----------|----------------------|
@@ -215,7 +235,8 @@ Use browser.click on the "Submit" button
 Use browser.screenshot to capture the result
 ```
 
-Every action is automatically logged, signed, and budget-checked. You get a full audit receipt at the end of every session with `cato receipt --session <id>`.
+For supported paths, `cato receipt --session <id>` renders the records captured
+for that session. Verify signing configuration before calling a receipt signed.
 
 ---
 
@@ -363,8 +384,8 @@ Pull requests welcome. The bar is: does it fit in a coffee break?
 ### Principles
 - Keep modules small and single-purpose (target < 250 lines each)
 - No new required dependencies without strong justification
-- Zero telemetry — every outbound connection must be user-initiated
-- All credentials must pass through the vault, never environment variables
+- No dedicated product telemetry; document every newly introduced outbound path
+- Prefer the vault for credentials and document any transitional environment-file use
 
 ### Adding a new tool
 
@@ -429,11 +450,12 @@ log_level: INFO
 
 - **Vault**: AES-256-GCM, Argon2id (64 MiB, 3 iterations, 4 threads), nonce-per-encryption
 - **Key storage**: Derived key lives in process memory only — never written to disk
-- **Credentials**: All API keys go through `cato vault set <KEY> <VALUE>`, not environment variables
-- **No telemetry**: Zero external connections except to LLM APIs you configure
+- **Credentials**: `cato vault set` is the intended path; existing installations may still use plaintext environment files until migrated
+- **Telemetry**: No dedicated telemetry client was found in the audited source; enabled integrations can contact their configured services
 - **Canary key**: Synthetic `sk-cato-canary-*` key detects accidental credential leaks
 
-Unlike OpenClaw / ClawdBot / MoltBot, there is no `telemetry.openclaw.io` or equivalent. Cato never calls home.
+Cato has no documented Cato-operated telemetry endpoint. Review configuration and
+the exact dependency/build graph to determine every outbound connection.
 
 ---
 
@@ -447,12 +469,12 @@ MIT. Do whatever you want. Attribution appreciated.
 
 If you found this repo searching for:
 - **openclaw alternative** — you're in the right place
-- **openclaw replacement** — `cato migrate --from-openclaw` gets you running in 60 seconds
+- **openclaw replacement** — `cato migrate --from-openclaw` provides a migration path; timing and completeness depend on the workspace
 - **clawdbot alternative** — ClawdBot was an earlier name for OpenClaw; same migration command
 - **moltbot alternative** — MoltBot was the original name; same directory structure, same SKILL.md format
 - **openclaw security issues** — see the [Why Not OpenClaw](#why-not-openclaw-clawdbot-or-moltbot) section above
-- **openclaw telemetry** — yes, OpenClaw phones home; Cato doesn't
-- **openclaw plaintext credentials** — yes, OpenClaw stores keys in `~/.openclaw/keys/` at 644; Cato encrypts everything
+- **openclaw telemetry** — verify the behavior of the exact upstream release; Cato has no dedicated telemetry client in the audited source
+- **credential storage** — Cato provides an encrypted vault, but operators must verify that their active installation has migrated secrets into it
 
 ---
 

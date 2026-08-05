@@ -1,0 +1,4 @@
+tests/test_packaged_native_contract.py
+test-outputs/financeos-cato/PACKAGED_PARITY_REPORT.md
+proof-artifacts/packaged-parity/test_output.txt
+proof-artifacts/packaged-parity/changed_file_list.txt

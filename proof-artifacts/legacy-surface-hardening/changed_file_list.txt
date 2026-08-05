@@ -1,0 +1,8 @@
+README.md
+cato/ui/dashboard.html
+cato/ui/server.py
+docs/ops/LIMITATIONS.md
+tests/test_dashboard_token_and_host.py
+tests/test_shipped_ui_security_and_colors.py
+proof-artifacts/legacy-surface-hardening/test_output.txt
+proof-artifacts/legacy-surface-hardening/changed_file_list.txt

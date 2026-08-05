@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "python ../scripts/sync_version.py --check && npm run build:ui",
+    "build": "npm run build:ui",
     "build:ui": "tsc -b && vite build",
     "lint": "eslint .",
+    "test": "npm run test:chat-policy && npm run test:no-green",
+    "test:chat-policy": "node --experimental-strip-types --test src/hooks/chatStreamPolicy.test.mjs",
+    "test:no-green": "node --test scripts/no-green-palette.test.mjs",
     "preview": "vite preview",
     "validate:frozen-sidecar": "python scripts/validate_frozen_bundle.py",
     "version:check": "python ../scripts/sync_version.py --check",

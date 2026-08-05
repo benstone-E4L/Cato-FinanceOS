@@ -85,12 +85,15 @@ class TestAuthenticatedEntry:
         resp = await client.get("/", headers={"X-Cato-Token": server_module._DAEMON_TOKEN})
         assert resp.status == 200
         body = await resp.text()
-        assert "window.__CATO_TOKEN__" in body
-        # The page must carry a working credential without us printing it.
-        assert len(server_module._DAEMON_TOKEN) == 64
-        assert server_module._DAEMON_TOKEN in body
+        assert "window.__CATO_TOKEN__" not in body
+        _assert_no_token(body)
+        cookie = resp.headers.get("Set-Cookie", "")
+        assert "cato_dashboard_session=" in cookie
+        assert "HttpOnly" in cookie
+        assert "SameSite=Strict" in cookie
         assert resp.headers["Cache-Control"].startswith("no-store")
         assert resp.headers["Referrer-Policy"] == "no-referrer"
+        assert "frame-ancestors 'none'" in resp.headers["Content-Security-Policy"]
 
     async def test_handoff_requires_the_token(self, client):
         resp = await client.post("/api/dashboard/handoff")
@@ -112,12 +115,18 @@ class TestAuthenticatedEntry:
 
         first = await client.get(f"/?handoff={ticket}")
         assert first.status == 200
-        assert "window.__CATO_TOKEN__" in await first.text()
+        _assert_no_token(await first.text())
+        assert "HttpOnly" in first.headers.get("Set-Cookie", "")
 
-        # Single use — the same ticket must not work twice.
-        second = await client.get(f"/?handoff={ticket}")
-        assert second.status == 401
-        _assert_no_token(await second.text())
+        # The browser's opaque session, not the daemon token, authenticates API calls.
+        api = await client.get("/api/skills")
+        assert api.status == 200
+
+        # Single use — the same ticket must not admit a fresh browser.
+        async with TestClient(TestServer(client.server.app)) as fresh_client:
+            second = await fresh_client.get(f"/?handoff={ticket}")
+            assert second.status == 401
+            _assert_no_token(await second.text())
 
     async def test_expired_ticket_is_refused(self, client, monkeypatch):
         minted = await client.post(
@@ -135,6 +144,20 @@ class TestAuthenticatedEntry:
         resp = await client.get(f"/?handoff={ticket}")
         assert resp.status == 401
         _assert_no_token(await resp.text())
+
+    async def test_dashboard_session_authenticates_websocket_without_url_token(self, client):
+        minted = await client.post(
+            "/api/dashboard/handoff",
+            headers={"X-Cato-Token": server_module._DAEMON_TOKEN},
+        )
+        ticket = (await minted.json())["handoff"]
+        assert (await client.get(f"/?handoff={ticket}")).status == 200
+
+        async with client.ws_connect("/ws") as ws:
+            await ws.send_json({"type": "health"})
+            payload = await ws.receive_json()
+            assert payload["type"] == "health"
+            assert payload["status"] == "ok"
 
 
 # ---------------------------------------------------------------------------

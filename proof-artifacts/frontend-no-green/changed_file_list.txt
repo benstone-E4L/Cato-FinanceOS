@@ -1,0 +1,10 @@
+desktop/package.json
+desktop/scripts/no-green-palette.test.mjs
+desktop/src/components/ModelSettings.tsx
+desktop/src/styles/talk-page.css
+desktop/src/views/ChatView.tsx
+desktop/src/views/CodingAgentView.tsx
+desktop/src/views/InteractiveCLIView.tsx
+desktop/src/views/LogsView.tsx
+proof-artifacts/frontend-no-green/changed_file_list.txt
+proof-artifacts/frontend-no-green/test_output.txt

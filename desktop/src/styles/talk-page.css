@@ -53,7 +53,7 @@
 .model-indicator.claude  { color: var(--color-claude);  background: #3b82f610; border-color: #3b82f640; }
 .model-indicator.codex   { color: var(--color-codex);   background: #f59e0b10; border-color: #f59e0b40; }
 .model-indicator.gemini  { color: var(--color-gemini);  background: #a855f710; border-color: #a855f740; }
-.model-indicator.cursor  { color: #22D3EE;              background: #22d3ee10; border-color: #22d3ee40; }
+.model-indicator.cursor  { color: #8B5CF6;              background: #8b5cf610; border-color: #8b5cf640; }
 
 .model-spinner {
   width: 8px;
@@ -154,7 +154,7 @@
 .model-icon.claude  { background: #3b82f620; color: var(--color-claude); }
 .model-icon.codex   { background: #f59e0b20; color: var(--color-codex); }
 .model-icon.gemini  { background: #a855f720; color: var(--color-gemini); }
-.model-icon.cursor  { background: #22d3ee20; color: #22D3EE; }
+.model-icon.cursor  { background: #8b5cf620; color: #8B5CF6; }
 
 .expand-arrow {
   font-size: 10px;

@@ -1,0 +1,23 @@
+2026-08-05 desktop no-green verification
+
+Command: npm test
+Working directory: desktop
+Exit: 0
+Result: 6 passed, 0 failed
+- 5 chat policy regression tests passed
+- full desktop source palette scan passed
+
+Command: npm run lint
+Working directory: desktop
+Exit: 0
+
+Command: npm run build
+Working directory: desktop
+Exit: 0
+Result: TypeScript compile and Vite production build completed (81 modules transformed).
+
+Palette scan coverage:
+- Recursively scans every .css, .html, .ts, and .tsx file under desktop/src.
+- Rejects prohibited green/emerald/lime/teal/cyan semantic names.
+- Rejects saturated hex, rgb/rgba, and hsl/hsla colors with hues from 75 through 195 degrees, including alpha hex forms.
+- Ignores numeric HTML entities rather than misclassifying them as colors.

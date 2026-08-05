@@ -139,17 +139,43 @@ _WORKSPACE_ALLOWED = {"SOUL.md", "IDENTITY.md", "USER.md", "AGENTS.md", "TOOLS.m
 # ---------------------------------------------------------------------------
 
 def _load_or_create_daemon_token() -> str:
-    """Load existing daemon token or generate a new one, write to data dir, and return it."""
+    """Rotate the daemon capability on every process start and store it privately."""
+    import getpass
+    import subprocess
     from cato.platform import get_data_dir
     token_path = get_data_dir() / "daemon.token"
-    if token_path.exists():
-        existing = token_path.read_text(encoding="utf-8").strip()
-        if len(existing) == 64:  # 32 bytes hex = 64 chars
-            return existing
     token = secrets.token_hex(32)
     token_path.parent.mkdir(parents=True, exist_ok=True)
-    token_path.write_text(token, encoding="utf-8")
-    token_path.chmod(0o600)
+    temporary = token_path.with_name(f".{token_path.name}.{os.getpid()}.tmp")
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            handle.write(token)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, token_path)
+        token_path.chmod(0o600)
+        if os.name == "nt":
+            # chmod is not a Windows DACL guarantee. Remove inherited grants
+            # and give only the current account read/write access. The token is
+            # never passed to the subprocess or included in diagnostics.
+            result = subprocess.run(
+                [
+                    "icacls", str(token_path), "/inheritance:r", "/grant:r",
+                    f"{getpass.getuser()}:(R,W)",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            if result.returncode != 0:
+                raise RuntimeError("Could not establish a private Windows ACL for daemon.token")
+    finally:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
     return token
 
 
@@ -439,17 +465,16 @@ def _collect_daemon_log_files(*, max_files: int = 8, max_chars: int = 20_000) ->
 # Dashboard handoff — short-lived, single-use browser entry tickets
 # ---------------------------------------------------------------------------
 #
-# GET / injects the 64-char daemon token into the page, so it cannot be served
-# to an unauthenticated requester. The desktop app and the CLI already hold the
-# token (both read ~/.cato/daemon.token directly), but a plain browser does not.
+# The desktop app and CLI hold the daemon token, but a plain browser does not.
+# A one-time handoff is exchanged for a short-lived, HttpOnly browser session;
+# the long-lived daemon token is never rendered into page source.
 #
 # Rejected alternatives:
 #   * "serve the shell unauthenticated and let the page fetch the token" — the
 #     page has no credential to authenticate that exchange with, so the exchange
 #     endpoint would have to be exempt too. That just relocates the leak.
-#   * "put the token in a cookie" — a cookie is ambient authority. Every request
-#     from a DNS-rebound origin would carry it automatically, turning the leak
-#     into trivial CSRF against /api/coding-agent/*. Strictly worse.
+#   * "put the daemon token in a cookie" — rejected. The cookie contains an
+#     independently generated, expiring browser-session identifier instead.
 #
 # So: `cato dashboard` reads the token from disk, exchanges it for a nonce that
 # is valid once and for 60 seconds, and opens the browser at /?handoff=<nonce>.
@@ -458,6 +483,9 @@ def _collect_daemon_log_files(*, max_files: int = 8, max_chars: int = 20_000) ->
 _HANDOFF_TTL_SECONDS = 60.0
 _HANDOFF_MAX_OUTSTANDING = 8
 _DASHBOARD_HANDOFFS: dict[str, float] = {}
+_DASHBOARD_SESSIONS: dict[str, float] = {}
+_DASHBOARD_SESSION_TTL_SECONDS = 8 * 60 * 60.0
+_DASHBOARD_SESSION_COOKIE = "cato_dashboard_session"
 
 
 def _mint_dashboard_handoff(now: float | None = None) -> tuple[str, float]:
@@ -490,6 +518,32 @@ def _consume_dashboard_handoff(nonce: str) -> bool:
             _DASHBOARD_HANDOFFS.pop(candidate, None)
             return True
     return False
+
+
+def _mint_dashboard_session(now: float | None = None) -> str:
+    """Create an independent, expiring browser credential."""
+    current = time.monotonic() if now is None else now
+    _prune_dashboard_sessions(current)
+    session = secrets.token_urlsafe(32)
+    _DASHBOARD_SESSIONS[session] = current + _DASHBOARD_SESSION_TTL_SECONDS
+    return session
+
+
+def _prune_dashboard_sessions(now: float) -> None:
+    for session, expires in list(_DASHBOARD_SESSIONS.items()):
+        if expires <= now:
+            _DASHBOARD_SESSIONS.pop(session, None)
+
+
+def _valid_dashboard_session(session: str) -> bool:
+    if not session:
+        return False
+    now = time.monotonic()
+    _prune_dashboard_sessions(now)
+    return any(
+        expires > now and secrets.compare_digest(candidate, session)
+        for candidate, expires in _DASHBOARD_SESSIONS.items()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -550,14 +604,14 @@ async def auth_token_middleware(request: web.Request, handler):
         return await handler(request)
     if request.method == "GET" and request.path in _TOKEN_EXEMPT_PATHS:
         return await handler(request)
-    # The dashboard shell carries the daemon token, so it is authenticated like
-    # any other privileged surface — by the token itself, or by a single-use
-    # handoff ticket minted from it.
+    # A single-use handoff admits the dashboard shell and is exchanged by the
+    # handler for an independent HttpOnly browser session.
     if (
         request.method == "GET"
         and request.path == "/"
         and _consume_dashboard_handoff(request.rel_url.query.get("handoff", ""))
     ):
+        request["mint_dashboard_session"] = True
         return await handler(request)
     # /coding-agent/{task_id} serves the SPA shell (static HTML) — no auth needed.
     # The API routes under /api/coding-agent/* remain auth-protected.
@@ -566,8 +620,13 @@ async def auth_token_middleware(request: web.Request, handler):
     # WS endpoints that authenticate via first-message envelope — skip pre-flight check
     if request.path.startswith(_TOKEN_EXEMPT_WS_PREFIXES):
         return await handler(request)
-    token = (request.headers.get("X-Cato-Token", "")
-             or request.rel_url.query.get("token", ""))
+    if request.path == "/ws":
+        # The browser WebSocket API cannot set X-Cato-Token. The /ws handler
+        # authenticates the Sec-WebSocket-Protocol credential before upgrade.
+        return await handler(request)
+    if _valid_dashboard_session(request.cookies.get(_DASHBOARD_SESSION_COOKIE, "")):
+        return await handler(request)
+    token = request.headers.get("X-Cato-Token", "")
     if not token or not secrets.compare_digest(token, _DAEMON_TOKEN):
         if (
             request.method == "POST"
@@ -576,30 +635,28 @@ async def auth_token_middleware(request: web.Request, handler):
         ):
             return await handler(request)
         return web.Response(status=401, reason="Missing or invalid X-Cato-Token")
+    if request.method == "GET" and request.path == "/":
+        request["mint_dashboard_session"] = True
     return await handler(request)
 
 
-_CORS_ALLOWED_ORIGINS = {"tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"}
+_CORS_ALLOWED_ORIGINS = {
+    "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
+    "http://127.0.0.1:5173", "http://localhost:5173",
+}
 _LOCALHOST_HOSTS = {"127.0.0.1", "localhost", "[::1]"}
 _SENSITIVE_PATHS = {"/api/vault/set", "/api/vault/delete", "/config"}
 _CORS_ALLOWED_HEADERS = "Content-Type, Authorization, X-Cato-Token"
 
 
-def _is_localhost_origin(origin: str) -> bool:
-    """Strict scheme://host[:port] match — no startswith, no subdomain smuggling."""
-    if not origin:
-        return False
-    try:
-        from urllib.parse import urlparse
-        parsed = urlparse(origin)
-    except Exception:
-        return False
-    if parsed.scheme not in ("http", "https"):
-        return False
-    host = (parsed.hostname or "").lower()
-    if host == "::1":
-        host = "[::1]"
-    return host in _LOCALHOST_HOSTS and not parsed.path and not parsed.query
+def _is_allowed_origin(origin: str) -> bool:
+    """Allow only the native shell and explicitly configured browser origins."""
+    configured = {
+        value.strip()
+        for value in os.environ.get("CATO_ALLOWED_BROWSER_ORIGINS", "").split(",")
+        if value.strip()
+    }
+    return origin in (_CORS_ALLOWED_ORIGINS | configured)
 
 
 @web.middleware
@@ -607,7 +664,7 @@ async def cors_middleware(request: web.Request, handler):
     """CORS middleware — permits Tauri/localhost origins; blocks cross-origin
     mutations to vault and config endpoints."""
     origin = request.headers.get("Origin", "")
-    allowed = origin in _CORS_ALLOWED_ORIGINS or _is_localhost_origin(origin)
+    allowed = _is_allowed_origin(origin)
     if request.path in _SENSITIVE_PATHS and not allowed and origin:
         return web.Response(status=403, reason="Cross-origin requests not allowed for this endpoint")
     allow_origin = origin if allowed else "tauri://localhost"
@@ -715,35 +772,26 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
         return response
 
     async def serve_dashboard(request: web.Request) -> web.Response:
-        """Serve the single-page dashboard HTML with token injected for WS auth.
-
-        Authenticated: the injected value is the daemon token, which unlocks
-        every /api/* route. auth_token_middleware admits only a caller that
-        already presented the token or redeemed a handoff ticket minted from it.
-        """
+        """Serve the dashboard without rendering credentials into the DOM."""
         html = _DASHBOARD.read_text(encoding="utf-8")
-        injection = (
-            "<script>\n"
-            f"window.__CATO_TOKEN__ = {json.dumps(_DAEMON_TOKEN)};\n"
-            "try { history.replaceState(null, '', location.pathname); } catch (e) {}\n"
-            "const __catoFetch = window.fetch.bind(window);\n"
-            "window.fetch = (input, init = {}) => {\n"
-            "  const headers = new Headers(init.headers || {});\n"
-            "  if (!headers.has('X-Cato-Token')) headers.set('X-Cato-Token', window.__CATO_TOKEN__ || '');\n"
-            "  return __catoFetch(input, { ...init, headers });\n"
-            "};\n"
-            "</script>"
-        )
-        html = html.replace("</head>", injection + "\n</head>", 1)
-        # Patch connectWS to append token as query param
-        html = html.replace(
-            "wsProto + '//' + location.host + '/ws'",
-            "wsProto + '//' + location.host + '/ws?token=' + (window.__CATO_TOKEN__ || '')",
-        )
         response = web.Response(text=html, content_type="text/html")
-        # The body carries a credential: keep it out of caches and referrers.
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
         response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; "
+            "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; "
+            "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        )
+        if request.get("mint_dashboard_session"):
+            response.set_cookie(
+                _DASHBOARD_SESSION_COOKIE,
+                _mint_dashboard_session(),
+                max_age=int(_DASHBOARD_SESSION_TTL_SECONDS),
+                httponly=True,
+                secure=request.secure,
+                samesite="Strict",
+                path="/",
+            )
         return response
 
     async def health(request: web.Request) -> web.Response:
@@ -858,14 +906,32 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
 
     async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         """Upgrade HTTP → WebSocket and proxy messages through the gateway."""
-        # FIX-C1: Authenticate before upgrading the WebSocket connection.
-        # Accept token from header or query param (query param needed for WS clients
-        # that cannot send custom headers during the HTTP upgrade handshake).
+        origin = request.headers.get("Origin", "")
+        if origin and not _is_allowed_origin(origin):
+            return web.Response(status=403, reason="WebSocket origin not allowed")
+
+        # Browser clients carry the capability in Sec-WebSocket-Protocol so it
+        # never appears in a URL, history entry, referrer, or access-log target.
+        offered_protocols = [
+            item.strip() for item in request.headers.get("Sec-WebSocket-Protocol", "").split(",")
+            if item.strip()
+        ]
+        auth_protocol = next(
+            (item for item in offered_protocols if item.startswith("cato-auth.")), ""
+        )
+        protocol_token = auth_protocol.removeprefix("cato-auth.") if auth_protocol else ""
         token = (request.headers.get("X-Cato-Token", "")
-                 or request.rel_url.query.get("token", ""))
-        if not token or not secrets.compare_digest(token, _DAEMON_TOKEN):
+                 or protocol_token)
+        browser_session = request.cookies.get(_DASHBOARD_SESSION_COOKIE, "")
+        if not (
+            (token and secrets.compare_digest(token, _DAEMON_TOKEN))
+            or _valid_dashboard_session(browser_session)
+        ):
             return web.Response(status=401, reason="Missing or invalid X-Cato-Token")
-        ws = web.WebSocketResponse(heartbeat=30)
+        ws = web.WebSocketResponse(
+            heartbeat=30,
+            protocols=[auth_protocol] if auth_protocol else (),
+        )
         await ws.prepare(request)
 
         if gateway is not None:
