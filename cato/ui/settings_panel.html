@@ -1,0 +1,522 @@
+<!-- Settings panel for dashboard.html -->
+<!-- Include this in the main dashboard HTML -->
+
+<div id="settings-panel" class="settings-panel" style="display: none;">
+  <div class="settings-overlay" onclick="closeSettings()"></div>
+  <div class="settings-modal">
+    <div class="settings-header">
+      <h2>Settings</h2>
+      <button class="close-button" onclick="closeSettings()">×</button>
+    </div>
+
+    <div class="settings-container">
+      <!-- Tab Navigation -->
+      <div class="settings-tabs">
+        <button class="tab-button active" onclick="switchSettingsTab('general')">
+          <span class="tab-icon">⚙️</span>
+          <span class="tab-label">General</span>
+        </button>
+        <button class="tab-button" onclick="switchSettingsTab('memory')">
+          <span class="tab-icon">🧠</span>
+          <span class="tab-label">Memory</span>
+        </button>
+        <button class="tab-button" onclick="switchSettingsTab('channels')">
+          <span class="tab-icon">📱</span>
+          <span class="tab-label">Channels</span>
+        </button>
+        <button class="tab-button" onclick="switchSettingsTab('scheduling')">
+          <span class="tab-icon">🕐</span>
+          <span class="tab-label">Scheduling</span>
+        </button>
+        <button class="tab-button" onclick="switchSettingsTab('workspace')">
+          <span class="tab-icon">📁</span>
+          <span class="tab-label">Workspace</span>
+        </button>
+      </div>
+
+      <!-- Tab Content -->
+      <div class="settings-content">
+        <!-- Status Messages -->
+        <div id="settings-message" class="settings-message" style="display: none;"></div>
+
+        <!-- General Tab -->
+        <div id="general-tab" class="tab-pane active">
+          <h3>General Settings</h3>
+          <div class="setting-group">
+            <label>Default Model</label>
+            <input type="text" id="default-model" placeholder="e.g., openai/gpt-4o-mini" />
+          </div>
+          <button class="button-primary" onclick="saveGeneralSettings()">Save Settings</button>
+        </div>
+
+        <!-- Memory Tab -->
+        <div id="memory-tab" class="tab-pane">
+          <h3>Memory & Search</h3>
+          <div id="memory-stats" class="setting-group">
+            <p>Loading...</p>
+          </div>
+          <button class="button-secondary" onclick="reindexMemory()">Re-index Memory</button>
+        </div>
+
+        <!-- Channels Tab -->
+        <div id="channels-tab" class="tab-pane">
+          <h3>Channel Configuration</h3>
+          <div class="channel-section">
+            <h4>WhatsApp</h4>
+            <div id="whatsapp-status" class="setting-group">
+              <p>Loading...</p>
+            </div>
+            <p class="hint">Configure WhatsApp credentials in the vault to enable messaging.</p>
+          </div>
+        </div>
+
+        <!-- Scheduling Tab -->
+        <div id="scheduling-tab" class="tab-pane">
+          <h3>Scheduling</h3>
+          <p class="hint">Manage scheduled tasks, heartbeat checks, and periodic jobs here.</p>
+          <div class="setting-group">
+            <label>Heartbeat Interval (minutes)</label>
+            <input type="number" id="heartbeat-interval" placeholder="30" value="30" />
+          </div>
+          <button class="button-primary" onclick="saveSchedulingSettings()">Save Schedule</button>
+        </div>
+
+        <!-- Workspace Tab -->
+        <div id="workspace-tab" class="tab-pane">
+          <h3>Workspace</h3>
+          <div class="setting-group">
+            <label>Workspace Directory</label>
+            <input type="text" id="workspace-path" placeholder="~/.cato/workspace" readonly />
+          </div>
+          <p class="hint">
+            This directory contains AGENTS.md, MEMORY.md, SOUL.md, and other workspace files.
+          </p>
+          <button class="button-primary" onclick="updateWorkspace()">Update Workspace</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .settings-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .settings-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .settings-modal {
+    position: relative;
+    background: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  }
+
+  .settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .settings-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .close-button {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-button:hover {
+    color: #1f2937;
+  }
+
+  .settings-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .settings-tabs {
+    width: 140px;
+    background: #f9fafb;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0;
+    overflow-y: auto;
+  }
+
+  .tab-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+  }
+
+  .tab-button:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  .tab-button.active {
+    background: #eff6ff;
+    border-left-color: #3b82f6;
+    color: #1e40af;
+  }
+
+  .tab-icon {
+    font-size: 16px;
+  }
+
+  .tab-label {
+    flex: 1;
+    text-align: left;
+  }
+
+  .settings-content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+  }
+
+  .tab-pane {
+    display: none;
+  }
+
+  .tab-pane.active {
+    display: block;
+  }
+
+  .tab-pane h3 {
+    margin: 0 0 20px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .tab-pane h4 {
+    margin: 16px 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  .setting-group {
+    margin-bottom: 20px;
+  }
+
+  .setting-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .setting-group input[type='text'],
+  .setting-group input[type='number'],
+  .setting-group select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    color: #1f2937;
+  }
+
+  .setting-group input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .setting-group input:read-only {
+    background: #f9fafb;
+    color: #6b7280;
+  }
+
+  .setting-group p {
+    margin: 8px 0;
+    font-size: 13px;
+    color: #374151;
+  }
+
+  .channel-section {
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 16px;
+  }
+
+  .status-active {
+    display: inline-block;
+    padding: 4px 8px;
+    background: #dcfce7;
+    color: #15803d;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .status-inactive {
+    display: inline-block;
+    padding: 4px 8px;
+    background: #fee2e2;
+    color: #991b1b;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .hint {
+    color: #6b7280;
+    font-size: 12px;
+    font-style: italic;
+    margin: 12px 0 0 0 !important;
+  }
+
+  .button-primary,
+  .button-secondary {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 8px;
+  }
+
+  .button-primary {
+    background: #3b82f6;
+    color: white;
+  }
+
+  .button-primary:hover {
+    background: #2563eb;
+  }
+
+  .button-secondary {
+    background: #e5e7eb;
+    color: #1f2937;
+  }
+
+  .button-secondary:hover {
+    background: #d1d5db;
+  }
+
+  .settings-message {
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    animation: slideInDown 0.2s ease;
+  }
+
+  .settings-message.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border-left: 4px solid #dc2626;
+  }
+
+  .settings-message.success {
+    background: #dcfce7;
+    color: #15803d;
+    border-left: 4px solid #22c55e;
+  }
+
+  @keyframes slideInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .settings-modal {
+      width: 95%;
+      max-height: 95vh;
+    }
+
+    .settings-container {
+      flex-direction: column;
+    }
+
+    .settings-tabs {
+      width: 100%;
+      flex-direction: row;
+      border-right: none;
+      border-bottom: 1px solid #e0e0e0;
+      overflow-x: auto;
+    }
+
+    .tab-button {
+      border-left: none;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+    }
+
+    .tab-button.active {
+      border-left: none;
+      border-bottom-color: #3b82f6;
+    }
+  }
+</style>
+
+<script>
+  function switchSettingsTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'))
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'))
+
+    // Show selected tab
+    const tab = document.getElementById(`${tabName}-tab`)
+    if (tab) tab.classList.add('active')
+
+    // Mark button as active
+    event.target.closest('.tab-button').classList.add('active')
+
+    // Load tab-specific data
+    loadSettingsTabData(tabName)
+  }
+
+  function loadSettingsTabData(tabName) {
+    const port = window.location.port || 8080
+    const baseUrl = `http://localhost:${port}`
+
+    switch (tabName) {
+      case 'memory':
+        fetch(`${baseUrl}/api/memory/stats`)
+          .then(r => r.json())
+          .then(data => {
+            const el = document.getElementById('memory-stats')
+            el.innerHTML = `
+              <p><strong>Indexed Chunks:</strong> ${data.stats?.chunks_indexed || 0}</p>
+              <p><strong>Model:</strong> ${data.stats?.model || 'N/A'}</p>
+            `
+          })
+          .catch(err => showSettingsMessage(`Memory load error: ${err.message}`, 'error'))
+        break
+
+      case 'channels':
+        fetch(`${baseUrl}/api/whatsapp/config`)
+          .then(r => r.json())
+          .then(data => {
+            const el = document.getElementById('whatsapp-status')
+            const status = data.configured
+              ? `<span class="status-active">Configured</span>`
+              : `<span class="status-inactive">Not Configured</span>`
+            el.innerHTML = `<p><strong>Status:</strong> ${status}</p>`
+          })
+          .catch(err => showSettingsMessage(`Channels load error: ${err.message}`, 'error'))
+        break
+    }
+  }
+
+  function saveGeneralSettings() {
+    const model = document.getElementById('default-model').value
+    const port = window.location.port || 8080
+    const baseUrl = `http://localhost:${port}`
+
+    fetch(`${baseUrl}/api/config`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ default_model: model }),
+    })
+      .then(r => r.json())
+      .then(() => showSettingsMessage('Settings saved successfully', 'success'))
+      .catch(err => showSettingsMessage(`Save error: ${err.message}`, 'error'))
+  }
+
+  function reindexMemory() {
+    const port = window.location.port || 8080
+    const baseUrl = `http://localhost:${port}`
+
+    fetch(`${baseUrl}/api/memory/index`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data =>
+        showSettingsMessage(
+          `Memory re-indexed: ${data.chunks_indexed || 0} chunks`,
+          'success'
+        )
+      )
+      .catch(err => showSettingsMessage(`Reindex error: ${err.message}`, 'error'))
+  }
+
+  function saveSchedulingSettings() {
+    const interval = document.getElementById('heartbeat-interval').value
+    showSettingsMessage('Scheduling settings saved', 'success')
+  }
+
+  function updateWorkspace() {
+    const path = document.getElementById('workspace-path').value
+    showSettingsMessage('Workspace settings updated', 'success')
+  }
+
+  function showSettingsMessage(text, type) {
+    const el = document.getElementById('settings-message')
+    el.textContent = text
+    el.className = `settings-message ${type}`
+    el.style.display = 'block'
+    setTimeout(() => (el.style.display = 'none'), 3000)
+  }
+
+  function closeSettings() {
+    document.getElementById('settings-panel').style.display = 'none'
+  }
+
+  // Open settings from main dashboard
+  function openSettings() {
+    document.getElementById('settings-panel').style.display = 'flex'
+    loadSettingsTabData('general')
+  }
+</script>

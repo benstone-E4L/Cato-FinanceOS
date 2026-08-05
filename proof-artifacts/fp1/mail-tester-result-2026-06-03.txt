@@ -1,0 +1,16 @@
+FP1 mail-tester — 2026-06-03
+From: bstone@surfacescore.com (Brevo SMTP)
+
+Run 1: test-7c773651d517 — score 6.7/10
+  https://www.mail-tester.com/test-7c773651d517
+  Main penalty: Brevo HTML tracking image (HTML_IMAGE_ONLY_08)
+
+Run 2: test-e8a564c9b3fa — score 7.6/10
+  https://www.mail-tester.com/test-e8a564c9b3fa
+  Longer plain text; still below 8.0 pass target
+
+Pass target: >= 8.0 (see ROW1-CHECKLIST.md)
+Next: Brevo support — disable transactional tracking on SMTP relay, then re-run:
+  ConduitScore/conduit_outreach_pipeline/scripts/fp1_mail_tester.py
+
+Screenshot (optional): open result URL in browser → save as mail-tester-2026-06-03.png

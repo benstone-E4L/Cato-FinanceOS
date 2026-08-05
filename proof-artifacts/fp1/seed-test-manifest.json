@@ -1,0 +1,176 @@
+{
+  "batch_id": "fp1-seed-20260603",
+  "from": "bstone@surfacescore.com",
+  "sending_domain": "surfacescore.com",
+  "total_seeds": 20,
+  "inbox_count": 20,
+  "spam_count": 0,
+  "operator_verify_required": false,
+  "operator_confirmed_date": "2026-06-03",
+  "operator_confirmed_note": "All 20 landed in Gmail inbox (operator report)",
+  "pass": true,
+  "seeds": [
+    {
+      "n": 1,
+      "email": "bullrushinvestments+fp1s01@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:29:58Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 2,
+      "email": "bullrushinvestments+fp1s02@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:02Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 3,
+      "email": "bullrushinvestments+fp1s03@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:06Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 4,
+      "email": "bullrushinvestments+fp1s04@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:10Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 5,
+      "email": "bullrushinvestments+fp1s05@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:14Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 6,
+      "email": "bullrushinvestments+fp1s06@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:17Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 7,
+      "email": "bullrushinvestments+fp1s07@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:21Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 8,
+      "email": "bullrushinvestments+fp1s08@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:24Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 9,
+      "email": "bullrushinvestments+fp1s09@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:27Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 10,
+      "email": "bullrushinvestments+fp1s10@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:30Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 11,
+      "email": "bullrushinvestments+fp1s11@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:34Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 12,
+      "email": "bullrushinvestments+fp1s12@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:37Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 13,
+      "email": "bullrushinvestments+fp1s13@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:40Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 14,
+      "email": "bullrushinvestments+fp1s14@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:44Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 15,
+      "email": "bullrushinvestments+fp1s15@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:47Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 16,
+      "email": "bullrushinvestments+fp1s16@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:51Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 17,
+      "email": "bullrushinvestments+fp1s17@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:54Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 18,
+      "email": "bullrushinvestments+fp1s18@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:30:57Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 19,
+      "email": "bullrushinvestments+fp1s19@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:31:01Z",
+      "smtp_ok": true
+    },
+    {
+      "n": 20,
+      "email": "bullrushinvestments+fp1s20@gmail.com",
+      "provider": "gmail",
+      "placement": "inbox",
+      "sent_at": "2026-06-03T15:31:04Z",
+      "smtp_ok": true
+    }
+  ],
+  "promotions_count": 0,
+  "pass": true
+}

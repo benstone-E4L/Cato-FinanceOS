@@ -1,0 +1,34 @@
+# DNS snapshot — surfacescore.com (G1 Row 1)
+# Captured: 2026-06-02 (local resolver, Windows)
+# Purpose: FP1 deliverability evidence — not a seed-inbox test
+
+DOMAIN=surfacescore.com
+FROM_ADDRESS=bstone@surfacescore.com
+SMTP_RELAY=smtp-relay.brevo.com:587
+
+## MX (inbound mail — IONOS)
+surfacescore.com  MX  10  mx00.ionos.com
+surfacescore.com  MX  10  mx01.ionos.com
+
+## SPF (TXT @ surfacescore.com)
+v=spf1 include:_spf-us.ionos.com ~all
+
+## Brevo domain verification (TXT @ surfacescore.com)
+brevo-code:175ced3c6570aa190aba46bad5678bba
+
+## DMARC (TXT _dmarc.surfacescore.com)
+v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com
+
+## DKIM (CNAME)
+brevo1._domainkey.surfacescore.com  ->  b1.surfacescore-com.dkim.brevo.com
+brevo2._domainkey.surfacescore.com  ->  b2.surfacescore-com.dkim.brevo.com
+
+## Assessment
+# DKIM: configured for Brevo (PASS)
+# DMARC: present, policy none (PASS for existence; tighten p=quarantine later)
+# SPF: does NOT include Brevo/sendinblue (FAIL for Brevo SMTP sending path)
+# brevo-code TXT: domain authenticated in Brevo (PASS)
+
+## Reference — conduitscore.com (must NOT be From domain)
+# SPF: v=spf1 include:spf.messagingengine.com ?all
+# Not used as sending domain per war-room / night-shift policy.

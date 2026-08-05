@@ -1,0 +1,289 @@
+# docs/approval-policy.yaml — declarative outbound approval policy.
+#
+# Loaded by cato/core/approval_policy.py. Lives beside night-shift-policy.yaml
+# because that is where this repo already keeps operator-authored security
+# policy, and both are loaded the same way (yaml.safe_load + a Python fail-safe).
+#
+# ---------------------------------------------------------------------------
+# HOW TO ADD A TOOL
+# ---------------------------------------------------------------------------
+#   tools:
+#     my_new_tool:
+#       tier: outbound            # must be one of the tiers declared below
+#       aliases: ["my.new.tool", "myNewTool"]
+#       simulation_exempt: false  # optional, defaults to false
+#
+# The key is the canonical capability id. Names are normalised before lookup
+# (camelCase -> snake_case, '-' '.' ':' ' ' -> '_'), so you only need aliases
+# for genuinely different names (e.g. "email.send" -> send_email), not for
+# punctuation or casing variants.
+#
+# ---------------------------------------------------------------------------
+# THINGS THIS FILE CANNOT DO (enforced in code, not by convention)
+# ---------------------------------------------------------------------------
+# * It cannot set default_decision to anything but `require`. An unlisted tool
+#   ALWAYS requires approval. Deleting a tool from this file makes it MORE
+#   restricted, never less.
+# * It cannot make a tool approval-free by omission or by using an unknown
+#   tier — an unknown tier is coerced to `critical`.
+# * If this file is missing or fails to parse, the built-in policy in
+#   cato/core/approval_policy.py runs instead. A broken policy file never
+#   opens the gate.
+# * `simulation_exempt` only matters when the CALLING PYTHON CODE passes an
+#   ApprovalContext(simulation_authorized=True). `dry_run` / `draft_only`
+#   inside model-supplied tool args can never downgrade anything.
+
+version: "1.0"
+
+# Enforced as `require` regardless of what is written here.
+default_decision: require
+
+ticket:
+  # Approvals bind to a sha256 of the canonical JSON payload, are valid for
+  # 24 hours, and tolerate 60s of clock skew in either direction. Matches the
+  # ProofRail approval binding Cato integrates with.
+  ttl_seconds: 86400
+  clock_skew_seconds: 60
+
+tiers:
+  read_only:  { approval: never }   # no side effects outside Cato
+  reversible: { approval: never }   # side effects Cato can undo itself
+  elevated:   { approval: always }  # local writes / repo mutation
+  outbound:   { approval: always }  # anything that leaves the machine
+  dispatch:   { approval: always }  # runs other tools/agents (blast radius)
+  financial:  { approval: always }
+  critical:   { approval: always }  # code execution, secrets
+
+# ---------------------------------------------------------------------------
+# TIERS MIRROR cato/safety.py
+# ---------------------------------------------------------------------------
+# safety.py::_POLICY_TIER_TO_RISK maps these tiers onto its RiskTier enum. The
+# tiers below are the inverse of that map, so a tool classified in
+# safety.py::_TOOL_TIER gets the same answer from both gates:
+#
+#     safety.py RiskTier        this file's tier      approval
+#     READ                  ->  read_only             never
+#     REVERSIBLE_WRITE      ->  reversible            never
+#     IRREVERSIBLE          ->  elevated              always
+#     HIGH_STAKES           ->  outbound/dispatch/financial/critical  always
+#
+# If you change a tier here, change safety.py::_TOOL_TIER to match, or the two
+# gates will disagree about the same call.
+#
+# This file is deliberately NOT a full mirror of safety.py::_TOOL_TIER.
+# safety.py falls through to this policy for anything its own table does not
+# cover, so duplicating a row it already owns would soften its "deleting a row
+# must escalate" property: the deletion would land on the copy here instead of
+# escalating to UNCLASSIFIED. Add a row here only for a tool safety.py does not
+# classify, or for a dispatcher sub-action this file has to resolve.
+#
+# ---------------------------------------------------------------------------
+# DISPATCHER TOOLS
+# ---------------------------------------------------------------------------
+# `file` and `browser` are single registered tools that carry their real
+# capability in args["action"] (or "op"/"operation" — same precedence as
+# safety.py::_dispatcher_key). Mark them `dispatcher: true` and tier each
+# sub-action separately as `<tool>_<action>`. A file READ and a file WRITE are
+# genuinely different tiers and are listed as such.
+#
+# Fail-closed behaviour for dispatchers:
+#   * no readable action supplied  -> the dispatcher's own tier (critical)
+#   * unrecognised sub-action      -> unknown, therefore gated
+#   * only rules marked `dispatcher: true` ever read args, so adding an
+#     "action" key to some other tool cannot redirect its policy row.
+
+tools:
+
+  # --- read-only -----------------------------------------------------------
+  memory_search:
+    tier: read_only
+    aliases: ["memory.search", "memorySearch"]
+  memory_federated:
+    tier: read_only
+    aliases: ["memory.federated"]
+  web_search:
+    tier: read_only
+    aliases: ["web.search", "webSearch"]
+  web_code:
+    tier: read_only
+    aliases: ["web.code", "webCode"]
+  web_news:
+    tier: read_only
+    aliases: ["web.news", "webNews"]
+  graph_query:
+    tier: read_only
+    aliases: ["graph.query"]
+  graph_related:
+    tier: read_only
+    aliases: ["graph.related"]
+  academic_arxiv:
+    tier: read_only
+    aliases: ["academic.arxiv"]
+  github_issue_list:
+    tier: read_only
+    aliases: ["github.issue_list"]
+  github_pr_list:
+    tier: read_only
+    aliases: ["github.pr_list"]
+  integration_status:
+    tier: read_only
+    aliases: ["integration.status"]
+  # DELIBERATE DIVERGENCE from safety.py. DO NOT "correct" this back to
+  # `reversible` to match safety.py::_TOOL_TIER['integration.action'].
+  #
+  # safety.py classifies the reversibility of a LOCAL effect. This policy must
+  # classify EXTERNAL BLAST RADIUS, and those are different questions.
+  # integration.action is the single entry point to every registered
+  # third-party write: Stripe create_payment_link and create_checkout_session,
+  # GitHub create_repo, Vercel create_deployment, Netlify deploys, Twilio
+  # sends. An action that creates a live payment link is not "reversible" in
+  # any sense that matters to the person whose card gets charged.
+  #
+  # Tiered `financial` so it ALWAYS requires an approval ticket. This is
+  # deliberately not sub-action routed: the registry does expose an
+  # IntegrationAction.write flag, but it is advisory author-maintained
+  # metadata with no enforcement, and POST/write-shaped actions are variously
+  # flagged write=False by whoever added them.
+  # Trusting a soft boolean is the exact mistake this row exists to prevent.
+  # If read actions ever need to run free, add an explicit allowlist of
+  # specific (integration, action) pairs reviewed one at a time.
+  integration_action:
+    tier: financial
+    aliases: ["integration.action"]
+  conduit_crawl:
+    tier: read_only             # safety.py: READ
+    aliases: ["conduit.crawl"]
+  conduit_monitor:
+    tier: reversible            # safety.py: REVERSIBLE_WRITE
+    aliases: ["conduit.monitor"]
+
+  # --- dispatcher: browser -------------------------------------------------
+  browser:
+    tier: critical              # applies only when no action is supplied
+    dispatcher: true
+
+  browser_navigate:       { tier: read_only,  aliases: ["browser.navigate"] }
+  browser_navigate_back:  { tier: read_only,  aliases: ["browser.navigate_back"] }
+  browser_extract:        { tier: read_only,  aliases: ["browser.extract"] }
+  browser_extract_main:   { tier: read_only,  aliases: ["browser.extract_main"] }
+  browser_screenshot:     { tier: read_only,  aliases: ["browser.screenshot"] }
+  browser_search:         { tier: read_only,  aliases: ["browser.search"] }
+  browser_snapshot:       { tier: read_only,  aliases: ["browser.snapshot"] }
+  browser_accessibility_snapshot:
+    tier: read_only
+    aliases: ["browser.accessibility_snapshot"]
+  browser_network_requests: { tier: read_only, aliases: ["browser.network_requests"] }
+  browser_console_messages: { tier: read_only, aliases: ["browser.console_messages"] }
+  browser_wait:           { tier: read_only,  aliases: ["browser.wait"] }
+  browser_wait_for:       { tier: read_only,  aliases: ["browser.wait_for"] }
+  browser_scroll:         { tier: read_only,  aliases: ["browser.scroll"] }
+  browser_hover:          { tier: read_only,  aliases: ["browser.hover"] }
+  browser_click:          { tier: reversible, aliases: ["browser.click"] }
+  browser_type:           { tier: reversible, aliases: ["browser.type"] }
+  browser_fill:           { tier: reversible, aliases: ["browser.fill"] }
+  browser_key_press:      { tier: reversible, aliases: ["browser.key_press"] }
+  browser_select_option:  { tier: reversible, aliases: ["browser.select_option"] }
+  browser_handle_dialog:  { tier: reversible, aliases: ["browser.handle_dialog"] }
+  browser_pdf:            { tier: reversible, aliases: ["browser.pdf"] }
+  browser_output_to_file: { tier: reversible, aliases: ["browser.output_to_file"] }
+  # browser.eval runs attacker-reachable JavaScript in the page context.
+  browser_eval:           { tier: elevated,   aliases: ["browser.eval"] }
+
+  # --- dispatcher: file ----------------------------------------------------
+  file:
+    tier: critical              # applies only when no action is supplied
+    dispatcher: true
+
+  file_read:   { tier: read_only, aliases: ["file.read"] }
+  file_list:   { tier: read_only, aliases: ["file.list"] }
+  file_exists: { tier: read_only, aliases: ["file.exists"] }
+  file_roots:  { tier: read_only, aliases: ["file.roots"] }
+  file_append: { tier: elevated,  aliases: ["file.append"] }
+  file_patch:  { tier: elevated,  aliases: ["file.patch"] }
+
+  # --- outbound ------------------------------------------------------------
+  send_email:
+    tier: outbound
+    simulation_exempt: false
+    aliases:
+      - "send_email"
+      - "send-email"
+      - "sendEmail"
+      - "email.send"
+      - "email_send"
+      - "send_mail"
+      - "sendmail"
+      - "mail.send"
+      - "send_email_tool"
+      - "tools.send_email"
+
+  outreach_run:
+    tier: outbound
+    # A real dry-run exists for outreach, but only the caller can assert it.
+    simulation_exempt: true
+    aliases:
+      - "outreach.run"
+      - "outreach-run"
+      - "outreachRun"
+      - "outreach_bridge"
+      - "outreach.bridge"
+      - "outreachBridge"
+      - "execute_outreach_run"
+      - "outreach.execute"
+
+  site_services_send_outreach:
+    tier: outbound
+    aliases: ["site_services.send_outreach", "siteServices.sendOutreach"]
+
+  site_services_match_apply:
+    tier: outbound
+    aliases: ["site_services.match_apply", "siteServices.matchApply"]
+
+  telegram_send:
+    tier: outbound
+    aliases: ["telegram.send", "telegramSend"]
+
+  # --- dispatch ------------------------------------------------------------
+  # genesis is gated unconditionally. The previous implementation decided this
+  # by substring-matching a model-written task string for "send"/"campaign",
+  # which "dispatch"/"deliver"/"blast" walked straight past. A dispatcher is
+  # dangerous because of what it can reach, not because of how it was described.
+  genesis:
+    tier: dispatch
+    aliases:
+      - "genesis"
+      - "genesis-email"
+      - "genesis_email"
+      - "genesisEmail"
+      - "genesis.run"
+      - "genesis_bridge"
+
+  clawflows_run:
+    tier: dispatch
+    aliases: ["clawflows.run", "flow.run", "flowRun"]
+
+  # --- elevated / financial / critical -------------------------------------
+  file_write:
+    tier: elevated
+    aliases: ["file.write", "write_file", "fileWrite"]
+  file_delete:
+    tier: elevated
+    aliases: ["file.delete", "delete_file", "fileDelete"]
+  github_pr_review:
+    tier: elevated
+    aliases: ["github.pr_review"]
+  github_issue_create:
+    tier: elevated
+    aliases: ["github.issue_create"]
+  api_payment:
+    tier: financial
+    aliases: ["api.payment", "payment", "stripe.charge"]
+  shell_exec:
+    tier: critical
+    aliases: ["shell.exec", "shell", "shellExec", "bash", "exec"]
+  python_execute:
+    tier: critical
+    aliases: ["python.execute", "pythonExecute", "python"]
+  vault_set:
+    tier: critical
+    aliases: ["vault.set", "vaultSet"]

@@ -1,0 +1,30 @@
+[package]
+name = "cato-desktop"
+version = "0.2.0"
+description = "Cato AI Desktop App"
+authors = ["Cato"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.71"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-log = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-process = "2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["time", "sync", "macros", "process", "io-util"] }
+dirs = "5"

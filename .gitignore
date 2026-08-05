@@ -1,0 +1,170 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.env
+.venv
+env/
+venv/
+*.sqlite
+*.db
+vault.enc
+*.log
+.pytest_cache/
+.pytest_cache_tmp/
+_pytest_out.txt
+_pytest_err.txt
+_pytest_pid.txt
+_run_pytest.ps1
+.pytest_full.out
+.pytest_full.err
+.run_pytest.bat
+.coverage
+htmlcov/
+Capture.PNG
+*.PNG
+OpenclawArticle.md
+remixforge/
+spiderspark-conduit/
+BRAINSTORM/
+CATO_ALEX_AUDIT.md
+CATO_BUILD_LOG.md
+CATO_KRAKEN_VERDICT.md
+CATO_UPGRADE_PLAN.md
+
+# Session/audit/task artifacts (dev-only, not for public repo)
+AUDIT_*.md
+TASK_*.md
+REALITY_CHECK_REPORT.md
+WEEK1_MVP_*.md
+README_WEEK1_EXECUTION.md
+CATO_SESSION_*.md
+*_SESSION_*.md
+*_EXECUTION.md
+*_IMPLEMENTATION_REPORT.md
+
+# Dev session docs and checklists (personal working files)
+CATO_BUILD_IMPROVEMENTS_CHECKLIST.md
+CATO_BUILD_POTENTIAL_ISSUES.md
+CATO_BUILD_RISKS.md
+CATO_CLI_INTEGRATION_CHECKLIST.md
+CATO_FINAL_TEST_REPORT.md
+CATO_GENESIS_BRAINSTORM.md
+CATO_HUDSON_REVIEW_M3.md
+CATO_HUDSON_REVIEW_M4.md
+DAEMON_RESTART_COMPLETE.md
+SKILLS_RECOGNITION_FIX_VERIFIED.md
+TELEGRAM_DESKTOP_INTEGRATION_FIX.md
+TELEGRAM_INTEGRATION_COMPLETE.md
+desktop/WINDOWS_BUILD.md
+
+# Kraken/test run artifacts
+kraken_e2e_report.json
+kraken_e2e_test.py
+kraken_test_output.txt
+kraken_test_run.txt
+test_skills.py
+
+# Local bridge/startup scripts (machine-specific)
+launch_bridge.py
+register_telegram_bridge_task.ps1
+start_telegram_bridge.ps1
+scripts/install_watchdog.ps1
+
+# Utility scripts (local dev only)
+scripts/sync_version.py
+scripts/verify_python_build.py
+
+# Night-shift local session state (operator machine)
+night_shift_session_state.json
+
+# Claude Code session data
+.claude/
+
+# Log directories
+logs/
+# Desktop app build artifacts
+desktop/src-tauri/target/
+desktop/dist/
+desktop/node_modules/
+desktop/src-tauri/binaries/
+
+# Ralph Loop state directories
+Ralph Loop Desktop APP/
+Ralph Loop Web UI/
+
+# --- Added: keep-out categories from untracked audit ---
+
+# Local logs and test outputs (root-level scratch)
+/pytest_*.txt
+/build_log*.txt
+/cargo_log.txt
+/daemon_err.txt
+/full_test*.txt
+/tauri_build.txt
+/test_err*.txt
+/test_errors.txt
+/test_out*.txt
+/test_output.txt
+/t2.txt
+/t2e.txt
+/t3.txt
+/null
+/live_*_results.json
+
+# Editor backups
+*.bak
+
+# Debug / scratch Python at repo root
+/cato_debug*.py
+/cato_test*.py
+/cato_time_test.py
+/cato_e2e_sentinel.py
+/diagnose*.py
+/live_browser_validation.py
+/live_conduit_test.py
+/ws_debug*.py
+/ws_test.py
+
+# Personal / internal docs (root-anchored to avoid tracked workspace/ copies)
+/AGENTS.md
+/IDENTITY.md
+/SOUL.md
+HKO_CERTIFICATE_*.md
+HKO_TRUTH_AUDIT*.md
+HKO-truth-audit-report.md
+HKO-certificate.md
+TRUTH_AUDIT_*.md
+
+# Brainstorm and strategy folders
+Brainstorm Cato/
+Empire Builder/
+
+# Old project snapshots (large, may contain stale secrets)
+Various Cato/
+
+# Variant build directories (local experiments, not for repo)
+Cato-1A/
+Cato-1B/
+Cato-2A/
+
+# Cato runtime identity files
+workspace_files/
+
+# Machine-specific launchers
+/Launch-CatoDesktop.ps1
+install_autostart.py
+
+# Audit reports (judgment-call group)
+final-outcome-audit-reports/
+
+# Google OAuth client-secret JSON files (downloaded from GCP Credentials page).
+# These contain client_id + client_secret and must never land in git.
+client_secret*.json
+client_secret*.txt

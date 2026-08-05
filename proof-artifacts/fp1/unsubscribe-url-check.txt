@@ -1,0 +1,5 @@
+URL=https://conduitscore.com/unsubscribe
+Method=HEAD
+Date=2026-06-02
+Result=HTTP 200 OK
+Note=Endpoint reachable. Unsubscribe links in outbound mail use this base + ?token= per row.

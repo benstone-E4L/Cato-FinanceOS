@@ -1,0 +1,7 @@
+# Copy to %APPDATA%\cato\schedules\ via scripts/install_night_shift_assets.ps1
+name: night-shift-digest
+cron: "0 8 * * *"
+skill: night_shift.digest
+args: {}
+budget_cap: 50
+enabled: true

@@ -1,0 +1,118 @@
+# Night-shift policy — ConduitScore revenue loop + Cato autonomy
+# Build spec: CONDUITSCORE-NIGHT-SHIFT-001
+# Edit values for your install. Cato code should read this file in a later sprint (P2-CATO-010+).
+# NEVER commit real API keys or passwords to git.
+
+version: "1.0"
+updated: "2026-06-02"
+owner: "operator"
+
+# ---------------------------------------------------------------------------
+# Phase gates (do not flip to true without Loop Proof Card evidence)
+# ---------------------------------------------------------------------------
+gates:
+  g1_manual_loop_proven: false      # Rows 1-6 on docs/loop-proof-card.md
+  g2_engine_audit_go: true            # Row 3 all GO (2026-06-03 evidence in proof-artifacts/audits/)
+  g3_cato_supervised_5_of_5: false
+  g4_alex_kraken_approved: false
+  g5_night_shift_30_day: false
+
+# ---------------------------------------------------------------------------
+# Spend caps (align with %APPDATA%/cato/config.yaml when possible)
+# ---------------------------------------------------------------------------
+budget:
+  daily_llm_cap_usd: 3.00
+  monthly_llm_cap_usd: 20.00
+  session_cap_usd: 3.00               # informational; daily/monthly enforce in BudgetManager
+  per_flow_cap_cents: 500             # $5.00 per clawflow run
+  per_schedule_cap_cents: 500         # default YAML schedule budget_cap
+  per_cron_cap_cents: 500             # CRONS.json optional budget_cap
+  max_genesis_usd_per_day: 5.00
+  conduit_session_cap_cents: 200      # per Conduit bridge session
+
+# ---------------------------------------------------------------------------
+# Outreach volume (manual → supervised → autonomous)
+# -------------------------------------------------------------------
+outreach:
+  phase: "manual"                     # manual | supervised | autonomous
+  max_sends_per_day: 0                # 0 until phase=supervised; then 5, ramp per build spec
+  max_sends_per_week: 25
+  canary_batch_size: 25
+  require_human_approve_each_send: true
+  sibling_sending_domain: "surfacescore.com"  # From: bstone@surfacescore.com — not conduitscore.com
+  forbidden_sending_domains:
+    - conduitscore.com
+    - www.conduitscore.com
+
+# ---------------------------------------------------------------------------
+# Auto-pause triggers
+# ---------------------------------------------------------------------------
+safety:
+  pause_on_complaint_rate_pct: 0.1
+  pause_on_bounce_rate_pct: 5.0
+  pause_on_budget_pct_remaining: 5      # pause when less than 5% daily budget left
+  pause_on_audit_chain_verify_fail: true
+  unattended_mode_allowed: false      # true only in Phase 3 after G3+G4
+  block_budget_bypass_phrases: true     # maps to P2-CATO-007
+
+# ---------------------------------------------------------------------------
+# Tools that require explicit approval (Telegram or desktop)
+# ---------------------------------------------------------------------------
+approval_required_tools:
+  - send_email                         # Gmail send click
+  - integration.action                 # any write integration
+  - genesis                            # when task contains "send" or "deploy" — refine in code
+
+# Forbidden until G1 (hard block for schedulers / flows)
+forbidden_until_g1:
+  - autonomous_send
+  - bulk_enqueue
+  - flow.run:conduitscore-revenue-loop   # live send variant
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+telegram:
+  enabled: true
+  digest_cron: "0 8 * * *"            # local time — adjust
+  digest_include:
+    - budget_spend
+    - sends_attempted
+    - approvals_pending
+    - audit_chain_head_hash
+    - complaint_bounce_flags
+
+# ---------------------------------------------------------------------------
+# Genesis allowlist (revenue loop only — empty = use config.yaml list)
+# ---------------------------------------------------------------------------
+genesis_allowlist:
+  - genesis-analyst
+  - genesis-content
+  - genesis-email
+  - genesis-marketing
+
+# ---------------------------------------------------------------------------
+# Paths (operator fills from docs/conduitscore-asset-map.md)
+# ---------------------------------------------------------------------------
+# Leave a path empty to use the portable default. Absolute paths here are
+# machine-specific and break on any account that is not literally the one they
+# were written on (e.g. PermissionError [WinError 5] on C:/Users/Administrator).
+#
+#   proof_artifacts_dir  empty -> $CATO_PROOF_ARTIFACTS_DIR, else <repo>/proof-artifacts
+#
+# `~` is expanded, so "~/.cato/proof-artifacts" is also portable.
+paths:
+  prospect_manifest: ""               # CSV/JSON for flow template
+  proof_artifacts_dir: ""             # portable default; override with CATO_PROOF_ARTIFACTS_DIR
+  loop_proof_card: ""                 # portable default: <repo>/docs/loop-proof-card.md
+  outreach_engine_cli: "C:/Users/Administrator/Desktop/ConduitScore/conduit_outreach_pipeline"
+  reverse_funnel_outreach_root: "C:/Users/Administrator/Desktop/ConduitScore/reverse_funnel_outreach"
+  conduitscore_payable_url: ""
+
+# ---------------------------------------------------------------------------
+# Audit / logging
+# ---------------------------------------------------------------------------
+audit:
+  require_hash_chain_verify_daily: true
+  ledger_middleware_enabled: true     # target after P2-CATO-005
+  retain_audit_days: 90

@@ -1,0 +1,27 @@
+{
+  "date": "2026-06-03",
+  "method": "Local Ed25519 signProof + verifyProof (same code as production)",
+  "unit_tests": "ConduitScore src/lib/aivs/__tests__/aivs.test.ts — 12/12 passed",
+  "samples": [
+    {
+      "file": "samples/sample-01-example.json",
+      "url": "https://example.com",
+      "signature_status": "valid"
+    },
+    {
+      "file": "samples/sample-02-linear.json",
+      "url": "https://linear.app",
+      "signature_status": "valid"
+    },
+    {
+      "file": "samples/sample-03-conduitscore.json",
+      "url": "https://conduitscore.com",
+      "signature_status": "valid"
+    }
+  ],
+  "live_api_scan": {
+    "attempted": true,
+    "result": "401 Unauthorized — CONDUITSCORE_API_KEY in vault/outreach .env not accepted by production",
+    "remediation": "Create new API key in ConduitScore (Pro+ REST API), sync to vault via scripts/sync_outreach_vault.py, re-run fp2_generate_fidelity_samples.py"
+  }
+}

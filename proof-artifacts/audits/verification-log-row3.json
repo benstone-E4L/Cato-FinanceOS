@@ -1,0 +1,23 @@
+{
+  "date": "2026-06-03",
+  "engine_a": {
+    "verdict": "CONDITIONAL_GO",
+    "g1_canary_blocked": true,
+    "dry_run_ok": true,
+    "scan_api": "401 Invalid API key"
+  },
+  "engine_b": {
+    "verdict": "GO",
+    "pytest": "187 passed, 2 xpassed",
+    "hko_prior": "PASS 2026-04-16"
+  },
+  "funnel": {
+    "verdict": "CONDITIONAL_GO",
+    "live_home": 200,
+    "live_pricing": 200,
+    "live_scan_anon": 402,
+    "war_audit_prior": "CONDITIONAL_GO 2026-05-30"
+  },
+  "row3_overall": "PENDING",
+  "row3_blocker": "Engine A needs valid CONDUITSCORE_API_KEY; funnel CONDITIONAL until API key + optional war-audit marketing fixes"
+}

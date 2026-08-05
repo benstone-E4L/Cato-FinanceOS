@@ -1,0 +1,12 @@
+API key rotated 2026-06-03 (values not stored in git).
+
+Updated locations:
+- ConduitScore/conduit_outreach_pipeline/.env
+- ~/.claude/skills/reverse-funnel-scanner/.env  (overrides pipeline — must stay in sync)
+- Cato vault CONDUITSCORE_API_KEY
+
+Live test:
+- POST /api/scan example.com → 200, overallScore 30, id cmpyoy1ip0003l404op7p2hzr
+- GET /api/scans → 200, 20 scans listed
+- GET /api/scans/{id} → 200
+- Outreach dry-run → ai_visibility_score 30

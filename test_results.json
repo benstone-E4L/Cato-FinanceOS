@@ -1,0 +1,503 @@
+{
+  "timestamp": "2026-03-08T12:15:14.068353",
+  "total": 99,
+  "pass": 99,
+  "fail": 0,
+  "results": [
+    {
+      "name": "GET / returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Page title is 'Cato Dashboard'",
+      "status": "PASS",
+      "detail": "title='Cato Dashboard'"
+    },
+    {
+      "name": "Sidebar element present",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Content area present",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "API GET /api/heartbeat -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/adapters -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/memory/stats -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/cli/status -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/flows -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/nodes -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/diagnostics/contradiction-health -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/diagnostics/decision-memory -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/diagnostics/query-classifier -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/diagnostics/anomaly-domains -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/diagnostics/skill-corrections -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/skills -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/logs -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/audit/entries -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/config -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/budget/summary -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/usage/summary -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/sessions -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/cron/jobs -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/workspace/files -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/vault/keys -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/action-guard/status -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/memory/files -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /api/chat/history -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "API GET /health -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Adapters API returns list",
+      "status": "PASS",
+      "detail": "count=2"
+    },
+    {
+      "name": "Telegram adapter present in API",
+      "status": "PASS",
+      "detail": "{'name': 'telegram', 'status': 'connected', 'details': {}}"
+    },
+    {
+      "name": "Heartbeat has 'status' field",
+      "status": "PASS",
+      "detail": "{'last_heartbeat': None, 'agent_name': None, 'uptime_seconds': None, 'status': 'unknown'}"
+    },
+    {
+      "name": "Dashboard page has HTML content",
+      "status": "PASS",
+      "detail": "len=3625"
+    },
+    {
+      "name": "Nav: Dashboard section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['adapter', 'heartbeat']/['adapter', 'heartbeat', 'status']"
+    },
+    {
+      "name": "Nav: Chat section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['message', 'send']/['chat', 'message', 'input', 'send']"
+    },
+    {
+      "name": "Nav: Agents section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['agent']/['agent', 'orchestrat', 'model']"
+    },
+    {
+      "name": "Nav: Skills section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['skill', 'Coding']/['skill', 'add-notion', 'Coding']"
+    },
+    {
+      "name": "Nav: Cron section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['cron', 'job', 'schedule']/['cron', 'job', 'schedule']"
+    },
+    {
+      "name": "Nav: Sessions section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['session', 'Sessions']/['session', 'Sessions']"
+    },
+    {
+      "name": "Nav: Usage section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['token', 'cost']/['usage', 'token', 'cost', 'spend']"
+    },
+    {
+      "name": "Nav: Audit Log section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['audit', 'chain']/['audit', 'entry', 'hash', 'chain']"
+    },
+    {
+      "name": "Nav: Memory section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['memory', 'fact', 'knowledge']/['memory', 'fact', 'knowledge']"
+    },
+    {
+      "name": "Nav: Logs section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['INFO', 'ERROR']/['log', 'INFO', 'ERROR']"
+    },
+    {
+      "name": "Nav: Alerts section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['notification']/['alert', 'notification']"
+    },
+    {
+      "name": "Nav: System section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['cli', 'pool', 'action']/['system', 'cli', 'pool', 'action']"
+    },
+    {
+      "name": "Nav: Diagnostics section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['query', 'contradiction']/['diagnostic', 'query', 'classifier', 'contradiction']"
+    },
+    {
+      "name": "Nav: Config section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['model']/['config', 'model', 'setting']"
+    },
+    {
+      "name": "Nav: Budget section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['budget', 'session', 'monthly', 'spend']/['budget', 'session', 'monthly', 'spend']"
+    },
+    {
+      "name": "Nav: Conduit section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['conduit']/['conduit', 'browser', 'tab', 'page']"
+    },
+    {
+      "name": "Nav: Vault section renders",
+      "status": "PASS",
+      "detail": "active=False, keywords=['vault', 'key', 'auth']/['vault', 'key', 'secret', 'auth']"
+    },
+    {
+      "name": "Skills API returns list",
+      "status": "PASS",
+      "detail": "count=18"
+    },
+    {
+      "name": "First skill has name and dir",
+      "status": "PASS",
+      "detail": "name=Add to Notion, dir=add-notion"
+    },
+    {
+      "name": "GET /api/skills/add-notion/content -> 200",
+      "status": "PASS",
+      "detail": "status=200, len=836"
+    },
+    {
+      "name": "Skills: UI elements present",
+      "status": "PASS",
+      "detail": "elements found=18"
+    },
+    {
+      "name": "Memory stats API returns dict",
+      "status": "PASS",
+      "detail": "{'facts': 0, 'kg_nodes': 0, 'kg_edges': 0}"
+    },
+    {
+      "name": "Memory stats has 'facts' field",
+      "status": "PASS",
+      "detail": "{'facts': 0, 'kg_nodes': 0, 'kg_edges': 0}"
+    },
+    {
+      "name": "Memory files API returns list",
+      "status": "PASS",
+      "detail": "count=0"
+    },
+    {
+      "name": "CLI status returns dict",
+      "status": "PASS",
+      "detail": "{'claude': {'installed': True, 'logged_in': True, 'version': '2.1.71 (Claude Code)'}, 'codex': {'installed': True, 'logg"
+    },
+    {
+      "name": "CLI status has 'claude' key",
+      "status": "PASS",
+      "detail": "{'claude': {'installed': True, 'logged_in': True, 'version': '2.1.71 (Claude Code)'}, 'codex': {'installed': True, 'logged_in': False, 'version': ''}, 'gemini': {'installed': True, 'logged_in': False, 'version': ''}, 'cursor': {'installed': True, 'logged_in': False, 'version': ''}}"
+    },
+    {
+      "name": "Action Guard status returns dict",
+      "status": "PASS",
+      "detail": "{'checks': [{'rule': 'Irreversibility check', 'description': 'Block irreversible actions above autonomy threshold', 'act"
+    },
+    {
+      "name": "Query classifier returns data",
+      "status": "PASS",
+      "detail": "{'tiers': {'TIER_A': {'label': 'Simple (Gemini only)', 'description': 'Single-fact lookups, unit con"
+    },
+    {
+      "name": "Contradiction health returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Decision memory returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Anomaly domains returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Skill corrections returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Config API returns dict",
+      "status": "PASS",
+      "detail": "{}"
+    },
+    {
+      "name": "Config page has form inputs",
+      "status": "PASS",
+      "detail": "html_len=4327"
+    },
+    {
+      "name": "Budget summary API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Usage summary API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Audit entries API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Audit entries is a list",
+      "status": "PASS",
+      "detail": "count=0"
+    },
+    {
+      "name": "Audit verify endpoint exists (POST)",
+      "status": "PASS",
+      "detail": "status=500"
+    },
+    {
+      "name": "Audit download endpoint exists",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Logs API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Logs returns list",
+      "status": "PASS",
+      "detail": "count=45"
+    },
+    {
+      "name": "Log entry has message field",
+      "status": "PASS",
+      "detail": "['ts', 'level', 'name', 'msg']"
+    },
+    {
+      "name": "Log entry has level field",
+      "status": "PASS",
+      "detail": "['ts', 'level', 'name', 'msg']"
+    },
+    {
+      "name": "Cron jobs API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Cron jobs returns list",
+      "status": "PASS",
+      "detail": "count=0"
+    },
+    {
+      "name": "Sessions API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Sessions returns list",
+      "status": "PASS",
+      "detail": "count=0"
+    },
+    {
+      "name": "Vault keys API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Vault response is list or dict",
+      "status": "PASS",
+      "detail": "['OPENROUTER_API_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_PHONE']"
+    },
+    {
+      "name": "Workspace files API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Workspace files returns list",
+      "status": "PASS",
+      "detail": "count=4"
+    },
+    {
+      "name": "Workspace file content fetch -> 200",
+      "status": "PASS",
+      "detail": "file=AGENTS.md, status=200"
+    },
+    {
+      "name": "Chat history API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Chat history returns list",
+      "status": "PASS",
+      "detail": "count=0"
+    },
+    {
+      "name": "Flows API returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Flows returns list",
+      "status": "PASS",
+      "detail": "count=0"
+    },
+    {
+      "name": "GET /health returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "/health response has content",
+      "status": "PASS",
+      "detail": "{'status': 'ok', 'version': '0.1.0', 'sessions': 0, 'uptime': 787}"
+    },
+    {
+      "name": "GET /favicon.png returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "PATCH /api/skills/add-notion/content -> 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "GET /coding-agent returns 200",
+      "status": "PASS",
+      "detail": "status=200"
+    },
+    {
+      "name": "Coding agent page has title",
+      "status": "PASS",
+      "detail": "title='Cato Coding Agent'"
+    },
+    {
+      "name": "Sidebar present at mobile width 375px",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Responsive: viewport changes without crash",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "No severe JS console errors on page load",
+      "status": "PASS",
+      "detail": "errors=0: "
+    }
+  ]
+}

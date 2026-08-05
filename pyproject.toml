@@ -1,0 +1,105 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cato-daemon"
+dynamic = ["version"]
+description = "The AI agent daemon you can audit in a coffee break"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["ai", "agent", "daemon", "llm", "automation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "cryptography>=42.0.0",
+    "argon2-cffi>=23.0.0",
+    "pyyaml>=6.0",
+    "click>=8.1.0",
+    "tiktoken>=0.7.0",
+    "rank-bm25>=0.2.2",
+    "sentence-transformers>=3.0.0",
+    "aiohttp>=3.10.0",
+    "websockets>=13.0",
+    "croniter>=2.0",
+    "python-telegram-bot>=21.0",
+    "mcp>=1.22.0",
+    "patchright>=1.49.0",
+    "rich>=13.0.0",
+    "numpy>=1.26.0",
+    "python-dotenv>=1.0.0",
+    "uvicorn>=0.38.0",
+    "google-api-python-client>=2.100.0",
+    "google-auth>=2.20.0",
+    "google-auth-oauthlib>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.0",
+]
+pty = [
+    "pywinpty>=2.0.0; sys_platform == 'win32'",
+    "ptyprocess>=0.7.0; sys_platform != 'win32'",
+]
+conduit = ["patchright>=1.49.0"]
+
+[project.scripts]
+cato = "cato.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/cato-daemon/cato"
+Documentation = "https://github.com/cato-daemon/cato#readme"
+"Bug Tracker" = "https://github.com/cato-daemon/cato/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cato"]
+
+[tool.hatch.version]
+path = "cato/__init__.py"
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.0",
+]
+
+[tool.hatch.envs.default.scripts]
+test = "pytest tests/ -v --cov=cato --cov-report=term-missing"
+verify = "python scripts/verify_python_build.py"
+verify-fast = "python scripts/verify_python_build.py --skip-pytest"
+lint = "ruff check cato/"
+fmt  = "ruff format cato/"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+norecursedirs = [".git", ".tox", "dist", "build", "*.egg", ".venv", "venv", ".claude", "node_modules"]
+markers = [
+    "live: requires live external CLI subprocess (codex, cursor) — skip by default, run with -m live",
+]
+# test_playwright_ui.py is a manual/live E2E script (zero pytest test functions,
+# `if __name__ == "__main__"` entrypoint only). It requires a running Cato daemon
+# on 8080-8085 and does import-time `pip install playwright` / `playwright install
+# chromium` side effects that mutate the environment during collection and fail
+# under some CLI versions (`--quiet` unsupported). Excluded from pytest discovery;
+# run it directly with `python tests/test_playwright_ui.py` against a live daemon.
+addopts = "-m 'not live' --ignore=tests/test_playwright_ui.py"

@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<title>Cato Coding Agent</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+/* ── Reset & Base ────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;font-size:14px;line-height:1.5}
+button{cursor:pointer;font-family:inherit;font-size:inherit}
+input,textarea,select{font-family:inherit;font-size:inherit;color:#e2e8f0}
+pre,code{font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:12px}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#1a1d26}
+::-webkit-scrollbar-thumb{background:#374151;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#4b5563}
+
+/* ── Variables ─────────────────────────────────────────────── */
+:root {
+  --color-claude:#3B82F6;
+  --color-codex:#F59E0B;
+  --color-gemini:#A855F7;
+  --bg-dark:#0f1117;
+  --bg-panel:#1a1d26;
+  --bg-card:#1e2433;
+  --border:#1e2433;
+  --text:#e2e8f0;
+  --text-sec:#94a3b8;
+  --text-muted:#64748b;
+}
+
+/* ── Layout ─────────────────────────────────────────────────── */
+#root{height:100vh;overflow:hidden}
+.coding-agent-page{display:grid;height:100vh;overflow:hidden;background:var(--bg-dark)}
+@media(min-width:1024px){
+  .coding-agent-page{grid-template-columns:280px 1fr 300px;grid-template-areas:"sidebar-left main sidebar-right"}
+}
+@media(min-width:640px) and (max-width:1023px){
+  .coding-agent-page{grid-template-columns:240px 1fr;grid-template-rows:1fr auto;grid-template-areas:"sidebar-left main" "sidebar-right sidebar-right"}
+}
+@media(max-width:639px){
+  .coding-agent-page{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;grid-template-areas:"sidebar-left" "main" "sidebar-right"}
+  .sidebar-right{display:none!important}
+}
+.sidebar-left{grid-area:sidebar-left;background:var(--bg-panel);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.talk-main{grid-area:main;display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.sidebar-right{grid-area:sidebar-right;background:var(--bg-panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+
+/* ── Sidebar common ─────────────────────────────────────────── */
+.sidebar-hdr{padding:12px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sidebar-body{padding:12px 16px;overflow-y:auto;flex:1}
+
+/* ── Talk Page ─────────────────────────────────────────────── */
+.talk-page{display:flex;flex-direction:column;height:100%;overflow:hidden}
+.talk-header{background:var(--bg-panel);border-bottom:1px solid var(--border);padding:14px 18px;flex-shrink:0}
+.talk-header-task{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-indicators{display:flex;gap:10px;flex-wrap:wrap}
+.model-ind{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid;opacity:.6;transition:opacity .2s}
+.model-ind.active{opacity:1}
+.model-ind.claude{color:var(--color-claude);background:#3b82f610;border-color:#3b82f640}
+.model-ind.codex{color:var(--color-codex);background:#f59e0b10;border-color:#f59e0b40}
+.model-ind.gemini{color:var(--color-gemini);background:#a855f710;border-color:#a855f740}
+.spinner{width:8px;height:8px;border-radius:50%;border:1.5px solid currentColor;border-top-color:transparent;animation:spin .8s linear infinite;display:inline-block}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Messages ───────────────────────────────────────────────── */
+.talk-msgs{flex:1;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth;min-height:0}
+.msg-bubble{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;animation:fadeIn .2s ease-out;position:relative;overflow:hidden}
+.msg-bubble::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.msg-bubble.claude::before{background:var(--color-claude)}
+.msg-bubble.codex::before{background:var(--color-codex)}
+.msg-bubble.gemini::before{background:var(--color-gemini)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+.msg-hdr{display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap}
+.model-btn{display:flex;align-items:center;gap:5px;background:transparent;border:none;padding:2px 5px;border-radius:5px;font-weight:700;font-size:12px;transition:background .15s;cursor:pointer;line-height:1}
+.model-btn:hover{background:rgba(255,255,255,.07)}
+.model-btn.claude{color:var(--color-claude)}
+.model-btn.codex{color:var(--color-codex)}
+.model-btn.gemini{color:var(--color-gemini)}
+.model-ic{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0}
+.model-ic.claude{background:#3b82f620;color:var(--color-claude)}
+.model-ic.codex{background:#f59e0b20;color:var(--color-codex)}
+.model-ic.gemini{background:#a855f720;color:var(--color-gemini)}
+.arrow{font-size:9px;transition:transform .2s;color:var(--text-muted)}
+.arrow.open{transform:rotate(90deg)}
+
+/* ── Confidence Badges ─────────────────────────────────────── */
+.conf-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:12px;font-size:11px;font-weight:700}
+.conf-badge.high{background:#14532d44;color:#86efac;border:1px solid #14532d}
+.conf-badge.medium{background:#78350f44;color:#fcd34d;border:1px solid #78350f}
+.conf-badge.low{background:#7c2d1244;color:#fdba74;border:1px solid #7c2d12}
+.ts{margin-left:auto;font-size:10px;color:var(--text-muted)}
+
+.msg-text{font-size:12px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word}
+.reasoning-block{margin-top:8px;padding:8px 10px;background:var(--bg-panel);border-radius:5px;border:1px solid var(--border);font-size:11px;color:var(--text-sec);line-height:1.5}
+.reasoning-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:4px}
+
+.code-wrap{position:relative;margin-top:8px}
+.code-pre{background:#0a0c12;border:1px solid #2d3448;border-radius:7px;padding:10px 12px;overflow-x:auto;font-size:11px;color:#e2e8f0;line-height:1.5}
+.copy-btn{position:absolute;top:6px;right:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:10px;color:var(--text-sec);cursor:pointer;transition:all .15s}
+.copy-btn:hover{background:var(--bg-panel);color:var(--text)}
+.copy-btn.copied{color:#86efac;border-color:#14532d}
+
+/* ── Footer / Synthesis ─────────────────────────────────────── */
+.talk-footer{background:var(--bg-panel);border-top:1px solid var(--border);padding:14px 18px;flex-shrink:0}
+.awaiting{font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:7px}
+.dots span{display:inline-block;width:4px;height:4px;background:var(--text-muted);border-radius:50%;animation:blink 1.4s infinite}
+.dots span:nth-child(2){animation-delay:.2s}
+.dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
+
+.synth-card{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 14px;position:relative;overflow:hidden}
+.synth-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(to bottom,#3b82f6,#a855f7)}
+.synth-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.synth-model{font-size:11px;font-weight:600;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.synth-text{font-size:12px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word}
+
+/* ── Task Input Form ─────────────────────────────────────────── */
+.form{display:flex;flex-direction:column;gap:12px}
+.f-lbl{font-size:11px;font-weight:600;color:var(--text-sec);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:3px}
+.f-req{color:#ef4444;margin-left:2px}
+.f-ta{background:var(--bg-dark);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-size:12px;line-height:1.5;resize:vertical;min-height:80px;max-height:160px;outline:none;transition:border-color .15s;width:100%}
+.f-ta:focus{border-color:#3b82f6}
+.f-ta::placeholder{color:var(--text-muted)}
+.f-sel{background:var(--bg-dark);border:1px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--text);font-size:12px;outline:none;transition:border-color .15s;width:100%;cursor:pointer}
+.f-sel:focus{border-color:#3b82f6}
+.char-ct{font-size:10px;text-align:right;margin-top:2px;color:var(--text-muted)}
+.char-ct.warn{color:#fcd34d}
+.char-ct.over{color:#fca5a5}
+.sub-btn{display:flex;align-items:center;justify-content:center;gap:7px;background:#3b82f6;color:#fff;border:none;border-radius:7px;padding:9px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,opacity .15s;width:100%}
+.sub-btn:hover:not(:disabled){background:#2563eb}
+.sub-btn:disabled{opacity:.5;cursor:not-allowed}
+.sub-spin{width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+
+/* ── Right Sidebar specific ─────────────────────────────────── */
+.synth-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.act-btn{display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:5px;border:1px solid var(--border);background:var(--bg-panel);color:var(--text-sec);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+.act-btn:hover{background:var(--bg-card);color:var(--text);border-color:#4b5563}
+.act-btn.copied{color:#86efac;border-color:#14532d}
+
+/* ── Alert / Error ─────────────────────────────────────────── */
+.conn-warn{background:#78350f44;border:1px solid #78350f;border-radius:5px;padding:7px 10px;font-size:11px;color:#fcd34d;display:flex;align-items:center;gap:7px;margin:6px 18px}
+.conn-err{background:#7f1d1d44;border:1px solid #7f1d1d;border-radius:5px;padding:7px 10px;font-size:11px;color:#fca5a5;display:flex;align-items:center;gap:7px;margin:6px 18px}
+.err-banner{background:#7f1d1d44;border:1px solid #7f1d1d;border-radius:7px;padding:10px 14px;color:#fca5a5;font-size:12px;display:flex;flex-direction:column;gap:7px;margin:14px 18px}
+.retry-btn{background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b;border-radius:5px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;align-self:flex-start}
+.retry-btn:hover{background:#991b1b}
+
+/* ── Pool Status Badges ───────────────────────────────────── */
+.pool-badge{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600}
+.pool-badge.warm{background:#14532d44;color:#86efac;border:1px solid #14532d}
+.pool-badge.cold{background:#78350f44;color:#fcd34d;border:1px solid #78350f}
+.pool-badge.subprocess{background:#1e293b;color:#94a3b8;border:1px solid #334155}
+.source-label{font-size:10px;color:var(--text-muted);font-style:italic}
+
+/* ── Token Status Bar ───────────────────────────────────────── */
+.token-bar{display:flex;align-items:center;gap:10px;padding:4px 18px;background:var(--bg-panel);border-top:1px solid var(--border);font-size:10px;color:var(--text-muted);flex-shrink:0;flex-wrap:wrap}
+.token-bar-item{display:flex;align-items:center;gap:3px}
+.token-bar-label{color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.token-bar-val{color:var(--text-sec);font-variant-numeric:tabular-nums}
+.token-bar-sep{color:var(--border);margin:0 2px}
+.token-tooltip{position:relative;cursor:help}
+.token-tooltip:hover .token-tooltip-body{display:block}
+.token-tooltip-body{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1e2433;border:1px solid #374151;border-radius:7px;padding:8px 12px;white-space:nowrap;font-size:11px;color:var(--text);z-index:100;min-width:180px;line-height:1.8}
+
+/* ── Focus styles (accessibility) ──────────────────────────── */
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid #3b82f6;outline-offset:2px}
+
+/* ── Recent tasks ───────────────────────────────────────────── */
+.recent-item{padding:6px 8px;border-radius:5px;cursor:pointer;font-size:11px;color:var(--text-sec);transition:background .15s;border:1px solid transparent;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;width:100%;background:transparent}
+.recent-item:hover{background:var(--bg-card);border-color:var(--border);color:var(--text)}
+.recent-item.current{border-color:#3b82f6}
+
+/* ── Loading placeholder ────────────────────────────────────── */
+.loading-center{display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;gap:10px}
+
+/* ── Entry page ─────────────────────────────────────────────── */
+.entry-page{display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg-dark)}
+.entry-card{background:var(--bg-panel);border:1px solid var(--border);border-radius:12px;padding:28px 30px;width:100%;max-width:520px;margin:0 16px}
+.entry-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px}
+.entry-sub{font-size:13px;color:var(--text-muted);margin-bottom:20px}
+
+/* ── Model colour for cursor ─────────────────────────────────── */
+:root{--color-cursor:#22D3EE}
+.model-ind.cursor{color:var(--color-cursor);background:#22d3ee10;border-color:#22d3ee40}
+.msg-bubble.cursor::before{background:var(--color-cursor)}
+.model-btn.cursor{color:var(--color-cursor)}
+.model-ic.cursor{background:#22d3ee20;color:var(--color-cursor)}
+
+/* ── Model Settings Panel ────────────────────────────────────── */
+.model-settings-panel{background:var(--bg-panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.settings-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.settings-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted)}
+.settings-close{background:transparent;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:2px 5px;border-radius:4px;line-height:1}
+.settings-close:hover{background:var(--bg-card);color:var(--text)}
+.settings-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:4px}
+.settings-model-list{display:flex;flex-direction:column;gap:6px}
+.settings-model-row{display:flex;align-items:center;justify-content:space-between;background:var(--bg-card);border:1px solid var(--border);border-radius:7px;padding:8px 10px;transition:border-color .15s}
+.settings-model-row.on{border-color:#334155}
+.settings-model-row.off{opacity:.55}
+.settings-model-info{display:flex;align-items:center;gap:8px}
+.settings-model-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.settings-model-name{display:block;font-size:12px;font-weight:600;color:var(--text);line-height:1.2}
+.settings-model-desc{display:block;font-size:10px;color:var(--text-muted);line-height:1.2}
+.settings-toggle{position:relative;width:32px;height:18px;border-radius:9px;border:none;cursor:pointer;transition:background .2s;flex-shrink:0;padding:0}
+.toggle-on{background:#3b82f6}
+.toggle-off{background:#374151}
+.toggle-knob{position:absolute;top:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s}
+.toggle-on .toggle-knob{left:16px}
+.toggle-off .toggle-knob{left:2px}
+.settings-subagent-row{display:flex;align-items:center}
+.settings-subagent-label{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-sec);cursor:pointer}
+.settings-subagent-label input[type=checkbox]{accent-color:#3b82f6}
+.settings-backend-select{display:flex;flex-direction:column;gap:4px}
+.settings-select{background:var(--bg-dark);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-size:12px;outline:none;cursor:pointer}
+.settings-select:focus{border-color:#3b82f6}
+.settings-footer{display:flex;align-items:center;gap:10px;margin-top:4px}
+.settings-save-btn{background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,opacity .15s}
+.settings-save-btn:hover:not(:disabled){background:#2563eb}
+.settings-save-btn:disabled{opacity:.5;cursor:not-allowed}
+.settings-status{font-size:11px;font-weight:600}
+.settings-status.ok{color:#86efac}
+.settings-status.err{color:#fca5a5}
+.settings-gear-btn{background:transparent;border:none;color:var(--text-muted);font-size:14px;cursor:pointer;padding:4px 6px;border-radius:5px;line-height:1;transition:background .15s,color .15s}
+.settings-gear-btn:hover{background:var(--bg-card);color:var(--text)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, createContext, useContext } = React;
+
+// ── Utility ────────────────────────────────────────────────────────────── //
+
+function getConfidenceLevel(c) {
+  if (c >= 0.90) return "high";
+  if (c >= 0.70) return "medium";
+  return "low";
+}
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+
+function getTaskIdFromUrl() {
+  const parts = location.pathname.split("/");
+  const idx = parts.indexOf("coding-agent");
+  if (idx !== -1 && parts[idx + 1]) return parts[idx + 1];
+  return null;
+}
+
+// ── Local Storage Hook ─────────────────────────────────────────────────── //
+
+function useLocalStorage(key, init) {
+  const [val, setVal] = useState(() => {
+    try {
+      const item = localStorage.getItem(key);
+      return item != null ? JSON.parse(item) : init;
+    } catch { return init; }
+  });
+  const set = useCallback((v) => {
+    const next = typeof v === "function" ? v(val) : v;
+    setVal(next);
+    try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+  }, [key, val]);
+  return [val, set];
+}
+
+// ── WebSocket Hook ─────────────────────────────────────────────────────── //
+
+const MAX_RETRIES        = 5;
+const INIT_BACKOFF       = 500;
+const MAX_BACKOFF        = 16000;
+const HB_TIMEOUT         = 3000;
+const TASK_TIMEOUT_MS    = 5000;
+
+function useTalkPageStream(taskId, wsBase) {
+  const [messages,       setMessages]       = useState([]);
+  const [isLoading,      setIsLoading]      = useState(true);
+  const [synthesis,      setSynthesis]      = useState(null);
+  const [error,          setError]          = useState(null);
+  const [connStatus,     setConnStatus]     = useState("connecting");
+  const [poolStatus,     setPoolStatus]     = useState(null);
+  const [tokenTelemetry, setTokenTelemetry] = useState(null);
+  const endRef     = useRef(null);
+  const wsRef      = useRef(null);
+  const retriesRef = useRef(0);
+  const hbTimerRef = useRef(null);
+  const ttTimerRef = useRef(null);
+  const closedRef  = useRef(false);
+  const msgsRef    = useRef([]);
+  const synthRef   = useRef(null);
+
+  useEffect(() => { msgsRef.current = messages; }, [messages]);
+  useEffect(() => { synthRef.current = synthesis; }, [synthesis]);
+
+  const scrollToBottom = useCallback(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  const resetHb = useCallback(() => {
+    if (hbTimerRef.current) clearTimeout(hbTimerRef.current);
+    hbTimerRef.current = setTimeout(() => {
+      setConnStatus(prev => prev === "connected" ? "reconnecting" : prev);
+    }, HB_TIMEOUT);
+  }, []);
+
+  const clearHb = useCallback(() => {
+    if (hbTimerRef.current) { clearTimeout(hbTimerRef.current); hbTimerRef.current = null; }
+  }, []);
+
+  const startTT = useCallback(() => {
+    if (ttTimerRef.current) clearTimeout(ttTimerRef.current);
+    ttTimerRef.current = setTimeout(() => {
+      const msgs = msgsRef.current;
+      if (msgs.length > 0 && !synthRef.current) {
+        const best = [...msgs].sort((a,b) => b.confidence - a.confidence)[0];
+        setSynthesis({
+          primary: { model: best.model, response: best.text, confidence: best.confidence,
+                     confidence_level: getConfidenceLevel(best.confidence) },
+          runners_up: msgs.filter(m => m.id !== best.id).map(m => ({
+            model: m.model, response: m.text, confidence: m.confidence,
+            confidence_level: getConfidenceLevel(m.confidence)
+          })),
+          early_exit: false
+        });
+      }
+      setIsLoading(false);
+    }, TASK_TIMEOUT_MS);
+  }, []);
+
+  const clearTT = useCallback(() => {
+    if (ttTimerRef.current) { clearTimeout(ttTimerRef.current); ttTimerRef.current = null; }
+  }, []);
+
+  const handleMsg = useCallback((raw) => {
+    let parsed;
+    try { parsed = JSON.parse(raw.trimEnd()); } catch { return; }
+    const { event, data } = parsed;
+    resetHb();
+
+    if (event === "heartbeat") return;
+
+    if (event === "pool_status") {
+      setPoolStatus(data.models || null);
+      return;
+    }
+
+    if (event === "token_telemetry") {
+      setTokenTelemetry(data);
+      return;
+    }
+
+    if (["claude_response","codex_response","gemini_response"].includes(event)) {
+      const model = event.replace("_response","");
+      const msg = {
+        id:         data.id || Math.random().toString(36).slice(2),
+        model,
+        timestamp:  data.timestamp || Date.now(),
+        text:       data.text || "",
+        confidence: data.confidence ?? 0.75,
+        reasoning:  data.reasoning,
+        code:       data.code,
+        source:     data.source || null,
+      };
+      setMessages(prev => [...prev, msg]);
+      scrollToBottom();
+      startTT();
+    } else if (event === "synthesis_complete") {
+      setSynthesis({
+        primary:    data.primary,
+        runners_up: data.runners_up || [],
+        early_exit: !!data.early_exit,
+      });
+      setIsLoading(false);
+      clearTT();
+      closedRef.current = true;
+    } else if (event === "early_termination") {
+      setIsLoading(false);
+      clearTT();
+    } else if (event === "error") {
+      setError(data.message || "Unknown error");
+    }
+  }, [resetHb, scrollToBottom, startTT, clearTT]);
+
+  const connect = useCallback(() => {
+    if (closedRef.current || !taskId) return;
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const host  = wsBase || location.host;
+    // The coding-agent socket authenticates itself after the upgrade and
+    // fails closed (cato/api/ws_auth.py). A browser WebSocket cannot set a
+    // request header, so the daemon token goes in the query string.
+    const tok   = window.__CATO_TOKEN__ || "";
+    const url   = `${proto}//${host}/ws/coding-agent/${encodeURIComponent(taskId)}`
+                + (tok ? `?token=${encodeURIComponent(tok)}` : "");
+    setConnStatus("connecting");
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setConnStatus("connected");
+      retriesRef.current = 0;
+      resetHb();
+      startTT();
+    };
+    ws.onmessage = (ev) => handleMsg(ev.data);
+    ws.onerror   = () => {};
+    ws.onclose   = () => {
+      clearHb();
+      if (closedRef.current) { setConnStatus("closed"); return; }
+      if (retriesRef.current < MAX_RETRIES) {
+        const delay = Math.min(INIT_BACKOFF * 2 ** retriesRef.current, MAX_BACKOFF);
+        retriesRef.current++;
+        setConnStatus("reconnecting");
+        setTimeout(connect, delay);
+      } else {
+        setConnStatus("disconnected");
+        setIsLoading(false);
+        setError("Connection lost after multiple retries.");
+      }
+    };
+  }, [taskId, wsBase, handleMsg, resetHb, clearHb, startTT]);
+
+  useEffect(() => {
+    closedRef.current  = false;
+    retriesRef.current = 0;
+    setMessages([]);
+    setIsLoading(true);
+    setSynthesis(null);
+    setError(null);
+    setConnStatus("connecting");
+    setPoolStatus(null);
+    connect();
+    return () => {
+      closedRef.current = true;
+      clearHb();
+      clearTT();
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [taskId]);
+
+  return { messages, isLoading, synthesis, error, connStatus, poolStatus, tokenTelemetry, endRef };
+}
+
+// ── Confidence Badge ───────────────────────────────────────────────────── //
+
+function ConfidenceBadge({ confidence }) {
+  const lvl = getConfidenceLevel(confidence);
+  const pct = Math.round(confidence * 100);
+  const sym = lvl === "high" ? "●" : lvl === "medium" ? "◐" : "○";
+  return (
+    <span className={`conf-badge ${lvl}`}
+          title={`Confidence: ${pct}%`}
+          aria-label={`Confidence ${pct}% (${lvl})`}
+          data-testid="confidence-badge"
+          data-level={lvl}>
+      {sym} {pct}%
+    </span>
+  );
+}
+
+// ── Message Bubble ─────────────────────────────────────────────────────── //
+
+const MODEL_LABELS = { claude:"Claude", codex:"Codex", gemini:"Gemini", cursor:"Cursor" };
+const MODEL_ICONS  = { claude:"C", codex:"X", gemini:"G", cursor:"⊕" };
+const MODEL_COLORS = { claude:"var(--color-claude)", codex:"var(--color-codex)", gemini:"var(--color-gemini)", cursor:"#22D3EE" };
+
+function MessageBubble({ message }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied,   setCopied]   = useState(false);
+  const model = message.model.toLowerCase();
+  const label = MODEL_LABELS[model] || message.model;
+  const icon  = MODEL_ICONS[model] || model[0]?.toUpperCase() || "?";
+
+  const copyCode = async () => {
+    if (!message.code) return;
+    try { await navigator.clipboard.writeText(message.code); }
+    catch {
+      const el = document.createElement("textarea");
+      el.value = message.code;
+      document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
+    }
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <article className={`msg-bubble ${model}`}
+             data-testid="message-bubble"
+             data-model={model}
+             role="article"
+             aria-label={`${label} response`}>
+      <div className="msg-hdr">
+        <button className={`model-btn ${model}`}
+                onClick={() => message.reasoning && setExpanded(e => !e)}
+                aria-expanded={expanded}
+                aria-label={`${label}: click to toggle reasoning`}
+                data-testid={`model-btn-${model}`}>
+          <span className={`model-ic ${model}`} aria-hidden="true">{icon}</span>
+          {label}
+          {message.reasoning && <span className={`arrow ${expanded?"open":""}`} aria-hidden="true">▶</span>}
+        </button>
+        <ConfidenceBadge confidence={message.confidence} />
+        {message.source && <span className="source-label" data-testid="source-label">via {message.source}</span>}
+        <time className="ts"
+              dateTime={new Date(message.timestamp).toISOString()}>
+          {formatTime(message.timestamp)}
+        </time>
+      </div>
+
+      <p className="msg-text" data-testid="message-text">{message.text}</p>
+
+      {message.reasoning && expanded && (
+        <div className="reasoning-block" data-testid="message-reasoning">
+          <div className="reasoning-lbl">Reasoning</div>
+          {message.reasoning}
+        </div>
+      )}
+
+      {message.code && (
+        <div className="code-wrap" data-testid="code-block-wrapper">
+          <pre className="code-pre" data-testid="code-block"><code>{message.code}</code></pre>
+          <button className={`copy-btn ${copied?"copied":""}`}
+                  onClick={copyCode}
+                  aria-label={copied?"Copied!":"Copy code"}
+                  data-testid="copy-btn">
+            {copied ? "✓ Copied" : "Copy"}
+          </button>
+        </div>
+      )}
+    </article>
+  );
+}
+
+// ── Token Status Bar ───────────────────────────────────────────────────── //
+
+function TokenStatusBar({ telemetry }) {
+  if (!telemetry) return null;
+  const fmt = (n) => n >= 1000 ? `${(n/1000).toFixed(1)}k` : String(n);
+  const slots = telemetry.context_slots_used || {};
+  const hasSlots = Object.keys(slots).length > 0;
+  return (
+    <div className="token-bar" role="status" aria-label="Token usage" data-testid="token-status-bar">
+      <span className="token-bar-item">
+        <span className="token-bar-label">Turn In</span>
+        <span className="token-bar-val" data-testid="token-turn-in">{fmt(telemetry.turn_tokens_in || 0)}</span>
+      </span>
+      <span className="token-bar-sep">·</span>
+      <span className="token-bar-item">
+        <span className="token-bar-label">Out</span>
+        <span className="token-bar-val" data-testid="token-turn-out">{fmt(telemetry.turn_tokens_out || 0)}</span>
+      </span>
+      <span className="token-bar-sep">·</span>
+      <span className="token-bar-item">
+        <span className="token-bar-label">Session</span>
+        <span className="token-bar-val" data-testid="token-session-total">
+          {fmt(telemetry.session_total_in || 0)} / {fmt(telemetry.session_total_out || 0)}
+        </span>
+      </span>
+      {(telemetry.input_output_ratio > 0) && (
+        <>
+          <span className="token-bar-sep">·</span>
+          <span className="token-bar-item">
+            <span className="token-bar-label">Ratio</span>
+            <span className="token-bar-val" data-testid="token-ratio">{(telemetry.input_output_ratio).toFixed(1)}:1</span>
+          </span>
+        </>
+      )}
+      {hasSlots && (
+        <>
+          <span className="token-bar-sep">·</span>
+          <span className="token-tooltip token-bar-item" tabIndex={0} aria-label="Context slot breakdown">
+            <span className="token-bar-label" style={{textDecoration:"underline dotted",cursor:"help"}}>Slots</span>
+            <div className="token-tooltip-body" role="tooltip">
+              {Object.entries(slots).map(([k, v]) => (
+                <div key={k}><strong>{k}:</strong> {v} tokens</div>
+              ))}
+            </div>
+          </span>
+        </>
+      )}
+      {(telemetry.estimated_cost_usd > 0) && (
+        <>
+          <span className="token-bar-sep">·</span>
+          <span className="token-bar-item">
+            <span className="token-bar-label">Est.</span>
+            <span className="token-bar-val" data-testid="token-cost">${telemetry.estimated_cost_usd.toFixed(4)}</span>
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── TalkPage ───────────────────────────────────────────────────────────── //
+
+const ALL_MODELS = ["claude","codex","gemini","cursor"];
+
+function TalkPage({ task, messages, isLoading, synthesis, error, connStatus, poolStatus, tokenTelemetry, endRef, activeModels }) {
+  const msgsAreaRef  = useRef(null);
+  const userScrolled = useRef(false);
+  const models = activeModels || ALL_MODELS;
+
+  const handleScroll = () => {
+    const el = msgsAreaRef.current;
+    if (!el) return;
+    userScrolled.current = el.scrollHeight - el.scrollTop - el.clientHeight > 80;
+  };
+
+  const responded = (model) => messages.some(m => m.model.toLowerCase() === model);
+  const respCount  = models.filter(m => responded(m)).length;
+
+  return (
+    <section className="talk-page" aria-label="Model conversation" data-testid="talk-page">
+      {connStatus === "reconnecting" && (
+        <div className="conn-warn" role="alert" aria-live="assertive" data-testid="connection-warning">
+          ⚠ Reconnecting to server...
+        </div>
+      )}
+      {connStatus === "disconnected" && (
+        <div className="conn-err" role="alert" aria-live="assertive" data-testid="connection-error">
+          ✕ Connection lost — results may be incomplete.
+        </div>
+      )}
+
+      <header className="talk-header">
+        <div className="talk-header-task" title={task} data-testid="task-header">{task}</div>
+        <div className="model-indicators" role="group" aria-label="Model status"
+             data-testid="loading-spinners">
+          {models.map(m => {
+            const loading = isLoading && !responded(m);
+            const ps = poolStatus?.[m];
+            return (
+              <div key={m}
+                   className={`model-ind ${m} ${!loading?"active":""}`}
+                   role="status"
+                   aria-label={`${MODEL_LABELS[m]}: ${loading?"waiting":"responded"}${ps?` (${ps})`:""}`}
+                   data-testid={`model-indicator-${m}`}>
+                {loading
+                  ? <span className="spinner" aria-hidden="true"/>
+                  : <span className="dot" aria-hidden="true"/>}
+                {MODEL_LABELS[m]}
+                {ps && <span className={`pool-badge ${ps}`} data-testid={`pool-badge-${m}`}>{ps}</span>}
+              </div>
+            );
+          })}
+        </div>
+      </header>
+
+      <div className="talk-msgs"
+           ref={msgsAreaRef}
+           onScroll={handleScroll}
+           role="log"
+           aria-live="polite"
+           aria-label="Model responses"
+           data-testid="messages-area">
+        {messages.length === 0 && isLoading && (
+          <p style={{textAlign:"center",color:"var(--text-muted)",marginTop:"32px",fontSize:"12px"}}
+             aria-live="polite">
+            Waiting for model responses...
+          </p>
+        )}
+        {messages.map(msg => <MessageBubble key={msg.id} message={msg}/>)}
+        {error && (
+          <div className="conn-err" role="alert" aria-live="assertive" data-testid="error-banner">
+            ✕ {error}
+          </div>
+        )}
+        <div ref={endRef} aria-hidden="true"/>
+      </div>
+
+      <div className="talk-footer"
+           role="region"
+           aria-label="Synthesis result">
+        {!synthesis && isLoading ? (
+          <div className="awaiting" role="status" aria-live="polite">
+            <div className="dots" aria-hidden="true"><span/><span/><span/></div>
+            {respCount > 0
+              ? `${respCount} response${respCount>1?"s":""} in… waiting for ${models.length-respCount} more`
+              : `${models.length} responses in progress...`}
+          </div>
+        ) : synthesis ? (
+          <div className="synth-card" data-testid="synthesis-result">
+            <div className="synth-lbl"><span aria-hidden="true">★</span> Best Answer</div>
+            <div className="synth-model" style={{color: synthesis.primary.model==="claude"?"#3B82F6":synthesis.primary.model==="codex"?"#F59E0B":"#A855F7"}}>
+              {MODEL_LABELS[synthesis.primary.model] || synthesis.primary.model}
+              <ConfidenceBadge confidence={synthesis.primary.confidence}/>
+              {synthesis.early_exit && <span style={{fontSize:"10px",color:"#fcd34d",background:"#78350f44",border:"1px solid #78350f",padding:"1px 6px",borderRadius:"10px"}}>Early Exit</span>}
+            </div>
+            <p className="synth-text">{synthesis.primary.response}</p>
+          </div>
+        ) : null}
+      </div>
+
+      <TokenStatusBar telemetry={tokenTelemetry} />
+    </section>
+  );
+}
+
+// ── Model Config Hook ──────────────────────────────────────────────────── //
+
+function useModelConfig(apiBase) {
+  const [config, setConfig] = useState({ enabled_models: ["claude","codex","gemini"], subagent_enabled: false, subagent_coding_backend: "codex" });
+  useEffect(() => {
+    fetch(`${apiBase}/api/config`).then(r => r.json()).then(setConfig).catch(() => {});
+  }, [apiBase]);
+  return [config, setConfig];
+}
+
+// ── Model Settings Panel ───────────────────────────────────────────────── //
+
+function ModelSettingsPanel({ apiBase, config, setConfig, onClose }) {
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState("idle");
+
+  const toggleModel = (model) => {
+    setConfig(prev => {
+      const isOn = prev.enabled_models.includes(model);
+      if (isOn && prev.enabled_models.length === 1) return prev;
+      const next = isOn ? prev.enabled_models.filter(m => m !== model) : [...prev.enabled_models, model];
+      return { ...prev, enabled_models: next };
+    });
+  };
+
+  const save = async () => {
+    setSaving(true); setStatus("idle");
+    try {
+      const res = await fetch(`${apiBase}/api/config`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setStatus("saved");
+      setTimeout(() => setStatus("idle"), 2000);
+    } catch { setStatus("error"); }
+    finally { setSaving(false); }
+  };
+
+  const modelMeta = {
+    claude: { desc: "Anthropic · Claude Code CLI", color: "var(--color-claude)" },
+    codex:  { desc: "OpenAI · Codex CLI",           color: "var(--color-codex)"  },
+    gemini: { desc: "Google · Gemini CLI",           color: "var(--color-gemini)" },
+    cursor: { desc: "Cursor · Agent mode",           color: "#22D3EE"             },
+  };
+
+  return (
+    <div className="model-settings-panel">
+      <div className="settings-header">
+        <span className="settings-title">Model Toggles</span>
+        {onClose && <button className="settings-close" onClick={onClose} aria-label="Close">✕</button>}
+      </div>
+
+      <div className="settings-section-label">Active backends</div>
+      <div className="settings-model-list">
+        {ALL_MODELS.map(model => {
+          const meta = modelMeta[model];
+          const enabled = config.enabled_models.includes(model);
+          return (
+            <div key={model} className={`settings-model-row ${enabled ? "on" : "off"}`}>
+              <div className="settings-model-info">
+                <span className="settings-model-dot" style={{ background: meta.color }}/>
+                <div>
+                  <span className="settings-model-name">{MODEL_LABELS[model]}</span>
+                  <span className="settings-model-desc">{meta.desc}</span>
+                </div>
+              </div>
+              <button className={`settings-toggle ${enabled ? "toggle-on" : "toggle-off"}`}
+                      onClick={() => toggleModel(model)}
+                      aria-pressed={enabled}
+                      aria-label={`${enabled ? "Disable" : "Enable"} ${MODEL_LABELS[model]}`}>
+                <span className="toggle-knob"/>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="settings-section-label" style={{ marginTop: 16 }}>Subagent routing</div>
+      <div className="settings-subagent-row">
+        <label className="settings-subagent-label">
+          <input type="checkbox" checked={config.subagent_enabled}
+                 onChange={e => setConfig(p => ({ ...p, subagent_enabled: e.target.checked }))}/>
+          <span>Route coding tasks to a single backend</span>
+        </label>
+      </div>
+      {config.subagent_enabled && (
+        <div className="settings-backend-select">
+          <label className="settings-section-label">Backend</label>
+          <select className="settings-select" value={config.subagent_coding_backend}
+                  onChange={e => setConfig(p => ({ ...p, subagent_coding_backend: e.target.value }))}>
+            {ALL_MODELS.map(m => <option key={m} value={m}>{MODEL_LABELS[m]}</option>)}
+          </select>
+        </div>
+      )}
+
+      <div className="settings-footer">
+        <button className="settings-save-btn" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save"}
+        </button>
+        {status === "saved" && <span className="settings-status ok">Saved</span>}
+        {status === "error" && <span className="settings-status err">Save failed</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Task Input Form ────────────────────────────────────────────────────── //
+
+const LANGS = [
+  {v:"",l:"Any / Auto-detect"},{v:"python",l:"Python"},{v:"javascript",l:"JavaScript"},
+  {v:"typescript",l:"TypeScript"},{v:"java",l:"Java"},{v:"go",l:"Go"},
+  {v:"rust",l:"Rust"},{v:"cpp",l:"C++"},{v:"csharp",l:"C#"},{v:"ruby",l:"Ruby"},
+];
+const EXTS = [".py",".js",".ts",".java",".go",".rs",".cpp",".cs",".rb"];
+
+function TaskInput({ readOnly=false, defaultTask="", onTaskCreated, apiBase="" }) {
+  const [task,      setTask]     = useState(defaultTask);
+  const [lang,      setLang]     = useState("");
+  const [ctx,       setCtx]      = useState("");
+  const [fname,     setFname]    = useState("");
+  const [loading,   setLoading]  = useState(false);
+  const [submitErr, setSubmitErr]= useState(null);
+  const fileRef = useRef(null);
+
+  const tooShort = task.trim().length > 0 && task.trim().length < 10;
+  const tooLong  = task.trim().length > 500;
+  const valid    = task.trim().length >= 10 && !tooLong && !loading;
+
+  const handleFile = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) { setCtx(""); setFname(""); return; }
+    const ext = "." + f.name.split(".").pop()?.toLowerCase();
+    if (!EXTS.includes(ext)) { setSubmitErr("Unsupported file type: " + EXTS.join(", ")); e.target.value=""; return; }
+    try {
+      const text = await f.text();
+      setCtx(text); setFname(f.name); setSubmitErr(null);
+    } catch { setSubmitErr("Failed to read file."); }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!valid) return;
+    setLoading(true); setSubmitErr(null);
+    try {
+      const r = await fetch(`${apiBase}/api/coding-agent/invoke`, {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({task:task.trim(), language:lang||undefined, context:ctx||undefined})
+      });
+      if (!r.ok) { const d = await r.json().catch(()=>({error:"Request failed"})); throw new Error(d.error||`HTTP ${r.status}`); }
+      const d = await r.json();
+      if (onTaskCreated) onTaskCreated(d.task_id);
+      else location.href = `/coding-agent/${d.task_id}`;
+    } catch(err) {
+      setSubmitErr(err.message || String(err));
+    } finally { setLoading(false); }
+  };
+
+  const charClass = task.length > 500 ? "char-ct over" : task.length > 425 ? "char-ct warn" : "char-ct";
+
+  return (
+    <form className="form" onSubmit={handleSubmit}
+          aria-label="Submit coding task"
+          data-testid="task-input-form" noValidate>
+      <div>
+        <label className="f-lbl" htmlFor="ta-desc">
+          Task Description<span className="f-req" aria-hidden="true">*</span>
+        </label>
+        <textarea id="ta-desc" className="f-ta"
+                  placeholder="e.g., Review this sorting algorithm, Optimize this query, Suggest architecture"
+                  value={task} onChange={e=>{setTask(e.target.value);setSubmitErr(null);}}
+                  disabled={readOnly||loading}
+                  aria-required="true" aria-invalid={tooShort||tooLong}
+                  data-testid="task-textarea" rows={4}/>
+        <span className={charClass} aria-live="polite" data-testid="char-count">
+          {task.length} / 500
+        </span>
+        {tooShort && <span style={{fontSize:"11px",color:"#fca5a5",display:"block"}} role="alert" data-testid="task-too-short-error">Minimum 10 characters required.</span>}
+        {tooLong  && <span style={{fontSize:"11px",color:"#fca5a5",display:"block"}} role="alert" data-testid="task-too-long-error">Maximum 500 characters allowed.</span>}
+      </div>
+
+      <div>
+        <label className="f-lbl" htmlFor="ta-lang">Language (optional)</label>
+        <select id="ta-lang" className="f-sel" value={lang} onChange={e=>setLang(e.target.value)}
+                disabled={readOnly||loading} data-testid="language-select">
+          {LANGS.map(({v,l}) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </div>
+
+      {!readOnly && (
+        <div>
+          <label className="f-lbl">File Context (optional)</label>
+          <label className="f-lbl" htmlFor="ta-file"
+                 style={{fontWeight:"normal",textTransform:"none",letterSpacing:"normal",display:"flex",alignItems:"center",gap:"6px",background:"var(--bg-dark)",border:"1px dashed var(--border)",borderRadius:"7px",padding:"8px 10px",cursor:"pointer",color:"var(--text-muted)",fontSize:"12px",transition:"border-color .15s"}}
+                 onMouseOver={e=>e.currentTarget.style.borderColor="#3b82f6"}
+                 onMouseOut={e=>e.currentTarget.style.borderColor=getComputedStyle(document.documentElement).getPropertyValue('--border')}>
+            📎 {fname ? `${fname} (click to replace)` : `Attach file (${EXTS.join(", ")})`}
+          </label>
+          <input ref={fileRef} id="ta-file" type="file" accept={EXTS.join(",")}
+                 onChange={handleFile} disabled={readOnly||loading}
+                 style={{display:"none"}} data-testid="file-input"/>
+          {ctx && (
+            <pre style={{marginTop:"6px",background:"#0a0c12",border:"1px solid #2d3448",borderRadius:"5px",padding:"7px 9px",fontSize:"11px",color:"#94a3b8",overflow:"auto",maxHeight:"100px"}}
+                 data-testid="file-preview">
+              {ctx.slice(0,500)}{ctx.length>500?"\n... (truncated)":""}
+            </pre>
+          )}
+        </div>
+      )}
+
+      {submitErr && (
+        <div className="conn-err" role="alert" aria-live="assertive" data-testid="submit-error">
+          ✕ {submitErr}
+        </div>
+      )}
+
+      {!readOnly && (
+        <button type="submit" className="sub-btn" disabled={!valid}
+                aria-disabled={!valid} data-testid="submit-btn">
+          {loading ? <><span className="sub-spin" aria-hidden="true"/> Submitting...</> : <>▶ Run Agents</>}
+        </button>
+      )}
+    </form>
+  );
+}
+
+// ── Right Sidebar ──────────────────────────────────────────────────────── //
+
+function RightSidebar({ synthesis, isLoading, taskId }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async (text) => {
+    try { await navigator.clipboard.writeText(text); }
+    catch { const el=document.createElement("textarea"); el.value=text; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); }
+    setCopied(true); setTimeout(()=>setCopied(false), 2000);
+  };
+
+  const save = (text, model) => {
+    const b = new Blob([text],{type:"text/plain"});
+    const u = URL.createObjectURL(b);
+    const a = document.createElement("a"); a.href=u; a.download=`cato-${model}-result.txt`; a.click(); URL.revokeObjectURL(u);
+  };
+
+  const share = (id) => {
+    const url = `${location.origin}/coding-agent/${id}`;
+    navigator.clipboard.writeText(url).catch(()=>{});
+    alert(`Link copied:\n${url}`);
+  };
+
+  const modelColor = (m) => MODEL_COLORS[m] || "#94a3b8";
+
+  return (
+    <aside className="sidebar-right" aria-label="Results panel" data-testid="right-sidebar">
+      <div className="sidebar-hdr">
+        <span>Results</span>
+        {synthesis && <span style={{color:"#22c55e",fontSize:"10px"}}>Complete</span>}
+      </div>
+      <div className="sidebar-body">
+        {!synthesis && isLoading && (
+          <p style={{fontSize:"11px",color:"var(--text-muted)",textAlign:"center",marginTop:"16px"}} aria-live="polite">
+            Awaiting responses...
+          </p>
+        )}
+        {synthesis && (
+          <>
+            <div className="synth-card" data-testid="primary-result" style={{marginBottom:"10px"}}>
+              <div className="synth-lbl"><span aria-hidden="true">★</span> Primary Answer</div>
+              <div className="synth-model" style={{color:modelColor(synthesis.primary.model)}}>
+                {MODEL_LABELS[synthesis.primary.model]||synthesis.primary.model}
+                <ConfidenceBadge confidence={synthesis.primary.confidence}/>
+              </div>
+              <p className="synth-text" style={{maxHeight:"180px",overflowY:"auto"}}>{synthesis.primary.response}</p>
+              <div className="synth-actions">
+                <button className={`act-btn ${copied?"copied":""}`}
+                        onClick={()=>copy(synthesis.primary.response)}
+                        aria-label="Copy primary answer"
+                        data-testid="copy-primary-btn">
+                  {copied?"✓ Copied":"Copy"}
+                </button>
+                <button className="act-btn" onClick={()=>save(synthesis.primary.response, synthesis.primary.model)}
+                        aria-label="Save primary answer" data-testid="save-btn">Save</button>
+                <button className="act-btn" onClick={()=>share(taskId)}
+                        aria-label="Share result" data-testid="share-btn">Share</button>
+              </div>
+            </div>
+
+            {synthesis.runners_up.length > 0 && (
+              <>
+                <div className="sidebar-hdr" style={{border:"none",padding:"8px 0 4px",fontSize:"10px"}}>
+                  <span>Alternatives</span>
+                </div>
+                {synthesis.runners_up.map((alt,i) => (
+                  <div key={i} className="synth-card" style={{marginBottom:"8px"}} data-testid={`runner-up-${i}`}>
+                    <div className="synth-model" style={{color:modelColor(alt.model)}}>
+                      {MODEL_LABELS[alt.model]||alt.model}
+                      <ConfidenceBadge confidence={alt.confidence}/>
+                    </div>
+                    <p className="synth-text" style={{maxHeight:"100px",overflowY:"auto",fontSize:"11px"}}>{alt.response}</p>
+                    <button className="act-btn" style={{marginTop:"6px"}}
+                            onClick={()=>copy(alt.response)}
+                            aria-label={`Copy ${MODEL_LABELS[alt.model]||alt.model} response`}>Copy</button>
+                  </div>
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+// ── Coding Agent Page ──────────────────────────────────────────────────── //
+
+function CodingAgentPage({ taskId, initialTask="" }) {
+  const { messages, isLoading, synthesis, error, connStatus, poolStatus, tokenTelemetry, endRef } =
+    useTalkPageStream(taskId);
+  const [taskDesc, setTaskDesc] = useState(initialTask);
+  const [recentTasks, setRecentTasks] = useLocalStorage("cato-recent-tasks", []);
+  const [showSettings, setShowSettings] = useState(false);
+  const [modelConfig, setModelConfig] = useModelConfig("");
+
+  useEffect(() => {
+    if (taskDesc || !taskId) return;
+    fetch(`/api/coding-agent/${encodeURIComponent(taskId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.task) setTaskDesc(d.task); })
+      .catch(() => {});
+  }, [taskId, taskDesc]);
+
+  useEffect(() => {
+    if (!synthesis || !taskDesc) return;
+    setRecentTasks(prev => {
+      if (prev.some(t => t.taskId === taskId)) return prev;
+      return [{taskId, task:taskDesc, createdAt:Date.now()}, ...prev].slice(0,10);
+    });
+  }, [synthesis, taskId, taskDesc]);
+
+  const handleRetry = () => location.reload();
+  const handleRecent = (rt) => { location.href = `/coding-agent/${rt.taskId}`; };
+
+  return (
+    <main className="coding-agent-page" data-testid="coding-agent-page" aria-label="Coding agent results">
+      {/* Left sidebar */}
+      <aside className="sidebar-left" aria-label="Task details" data-testid="left-sidebar">
+        <div className="sidebar-hdr">
+          <span style={{display:"flex",alignItems:"center",gap:"6px"}}>
+            <img src="/logo-32.png" alt="Cato" style={{width:"20px",height:"20px",borderRadius:"4px",objectFit:"contain"}} onError={e=>{e.target.style.display="none"}}/>
+            <span style={{color:"#3b82f6",fontWeight:"700",fontSize:"12px"}}>Cato</span>
+          </span>
+          <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+            {isLoading && <span style={{color:"#60a5fa",fontSize:"10px"}} role="status" aria-live="polite" data-testid="loading-status">Running...</span>}
+            <button className="settings-gear-btn" onClick={() => setShowSettings(s => !s)} aria-label="Model settings" title="Model settings">⚙</button>
+          </div>
+        </div>
+        <div className="sidebar-body">
+          {showSettings && (
+            <ModelSettingsPanel apiBase="" config={modelConfig} setConfig={setModelConfig} onClose={() => setShowSettings(false)}/>
+          )}
+          <TaskInput readOnly={isLoading} defaultTask={taskDesc}
+                     onTaskCreated={id => { location.href = `/coding-agent/${id}`; }}/>
+
+          {recentTasks.length > 0 && (
+            <div style={{marginTop:"18px"}}>
+              <div style={{fontSize:"10px",fontWeight:"700",textTransform:"uppercase",letterSpacing:".07em",color:"var(--text-muted)",marginBottom:"6px"}}>
+                Recent Tasks
+              </div>
+              <nav aria-label="Recent tasks">
+                {recentTasks.map(rt => (
+                  <button key={rt.taskId}
+                          className={`recent-item ${rt.taskId===taskId?"current":""}`}
+                          onClick={()=>handleRecent(rt)}
+                          aria-label={`Resume task: ${rt.task}`}
+                          aria-current={rt.taskId===taskId?"page":undefined}
+                          data-testid="recent-task-item">
+                    {rt.task.slice(0,55)}{rt.task.length>55?"…":""}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Main talk area */}
+      <div className="talk-main" data-testid="talk-main">
+        {error && !isLoading && (
+          <div className="err-banner" role="alert" data-testid="page-error-banner">
+            <span>Error: {error}</span>
+            <button className="retry-btn" onClick={handleRetry}
+                    aria-label="Retry task" data-testid="retry-btn">Retry</button>
+          </div>
+        )}
+        <TalkPage task={taskDesc||`Task ${taskId}`} messages={messages}
+                  isLoading={isLoading} synthesis={synthesis} error={error}
+                  connStatus={connStatus} poolStatus={poolStatus}
+                  tokenTelemetry={tokenTelemetry} endRef={endRef}
+                  activeModels={modelConfig.enabled_models}/>
+      </div>
+
+      {/* Right sidebar */}
+      <RightSidebar synthesis={synthesis} isLoading={isLoading} taskId={taskId}/>
+    </main>
+  );
+}
+
+// ── Entry Page (no task yet) ───────────────────────────────────────────── //
+
+function EntryPage() {
+  return (
+    <div className="entry-page">
+      <div className="entry-card">
+        <img src="/favicon.png" alt="Cato" style={{width:"120px",height:"120px",display:"block",margin:"0 auto 16px"}} /><h1 className="entry-title">Cato Coding Agent</h1>
+        <p className="entry-sub">Submit a task to get parallel responses from Claude, Codex, and Gemini.</p>
+        <TaskInput onTaskCreated={id => { location.href = `/coding-agent/${id}`; }}/>
+      </div>
+    </div>
+  );
+}
+
+// ── App Router ─────────────────────────────────────────────────────────── //
+
+function App() {
+  const taskId = getTaskIdFromUrl();
+  if (taskId) {
+    return <CodingAgentPage taskId={taskId}/>;
+  }
+  return <EntryPage/>;
+}
+
+// ── Mount ──────────────────────────────────────────────────────────────── //
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# ConduitScore revenue loop — reference Clawflow (dry-run safe)
+# Copy to %APPDATA%/cato/flows/ after customizing paths.
+# Build spec: CONDUITSCORE-NIGHT-SHIFT-001 — P2-CATO-006
+
+name: conduitscore-revenue-loop
+active: false
+dry_run: true
+trigger:
+  type: manual
+budget_cap: 500
+steps:
+  - skill: file.read
+    args:
+      path: "{{prospect_manifest}}"
+    on_error: stop
+  - skill: genesis
+    args:
+      agent: genesis-analyst
+      task: representation_fidelity
+      params:
+        url: "{{url}}"
+    on_error: stop
+  - skill: genesis
+    args:
+      agent: genesis-email
+      task: draft_outreach
+      params:
+        audit_url: "{{artifact_url}}"
+    on_error: stop
+  - skill: send_email
+    args:
+      draft_only: true
+    on_error: stop

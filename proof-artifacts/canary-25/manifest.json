@@ -1,0 +1,82 @@
+{
+  "batch_id": "test-batch",
+  "created": "2026-08-05T22:08:23+00:00",
+  "status": "selected",
+  "g1_safety": {
+    "live_outreach_via_cato": false,
+    "operator_hand_approve_each_send": true,
+    "notes": "Cato does not enqueue live sends until G1. Use outreach engine manually per contact."
+  },
+  "source_file": "/tmp/pool.csv",
+  "selection": {
+    "criteria_version": "1.0",
+    "pool_size": 2,
+    "selected_count": 2,
+    "seed": null,
+    "excluded_contact_ids": 0
+  },
+  "tracking": {
+    "window_start": "",
+    "window_end": "",
+    "window_days": 7,
+    "sent_count": 0,
+    "replies": 0,
+    "audit_views": 0,
+    "complaints": 0,
+    "bounces": 0,
+    "complaint_rate_pct": 0.0,
+    "bounce_rate_pct": 0.0
+  },
+  "pass_criteria": {
+    "min_replies_or_audit_views": 1,
+    "max_complaint_rate_pct": 0.1,
+    "description": "Row 4 loop-proof-card: >=1 reply OR >=1 audit view; complaints <0.1%"
+  },
+  "contacts": [
+    {
+      "contact_id": "one.com",
+      "domain": "one.com",
+      "receiver_email": "a@one.com",
+      "first_name": "",
+      "company_name": "",
+      "notes": "",
+      "scrape_source": "",
+      "tier": "tier_a",
+      "score": 0,
+      "send_status": "pending",
+      "approved_at": "",
+      "sent_at": "",
+      "reply": false,
+      "audit_view": false,
+      "complaint": false,
+      "bounce": false,
+      "operator_notes": ""
+    },
+    {
+      "contact_id": "two.com",
+      "domain": "two.com",
+      "receiver_email": "b@two.com",
+      "first_name": "",
+      "company_name": "",
+      "notes": "",
+      "scrape_source": "",
+      "tier": "tier_b",
+      "score": 0,
+      "send_status": "pending",
+      "approved_at": "",
+      "sent_at": "",
+      "reply": false,
+      "audit_view": false,
+      "complaint": false,
+      "bounce": false,
+      "operator_notes": ""
+    }
+  ],
+  "evidence": {
+    "deliverability_report": "proof-artifacts/fp1/",
+    "tracking_sheet": "proof-artifacts/canary-25/tracking-sheet.csv",
+    "stripe_payment_url": "",
+    "fulfillment_artifact": ""
+  },
+  "notes": ""
+}

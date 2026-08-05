@@ -1,0 +1,23 @@
+{
+  "date": "2026-06-03",
+  "tests": [
+    {
+      "token": "test-7c773651d517",
+      "score": 6.7,
+      "pass": false,
+      "url": "https://www.mail-tester.com/test-7c773651d517",
+      "notes": "Brevo injected HTML tracking pixel; HTML_IMAGE_ONLY_08 (-1.78)"
+    },
+    {
+      "token": "test-e8a564c9b3fa",
+      "score": 7.6,
+      "pass": false,
+      "url": "https://www.mail-tester.com/test-e8a564c9b3fa",
+      "notes": "Longer plain body; still Brevo HTML-only relay"
+    }
+  ],
+  "from": "bstone@surfacescore.com",
+  "pass_target": 8.0,
+  "best_score": 7.6,
+  "remediation": "Ask Brevo support to disable transactional open/link tracking on SMTP, then re-run scripts/fp1_mail_tester.py"
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "name": "dashboard",
+    "priority": "P0",
+    "result": "PASS",
+    "evidence": "C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\dashboard_final.png"
+  },
+  {
+    "name": "workflow_to_chat",
+    "priority": "P0",
+    "result": "FAIL",
+    "evidence": "attempt 1: console:[useChatStream] WebSocket error; screenshot=C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\workflow_to_chat_attempt1_1785970144.png | attempt 2: console:[useChatStream] WebSocket error; screenshot=C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\workflow_to_chat_attempt2_1785970146.png"
+  },
+  {
+    "name": "navigation",
+    "priority": "P1",
+    "result": "PASS",
+    "evidence": "C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\navigation_final.png"
+  },
+  {
+    "name": "mobile_dashboard",
+    "priority": "P1",
+    "result": "PASS",
+    "evidence": "C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\mobile_dashboard_final.png"
+  },
+  {
+    "name": "no_green_rendered",
+    "priority": "P1",
+    "result": "PASS",
+    "evidence": "C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\no_green_rendered_final.png"
+  }
+]

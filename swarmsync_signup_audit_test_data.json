@@ -1,0 +1,69 @@
+{
+  "sourceAuditFile": "C:\\Users\\Administrator\\Desktop\\SwarmSync\\Testing suites\\SwarmSync_New_User_Registration_Login_Audit.md",
+  "repo": "C:\\Users\\Administrator\\Desktop\\SwarmSync",
+  "krakenPersonaFile": "C:\\Users\\Administrator\\.codex\\agents\\Kraken.md",
+  "urls": {
+    "productionWeb": "https://swarmsync.ai",
+    "productionApi": "https://api.swarmsync.ai",
+    "productionAgentsGateway": "https://swarmsync-agents.onrender.com",
+    "localWeb": "http://localhost:3000",
+    "localApi": "http://localhost:4000"
+  },
+  "apiRoutes": {
+    "checkUsername": "GET /auth/check-username?username=<username>",
+    "registerHuman": "POST /auth/register",
+    "registerAgent": "POST /auth/register-agent",
+    "login": "POST /auth/login",
+    "loginMfa": "POST /auth/login/mfa",
+    "logout": "POST /auth/logout",
+    "refresh": "POST /auth/refresh",
+    "forgotPassword": "POST /auth/forgot-password",
+    "resetPassword": "POST /auth/reset-password",
+    "verifyEmail": "POST /auth/verify-email",
+    "resendVerification": "POST /auth/resend-verification",
+    "magicLinkRequest": "POST /auth/magic-link/request",
+    "magicLinkConsume": "POST /auth/magic-link/consume",
+    "sessionExchange": "POST /auth/session/exchange"
+  },
+  "human": {
+    "name": "Test Human Buyer",
+    "company": "Northstar Medical Supplies LLC",
+    "email": "test.human.buyer+signup-audit@test.swarm",
+    "apiBody": {
+      "email": "test.human.buyer+signup-audit@test.swarm",
+      "displayName": "Test Human Buyer",
+      "password": "<secure test password>",
+      "userType": "HUMAN"
+    }
+  },
+  "agent": {
+    "sourceAuditUsername": "invoice-risk-review-agent-signup-audit",
+    "apiCompatibleUsername": "invoice_risk_review",
+    "displayName": "Invoice Risk Review Agent",
+    "capabilities": [
+      "invoice verification",
+      "vendor risk review",
+      "duplicate invoice detection"
+    ],
+    "description": "Reviews vendor invoices and flags duplicate invoices, changed bank details, and payment risk before approval.",
+    "operatorEmail": "test.agent.operator+signup-audit@test.swarm",
+    "walletType": "managed",
+    "ap2Endpoint": "https://example.test/ap2/invoice-risk-review-agent",
+    "websiteEndpoint": "https://example.test/agents/invoice-risk-review-agent",
+    "expectedSandboxCreditsUsd": 50,
+    "apiBody": {
+      "email": "test.agent.operator+signup-audit@test.swarm",
+      "password": "<secure test password>",
+      "username": "invoice_risk_review",
+      "walletType": "managed",
+      "agentDisplayName": "Invoice Risk Review Agent",
+      "description": "Reviews vendor invoices and flags duplicate invoices, changed bank details, and payment risk before approval."
+    }
+  },
+  "expectedVerdicts": [
+    "SAFE TO PROMOTE",
+    "SAFE WITH LIMITS",
+    "NOT SAFE YET"
+  ],
+  "blockingRule": "If no supervisor/bootstrap/API/payment controls are provided, privileged wallet, escrow, refund, payout, failed payment, wrong-org DB, and admin inspection checks are blocked and cannot be claimed as passed."
+}

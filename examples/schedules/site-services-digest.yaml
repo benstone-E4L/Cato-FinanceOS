@@ -1,0 +1,7 @@
+# Morning digest: site-services audit + inbox stats + pending approvals.
+name: site-services-digest
+cron: "0 7 * * *"
+skill: site_services.digest
+args: {}
+budget_cap: 50
+enabled: true

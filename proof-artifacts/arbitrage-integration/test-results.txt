@@ -1,0 +1,30 @@
+CATO ARBITRAGE INTEGRATION — PROOF ARTIFACTS (2026-07-03, post-HKO-fix)
+Branch: feat/arbitrage-engine-integration
+
+NEW UNIT TESTS: tests/test_arbitrage_integration.py — 11 passed (9 build + 2 HKO operator-gate)
+FINAL FULL SUITE: 1967 passed, 5 skipped, 0 failed (baseline ~1956; +11 new)
+LIVE-DRY TRANSPORT SMOKE (Cato runtime -> live Render engine):
+  health: ok=True, HTTP 200, body.status=ok
+  run_cycle dry-run: approval_required=True, url=.../internal/engine/run-cycle
+
+HKO-TRUTH-AUDIT: PASS (PASSED_WITH_FIXES)
+  HK: 0 critical / 0 high  |  OTA: 0  |  RIO: 1 MEDIUM (fixed) + 1 info
+  F1 (MEDIUM) operator-auth on /arbitrage controls — FIXED + regression-tested — CLOSED
+
+FILES CHANGED (final):
+  M cato/integrations/registry.py
+  M cato/integrations/runtime.py
+  M cato/config.py                  (+arbitrage_engine_url, arbitrage_autonomy, arbitrage_operator_chat_ids)
+  M cato/core/scheduled_dispatch.py
+  M cato/adapters/telegram.py       (/arbitrage cmd + operator gate)
+  A cato/core/arbitrage_cycle.py
+  A tests/test_arbitrage_integration.py (11 tests)
+  A (skill) ~/.cato/skills/arbitrage-ops/SKILL.md
+
+--- E2E FOLLOW-UP (scheduler dispatch simulation) ---
+Bug surfaced by full-path E2E: run_arbitrage_cycle resolved base_url from legacy
+vault ARBITRAGE_SERVICE_URL (retired Railway backend) -> 404. Fixed precedence to
+ARBITRAGE_ENGINE_URL (optional vault override) -> config.arbitrage_engine_url (Render).
+Post-fix dispatch E2E: arbitrage.cycle/reconcile -> ok=True, HTTP 201, gateway notified.
+Vault synced + live-verified: overview(dashboard token)=200, reconcile(internal secret)=201.
+Stage-1 schedules seeded: arbitrage-gbp-scan (0 13 * * *), arbitrage-reconcile (45 9 * * *).

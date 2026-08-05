@@ -1,0 +1,60 @@
+{
+  "schema_note": "Reference artifact for G1 Row 2 contract — signed locally; replace with live /api/scan output when API key is valid.",
+  "scan_id": "fp2-ref-sample-01-example",
+  "report_card": {
+    "schema_version": "conduitscore.report_card.v1",
+    "scan_id": "fp2-ref-sample-01-example",
+    "domain": "example.com",
+    "scanned_url": "https://example.com",
+    "generated_at": "2026-06-03T23:14:37.336Z",
+    "readiness_score": 42,
+    "visibility": null,
+    "core_findings": [
+      {
+        "title": "Meta description missing or weak",
+        "severity": "warning",
+        "impact": "AI crawlers may summarize your site inaccurately."
+      },
+      {
+        "title": "Structured data gaps",
+        "severity": "info",
+        "impact": "Rich results and entity clarity improve when schema is complete."
+      }
+    ],
+    "top_false_or_missing_ai_claims": [],
+    "recommended_fix_path": {
+      "label": "Fix this on SwarmSync",
+      "cta_url": "https://conduitscore.com/api/swarmsync/create-fix-order",
+      "amount_cents": 2900,
+      "currency": "usd"
+    },
+    "verification": {
+      "aivs_micro": {
+        "url": "https://example.com",
+        "dom_hash": "sha256:6eb28707bfef64fb7043cbd73ebaf31dfde49f9d0a9888c73efdee662396c7ba",
+        "timestamp": "2026-06-03T23:14:37.329Z",
+        "signature": "ed25519:hADKpaOwFMiYS9YrpGqGab9TEuBfpc9rrklqgp20t+NXU1iCKhR9ZUkPKvhHjHrsSkqrH0tkS86x68vxG0F9AA==",
+        "scanner_version_hash": "sha256:da90c3ec8d1b13f3d53d76a17fc7f0b5830479ff20b4e5310c7e831b6275f77e",
+        "scan_origin": "scan_result"
+      },
+      "verify_url": "https://conduitscore.com/verify/fp2-ref-sample-01-example",
+      "public_key_url": "https://conduitscore.com/.well-known/aivs-public-key"
+    },
+    "badge": {
+      "svg_url": "https://conduitscore.com/api/badge/fp2-ref-sample-01-example",
+      "embed_html": "<a href=\"https://conduitscore.com/reports/fp2-ref-sample-01-example?utm_source=badge&utm_medium=embed&utm_campaign=representation_fidelity\"><img src=\"https://conduitscore.com/api/badge/fp2-ref-sample-01-example\" alt=\"ConduitScore AI Visibility Badge\" width=\"160\" height=\"28\" /></a>"
+    }
+  },
+  "aivs_micro_proof": {
+    "url": "https://example.com",
+    "dom_hash": "sha256:6eb28707bfef64fb7043cbd73ebaf31dfde49f9d0a9888c73efdee662396c7ba",
+    "timestamp": "2026-06-03T23:14:37.329Z",
+    "signature": "ed25519:hADKpaOwFMiYS9YrpGqGab9TEuBfpc9rrklqgp20t+NXU1iCKhR9ZUkPKvhHjHrsSkqrH0tkS86x68vxG0F9AA==",
+    "scanner_version_hash": "sha256:da90c3ec8d1b13f3d53d76a17fc7f0b5830479ff20b4e5310c7e831b6275f77e",
+    "scan_origin": "scan_result"
+  },
+  "verification": {
+    "status": "valid",
+    "checkedAt": "2026-06-03T23:14:37.333Z"
+  }
+}

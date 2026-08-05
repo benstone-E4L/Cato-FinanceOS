@@ -1,0 +1,381 @@
+"""
+cato/config.py — Configuration management for CATO.
+
+Loads and saves ~/.cato/config.yaml with defaults for all known fields.
+First-run detection: returns defaults when the config file does not yet exist.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass, field, fields
+from pathlib import Path
+from typing import Any, Optional
+
+import yaml
+
+from .platform import get_data_dir
+
+_CONFIG_FILE = get_data_dir() / "config.yaml"
+logger = logging.getLogger(__name__)
+
+
+_TRUE_STRINGS = {"1", "true", "yes", "y", "on"}
+_FALSE_STRINGS = {"0", "false", "no", "n", "off"}
+_NULL_STRINGS = {"null", "none", "~"}
+
+
+def _normalize_config_value(value: Any, default: Any) -> Any:
+    """Coerce legacy YAML string scalars to the type used by the config default."""
+    if isinstance(value, str):
+        stripped = value.strip()
+        lowered = stripped.lower()
+        if lowered in _NULL_STRINGS:
+            return None
+
+        if isinstance(default, bool):
+            if lowered in _TRUE_STRINGS:
+                return True
+            if lowered in _FALSE_STRINGS:
+                return False
+            return value
+
+        if isinstance(default, int) and not isinstance(default, bool):
+            try:
+                return int(stripped)
+            except ValueError:
+                return value
+
+        if isinstance(default, float):
+            try:
+                return float(stripped)
+            except ValueError:
+                return value
+
+        if isinstance(default, list):
+            if lowered in {"", "[]"}:
+                return []
+            if stripped.startswith("["):
+                try:
+                    parsed = yaml.safe_load(stripped)
+                except yaml.YAMLError:
+                    parsed = None
+                if isinstance(parsed, list):
+                    return parsed
+            return [item.strip() for item in stripped.split(",") if item.strip()]
+
+    return value
+
+
+@dataclass
+class CatoConfig:
+    """
+    Full CATO configuration.
+
+    All fields have safe defaults so CATO works out-of-the-box.
+    Persist changes with :meth:`save`.
+    """
+
+    # Identity
+    agent_name: str = "cato"
+
+    # Model selection (fallback slug — SwarmSync overrides this when enabled)
+    default_model: str = "openai/gpt-4o-mini"
+
+    # SwarmSync intelligent routing
+    swarmsync_enabled: bool = True
+    swarmsync_api_url: str = "https://api.swarmsync.ai/v1/chat/completions"
+
+    # Genesis Agents (SwarmSync agent registry / delegation)
+    genesis_enabled: bool = True
+    genesis_endpoint: str = "https://swarmsync-agents.onrender.com"
+    # Fail-closed allowlist: EMPTY (the default) or missing denies every agent.
+    # Only an explicitly populated list grants anything — removing config
+    # must reduce capability, never expand it.
+    genesis_agent_allowlist: list = field(default_factory=list)
+    # Additive money-domain denylist entries (beyond the hardcoded,
+    # non-configurable set in cato.tools.genesis.MONEY_DOMAIN_AGENTS). This
+    # list can only ADD denials; it can never remove the hardcoded ones.
+    # Evaluated independently of, and takes priority over, the allowlist.
+    genesis_agent_denylist: list = field(default_factory=list)
+    genesis_timeout_s: float = 30.0
+
+    # Budget caps (USD)
+    # DEPRECATED — no longer enforced; will be removed in v0.3.0.
+    # Retained so existing config.yaml files that set session_cap keep loading
+    # without error.  Use daily_cap + monthly_cap instead.
+    session_cap: float = 999.00
+    daily_cap: float = 50.00
+    monthly_cap: float = 100.00
+
+    # Workspace
+    workspace_dir: str = str(get_data_dir() / "workspace")
+    pipeline_root_dir: str = str(get_data_dir() / "businesses")
+
+    # Logging
+    log_level: str = "INFO"
+
+    # Messaging channels
+    telegram_enabled: bool = False
+    telegram_bot_token: str = ""
+    whatsapp_enabled: bool = False
+    webchat_port: int = 8080
+    mcp_enabled: bool = False
+    mcp_host: str = "127.0.0.1"
+    mcp_port: int = 8765
+    mcp_mount_path: str = "/mcp"
+
+    # Planning
+    max_planning_turns: int = 6
+    context_budget_tokens: int = 7000
+    max_output_tokens: int = 16384          # max tokens per LLM response
+    # BH-009 — Hard cap on the per-message agent-loop run.  This budget covers
+    # ALL planning turns + LLM round trips + tool executions for a single
+    # inbound message.  When it expires the user sees the "long-running tool
+    # call had to abort after N minutes" fallback.  Default 600s (10 min) is
+    # generous enough for multi-tool plans against a degraded SwarmSync.  Raise
+    # for long-running ops; lower for fast-feedback interactive use.
+    gateway_task_timeout_s: float = 600.0
+
+    # Conduit browser engine (opt-in)
+    conduit_enabled: bool = False
+    conduit_budget_per_session: int = 100   # cents
+    conduit_extract_max_chars: int = 20_000
+    searxng_url: str = ""
+    search_rerank_enabled: bool = False
+    conduit_crawl_delay_sec: float = 1.0
+    conduit_crawl_max_delay_sec: float = 60.0
+    selector_healing_enabled: bool = False
+    vault: Optional[dict] = None   # API keys / credentials for search, login, etc.
+
+    # Active model toggles — which CLIs are included in coding-agent fan-out
+    enabled_models: list = field(default_factory=lambda: ["claude", "codex", "gemini"])
+
+    # Subagent routing (mirrors OpenClaw's ChatGPT-subagent feature)
+    # When enabled, TIER_C coding tasks are delegated to the chosen CLI backend
+    # so users can leverage plan-included usage from their preferred provider.
+    subagent_enabled: bool = False
+    subagent_coding_backend: str = "codex"  # claude | codex | gemini | cursor
+
+    # Night-shift / unattended automation (ConduitScore loop)
+    unattended_mode: bool = False           # when True, budget-bypass phrases are ignored
+    live_outreach_enabled: bool = False     # master kill switch — must be True to send email
+    night_shift_policy_path: str = ""       # empty = auto-discover docs/night-shift-policy.yaml
+
+    # Safety gates
+    safety_mode: str = "strict"             # strict | permissive | off
+    # When False (default) PowerShell commands run in gateway/sandbox mode.
+    # Set True only to explicitly grant unrestricted full-shell access.
+    powershell_full_mode: bool = False
+
+    # Tool-approval policy (per-call user-confirmation gate)
+    #
+    # `auto_approved_tools` lists reversible tools that bypass the
+    # delegation-token gate in `cato.auth.token_checker.TokenChecker`.
+    # The user can still revoke any of these by editing the list.
+    #
+    # `strict_approval` (or CATO_STRICT_APPROVAL=true env var) forces the
+    # original "prompt for everything" behaviour for paranoid mode.
+    #
+    # Only reversible / read-only tools should appear here.  Irreversible
+    # ops (shell.exec, python.execute, file writes, github writes,
+    # integration.action, email send, payments) must continue to gate.
+    auto_approved_tools: list = field(default_factory=lambda: [
+        # Memory — read + write Cato's own SQLite (always safe)
+        "memory.search", "memory.federated",
+        "memory_search", "memory_read",
+        # Web search / research (read-only)
+        "web.search", "web.code", "web.news", "web_search",
+        "academic.arxiv", "academic.semantic_scholar", "academic.pubmed",
+        # Knowledge graph (read-only)
+        "graph.query", "graph.related",
+        # GitHub reads
+        "github.issue_list", "github.pr_list",
+        # Integration status read
+        "integration.status",
+        # Conduit navigation + extraction (read-only browser)
+        "conduit.crawl", "conduit.monitor",
+        "conduit_navigate", "conduit_extract",
+        # Time / config reads
+        "get_time", "get_config", "list_files", "read_file",
+    ])
+    strict_approval: bool = False
+
+    # Budget forecast
+    budget_forecast_enabled: bool = True    # show cost estimate before tasks
+
+    # Audit log
+    audit_enabled: bool = True              # append-only action log
+
+    # Interactive PTY CLI sessions (desktop)
+    interactive_cli_enabled: bool = True
+    cli_session_cwd: str = ""              # empty = use process cwd
+    claude_auth_dir: str = ""
+    codex_api_key_env: str = "OPENAI_API_KEY"
+    gemini_api_key_env: str = "GEMINI_API_KEY"
+    pty_default_cols: int = 80
+    pty_default_rows: int = 24
+    pty_idle_timeout_sec: int = 0           # 0 = no auto-cleanup
+
+    # Internal — path is excluded from YAML serialisation
+    _path: Path = field(default_factory=lambda: _CONFIG_FILE, repr=False, compare=False)
+
+    # ------------------------------------------------------------------
+    # Factories
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def load(cls, config_path: Optional[Path] = None) -> "CatoConfig":
+        """
+        Load config from *config_path* (default ~/.cato/config.yaml).
+
+        Missing fields fall back to dataclass defaults.
+        If the file does not exist the default config is returned (first run).
+        """
+        path = config_path or _CONFIG_FILE
+        instance = cls()
+        instance._path = path
+
+        if not path.exists():
+            return instance  # first-run defaults
+
+        try:
+            raw_data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as exc:
+            logger.critical(
+                "Config file %s is UNREADABLE (%s). Falling back to hardened "
+                "defaults: every capability the operator may have granted in "
+                "this file is now OFF.", path, exc,
+            )
+            return instance._hardened()
+        if not isinstance(raw_data, dict):
+            logger.critical(
+                "Config file %s has a non-mapping root; falling back to hardened "
+                "defaults.", path,
+            )
+            return instance._hardened()
+
+        # Only set fields that are declared on the dataclass
+        field_by_name = {
+            f.name: f
+            for f in fields(cls)
+            if not f.name.startswith("_")
+        }
+        for key, value in raw_data.items():
+            if key == "config" and isinstance(value, dict):
+                logger.warning("Ignoring nested legacy 'config' block in %s", path)
+                continue
+            if key in field_by_name:
+                default = getattr(instance, key)
+                setattr(instance, key, _normalize_config_value(value, default))
+
+        return instance
+
+    def _hardened(self) -> "CatoConfig":
+        """Return this config with every capability-granting field forced OFF.
+
+        Used when config.yaml cannot be parsed. Returning plain dataclass
+        defaults was the wrong answer: the defaults are LOOSER than a hardened
+        operator config (``auto_approved_tools`` defaults to a 25-entry list,
+        ``genesis_enabled`` defaults True), so a single YAML typo silently
+        restored capability the operator had deliberately removed — and did it
+        without a log line. An unreadable config must reduce what Cato can do,
+        never expand it.
+        """
+        self.auto_approved_tools = []
+        self.genesis_enabled = False
+        self.conduit_enabled = False
+        self.unattended_mode = False
+        self.live_outreach_enabled = False
+        self.powershell_full_mode = False
+        self.safety_mode = "strict"
+        self.strict_approval = True
+        self.audit_enabled = True
+        self.genesis_agent_allowlist = []
+        return self
+
+    # ------------------------------------------------------------------
+    # Persistence
+    # ------------------------------------------------------------------
+
+    # Fields that must never be written to the plaintext YAML config file.
+    # vault is a runtime-only bridge credential store — it belongs in vault.enc, not config.yaml.
+    _RUNTIME_ONLY: frozenset[str] = frozenset({"vault"})
+
+    def save(self, config_path: Optional[Path] = None) -> None:
+        """Write current config to YAML file, creating parent dirs as needed."""
+        path = config_path or self._path
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Serialise all public fields except runtime-only ones (e.g. vault)
+        data: dict[str, Any] = {}
+        for f in fields(self):
+            if not f.name.startswith("_") and f.name not in self._RUNTIME_ONLY:
+                data[f.name] = getattr(self, f.name)
+
+        path.write_text(
+            yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=True),
+            encoding="utf-8",
+        )
+
+    # ------------------------------------------------------------------
+    # Utility
+    # ------------------------------------------------------------------
+
+    def workspace_path(self) -> Path:
+        """Return :attr:`workspace_dir` as a resolved Path object."""
+        return Path(self.workspace_dir).expanduser().resolve()
+
+    def is_first_run(self) -> bool:
+        """Return True if no config file exists on disk."""
+        return not self._path.exists()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Vault-style get for API keys (used by WebSearchTool and Conduit login)."""
+        if self.vault and isinstance(self.vault, dict):
+            return self.vault.get(key, default)
+        return default
+
+    def to_conduit_bridge_config(
+        self,
+        session_id: str,
+        data_dir: Optional[str] = None,
+        conduit_budget_per_session: Optional[float] = None,
+    ) -> dict[str, Any]:
+        """
+        Build config dict for ConduitBridge so bridge _config drives Conduit behavior.
+
+        Use when creating the bridge (e.g. when conduit_enabled)::
+
+            bridge = ConduitBridge(
+                cfg.to_conduit_bridge_config(
+                    session_id,
+                    data_dir=str(get_data_dir()),
+                    conduit_budget_per_session=cfg.conduit_budget_per_session,
+                ),
+                session_id,
+            )
+        """
+        out: dict[str, Any] = {
+            "session_id": session_id,
+            "conduit_extract_max_chars": self.conduit_extract_max_chars,
+            "searxng_url": self.searxng_url or "",
+            "search_rerank_enabled": self.search_rerank_enabled,
+            "conduit_crawl_delay_sec": self.conduit_crawl_delay_sec,
+            "conduit_crawl_max_delay_sec": self.conduit_crawl_max_delay_sec,
+            "selector_healing_enabled": self.selector_healing_enabled,
+            "vault": self.vault,
+        }
+        if data_dir is not None:
+            out["data_dir"] = data_dir
+        if conduit_budget_per_session is not None:
+            out["conduit_budget_per_session"] = conduit_budget_per_session
+        return out
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialise config to a plain dict (excluding private and runtime-only fields)."""
+        return {
+            f.name: getattr(self, f.name)
+            for f in fields(self)
+            if not f.name.startswith("_") and f.name not in self._RUNTIME_ONLY
+        }

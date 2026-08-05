@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-06-03T23:14:37.352Z",
+  "samples": [
+    {
+      "label": "sample-01-example",
+      "path": "proof-artifacts/fidelity/samples/sample-01-example.json",
+      "url": "https://example.com",
+      "readiness_score": 42,
+      "signature_status": "valid",
+      "verify_url": "https://conduitscore.com/verify/fp2-ref-sample-01-example",
+      "report_url": "https://conduitscore.com/reports/fp2-ref-sample-01-example",
+      "live_scan": false
+    },
+    {
+      "label": "sample-02-linear",
+      "path": "proof-artifacts/fidelity/samples/sample-02-linear.json",
+      "url": "https://linear.app",
+      "readiness_score": 61,
+      "signature_status": "valid",
+      "verify_url": "https://conduitscore.com/verify/fp2-ref-sample-02-linear",
+      "report_url": "https://conduitscore.com/reports/fp2-ref-sample-02-linear",
+      "live_scan": false
+    },
+    {
+      "label": "sample-03-conduitscore",
+      "path": "proof-artifacts/fidelity/samples/sample-03-conduitscore.json",
+      "url": "https://conduitscore.com",
+      "readiness_score": 58,
+      "signature_status": "valid",
+      "verify_url": "https://conduitscore.com/verify/fp2-ref-sample-03-conduitscore",
+      "report_url": "https://conduitscore.com/reports/fp2-ref-sample-03-conduitscore",
+      "live_scan": false
+    }
+  ]
+}

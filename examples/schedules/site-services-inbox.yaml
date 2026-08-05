@@ -1,0 +1,7 @@
+# Poll site-services permit inbox every 30 minutes.
+name: site-services-inbox
+cron: "*/30 * * * *"
+skill: site_services.pulse
+args: {}
+budget_cap: 50
+enabled: true
