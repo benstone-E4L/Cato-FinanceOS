@@ -33,7 +33,7 @@ def main() -> int:
         "e4l-runtime-hardening",
         "VITE_CATO_BUILD_SHA: ${{ github.sha }}",
         "VITE_CATO_BUILD_VERSION=$version",
-        "npm run tauri build -- --bundles nsis",
+        "npx tauri build --bundles nsis",
         "Get-FileHash -Algorithm SHA256",
         "actions/upload-artifact@v4",
         "if-no-files-found: error",

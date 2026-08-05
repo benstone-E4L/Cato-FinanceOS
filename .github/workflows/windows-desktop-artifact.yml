@@ -55,7 +55,7 @@ jobs:
         run: npm run lint
       - name: Build signed-independent NSIS installer
         working-directory: desktop
-        run: npm run tauri build -- --bundles nsis
+        run: npx tauri build --bundles nsis
       - name: Stage installer and checksums
         id: stage
         shell: pwsh
