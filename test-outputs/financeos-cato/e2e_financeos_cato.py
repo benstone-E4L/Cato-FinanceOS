@@ -9,6 +9,7 @@ from playwright.sync_api import Page, sync_playwright
 
 
 TARGET = "http://127.0.0.1:5173"
+DAEMON_TOKEN = "cato-e2e-browser-harness-token"
 ROOT = Path(__file__).resolve().parent
 SHOTS = ROOT / "screenshots"
 SHOTS.mkdir(parents=True, exist_ok=True)
@@ -19,7 +20,7 @@ def install_desktop_bridge(page: Page) -> None:
         """
         window.__TAURI_INTERNALS__ = {
           invoke: async (cmd) => cmd === 'get_daemon_status'
-            ? { running: true, http_port: 8080, ws_port: 8080, daemon_token: 'e2e-token' }
+            ? { running: true, http_port: 8080, ws_port: 8080, daemon_token: 'cato-e2e-browser-harness-token' }
             : null,
           transformCallback: () => 1
         };
@@ -99,6 +100,8 @@ def workflow_to_chat(page: Page) -> None:
     box.wait_for()
     assert "E4Life" in box.input_value(), "workflow prompt did not carry into chat"
     assert "verified facts" in box.input_value(), "workflow prompt omitted evidence guardrail"
+    page.get_by_role("button", name="Send", exact=True).click()
+    page.get_by_text("Authenticated Cato harness response received.", exact=True).wait_for()
 
 
 def navigation(page: Page) -> None:

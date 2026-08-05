@@ -216,10 +216,20 @@ export function useChatStream(wsBase?: string, httpPort?: number, daemonToken?: 
   }, [wsBase, daemonToken, addMessages]);
 
   useEffect(() => {
+    // React Strict Mode intentionally runs setup -> cleanup -> setup in
+    // development. Restore this guard for every setup; otherwise the first
+    // cleanup leaves the second socket permanently unable to report onopen.
+    mountedRef.current = true;
     connect();
     return () => {
       mountedRef.current = false;
       if (wsRef.current) {
+        // Detaching every callback before an intentional teardown prevents a
+        // CONNECTING socket (notably Strict Mode's first probe connection)
+        // from reporting a false runtime error while it is being closed.
+        wsRef.current.onopen = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.onerror = null;
         wsRef.current.onclose = null;
         wsRef.current.close();
         wsRef.current = null;

@@ -8,8 +8,8 @@
   {
     "name": "workflow_to_chat",
     "priority": "P0",
-    "result": "FAIL",
-    "evidence": "attempt 1: console:[useChatStream] WebSocket error; screenshot=C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\workflow_to_chat_attempt1_1785970144.png | attempt 2: console:[useChatStream] WebSocket error; screenshot=C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\workflow_to_chat_attempt2_1785970146.png"
+    "result": "PASS",
+    "evidence": "C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato\\test-outputs\\financeos-cato\\screenshots\\workflow_to_chat_final.png"
   },
   {
     "name": "navigation",
