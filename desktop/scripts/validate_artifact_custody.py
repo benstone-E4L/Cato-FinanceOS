@@ -4,13 +4,28 @@
 from __future__ import annotations
 
 import json
+import colorsys
 import re
 from pathlib import Path
+
+from PIL import Image
 
 
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise SystemExit(f"[artifact-custody] ERROR: {message}")
+
+
+def prohibited_pixel_count(path: Path) -> int:
+    image = Image.open(path).convert("RGBA")
+    count = 0
+    for red, green, blue, alpha in image.get_flattened_data():
+        if alpha == 0:
+            continue
+        hue, saturation, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
+        if 60 <= hue * 360 < 200 and saturation >= 0.01 and value >= 0.01:
+            count += 1
+    return count
 
 
 def main() -> int:
@@ -29,7 +44,11 @@ def main() -> int:
     require(cargo_version.group(1) == package["version"], "Cargo.toml version differs from desktop version")
     icon_paths = [tauri["app"]["trayIcon"]["iconPath"], *tauri["bundle"]["icon"]]
     for relative_icon in icon_paths:
-        require((desktop_dir / "src-tauri" / relative_icon).is_file(), f"configured icon is missing: {relative_icon}")
+        icon = desktop_dir / "src-tauri" / relative_icon
+        require(icon.is_file(), f"configured icon is missing: {relative_icon}")
+        require(prohibited_pixel_count(icon) == 0, f"configured icon contains prohibited green/teal pixels: {relative_icon}")
+    logo = repo_root / "New Logos" / "CATO-E4Life-Structure-Transparent.png"
+    require(prohibited_pixel_count(logo) == 0, "shipped Cato logo contains prohibited green/teal pixels")
 
     workflow = workflow_path.read_text(encoding="utf-8")
     for marker in (
