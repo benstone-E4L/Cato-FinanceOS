@@ -1,0 +1,16 @@
+FILES_CHANGED:
+  cato/safety.py
+  cato/tools/shell.py
+  tests/test_shell_security.py
+
+FILES_CREATED:
+  proof-artifacts/shell-c2-adversarial-harden/test_output.txt
+  proof-artifacts/shell-c2-adversarial-harden/changed_file_list.txt
+
+FILES_TOUCHED_OUTSIDE_SCOPE:
+  (none)
+
+SUMMARY:
+  - _classify_shell now de-obfuscates quoting/escaping/concatenation before keyword scan
+  - gateway mode refuses IRREVERSIBLE/HIGH_STAKES payloads (fail-closed; full+grant is escape hatch)
+  - cmd/powershell/pwsh/rm moved from DEFAULT_ALLOWLIST to EXTENDED_ALLOWLIST

@@ -1,0 +1,8 @@
+command: python -m cato vault migrate-env --dry-run
+CATO_VAULT_PASSWORD_set: False
+exit_code: 1
+stdout_stderr_redacted: |
+  migrate-env FAILED: CATO_VAULT_PASSWORD environment variable is not set. Set it before launching the daemon or migrating credentials.
+
+BLOCKED: live machine migrate/unlock requires CATO_VAULT_PASSWORD in the environment.
+No secret values were printed. Production vault.enc left untouched (still 84 bytes).

@@ -1,12 +1,14 @@
 """Minimal runner script for the Cato daemon — used by Task Scheduler / NSSM."""
-import io
 import logging
 import os
 import sys
 from pathlib import Path
 
-os.chdir(r"C:\Users\Administrator\Desktop\Cato")
-sys.path.insert(0, r"C:\Users\Administrator\Desktop\Cato")
+# Repo root = directory containing this script (any Windows profile / clone).
+_REPO_ROOT = Path(__file__).resolve().parent
+os.chdir(_REPO_ROOT)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 _DATA_DIR = Path(os.environ.get("APPDATA", Path.home())) / "cato"
 _DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -41,16 +43,33 @@ logging.basicConfig(
     ],
 )
 
+# Prefer encrypted vault for operator secrets; .env only fills missing keys.
+# Never logs secret values.
+from cato.vault import VaultError
+from cato.vault_bootstrap import bootstrap_launch_credentials
+
 try:
-    from dotenv import load_dotenv
-    load_dotenv(r"C:\Users\Administrator\Desktop\Cato\.env")
-except ImportError:
-    pass
+    _vault, _boot = bootstrap_launch_credentials(
+        repo_root=_REPO_ROOT,
+        require_password=True,
+        load_dotenv=True,
+    )
+    logging.info(
+        "Launch credentials: vault_present=%s unlocked=%s vault_keys=%d "
+        "applied_from_vault=%s filled_from_dotenv=%s",
+        _boot.vault_present,
+        _boot.vault_unlocked,
+        _boot.vault_keys_total,
+        list(_boot.applied_from_vault),
+        list(_boot.filled_from_dotenv),
+    )
+except VaultError as _exc:
+    logging.error("Vault bootstrap failed: %s", _exc)
+    print(f"[CATO] ERROR: vault bootstrap failed: {_exc}")
+    sys.exit(1)
 
-from cato.cli import CatoConfig, Vault, BudgetManager, _CATO_DIR, _run_daemon, _PID_FILE, _read_live_pid
+from cato.cli import CatoConfig, BudgetManager, _CATO_DIR, _run_daemon, _PID_FILE, _read_live_pid
 
-vault_path = _CATO_DIR / "vault.enc"
-vault = Vault(vault_path=vault_path) if vault_path.exists() else None
 config = CatoConfig.load()
 budget = BudgetManager(session_cap=config.session_cap, monthly_cap=config.monthly_cap, daily_cap=config.daily_cap)
 

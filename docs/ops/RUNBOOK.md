@@ -3,46 +3,51 @@
 Audience: one solo operator. There is no team, no on-call rotation, no monitoring
 stack. Everything here is something you do yourself at a terminal.
 
-Written against Cato at commit `8731f21`. Verified on Windows 11 Pro
-(ACEMAGIC-WINDOW), 2026-08-03.
+Written against Cato on this machine at
+`C:\Users\Work\Desktop\vault\projects\My Github\Cato`. Original verification
+pass: Windows 11 Pro (ACEMAGIC-WINDOW), 2026-08-03. Paths refreshed 2026-08-06
+(the former Desktop “GitHub” clone path is gone; do not use a nested `Main\`
+folder). Historical write-ups cited SHA `8731f21`, which is **not** in this
+clone — record actual HEAD with `git log --oneline -1`.
 
 > ### Concurrency notice — read before trusting a line number
 >
 > A failure-mode audit was running in this repository while these documents were
-> written. At the time of writing, the working tree had **uncommitted
-> modifications** to `cato/agent_loop.py`, `cato/anthropic_client.py`,
-> `cato/audit/ledger.py`, `cato/budget.py`, `cato/cli.py`, `cato/config.py`,
+> first written. At that time, the working tree had **uncommitted modifications**
+> to `cato/agent_loop.py`, `cato/anthropic_client.py`, `cato/audit/ledger.py`,
+> `cato/budget.py`, `cato/cli.py`, `cato/config.py`,
 > `cato/core/approval_policy.py`, `cato/core/outbound_approval.py`,
 > `cato/safety.py`, `cato/tools/genesis.py`, `tests/test_dispatch_gates.py` and
 > `tests/test_ledger_failclosed.py`.
 >
-> **These documents describe committed state at `8731f21`.** Two facts have
-> uncommitted fixes in flight, and both are flagged inline where they appear:
-> §0 Fact 3 (the `safety_mode` trap) and `LIMITATIONS.md` §4 (the `BudgetManager`
-> call site). **Line numbers cited anywhere in `docs/ops/` are as-of-`8731f21`
-> and will drift.** Prefer the symbol names — `SafetyGuard.check_and_confirm`,
+> **These documents describe behaviour observed in the 2026-08-03 write-up.**
+> Two facts had uncommitted fixes in flight then, and both are flagged inline
+> where they appear: §0 Fact 3 (the `safety_mode` trap) and `LIMITATIONS.md` §4
+> (the `BudgetManager` call site). **Line numbers cited anywhere in `docs/ops/`
+> drift with HEAD.** Prefer the symbol names — `SafetyGuard.check_and_confirm`,
 > `_guarded_dispatch`, `record_recovery` — and use `grep` to relocate them.
 >
 > Establish which version you have before acting:
 > ```
-> git -C "C:\Users\Work\Desktop\GitHub\Cato" status --short
-> git -C "C:\Users\Work\Desktop\GitHub\Cato" log --oneline -1
+> git -C "C:\Users\Work\Desktop\vault\projects\My Github\Cato" status --short
+> git -C "C:\Users\Work\Desktop\vault\projects\My Github\Cato" log --oneline -1
 > ```
 
 ---
 
 ## 0. Read this first — four facts that change how you operate
 
-### Fact 1: The daemon has not been started during this remediation
+### Fact 1: Do not assume the daemon is live-proven from old dates alone
 
-**The last time Cato actually ran was 2026-06-14.** Evidence:
-`C:\Users\benst\.cato\cato.db` has a last-write time of 2026-06-14 15:25:18.
-Nothing in this remediation cycle started the daemon.
+**Re-checked 2026-08-06:** `C:\Users\benst\.cato\cato.db` is **ABSENT** (earlier
+notes cited last-write 2026-06-14 15:25:18 on that path — not re-verifiable).
+Work `%APPDATA%\cato` shows Aug 2026 filesystem activity (`cato.db`,
+`daemon.token`, `config.yaml` mtimes on 2026-08-05). That is **not** the same as
+a watched green `/health` or a proven model call — see `LIMITATIONS.md` §1.
 
-Every startup instruction in Section 3 is therefore **UNVERIFIED**. The commands
-exist (verified — see `VERIFICATION.md`), the code paths were read, but nobody
-has watched `cato start` come up and serve traffic since June. Treat the first
-real start as an experiment, not a routine.
+Every startup instruction in Section 3 is therefore **UNVERIFIED** unless you
+observe it yourself. The commands exist (verified — see `VERIFICATION.md`);
+treat the first start you have not watched as an experiment.
 
 ### Fact 2: Which Windows account you launch as decides which state tree is used
 
@@ -59,45 +64,41 @@ So Cato writes to **two roots on the same machine**, and both move when the
 launching account changes. This is the single most important operational fact in
 the system.
 
-What that looks like right now, verified:
+What that looks like right now, re-checked 2026-08-06 where noted:
 
 ```
-C:\Users\benst\.cato\                      <- legacy production tree, last write 2026-06-14
-    cato.db          (audit_log 44 rows, conduit_billing 44, conduit_bundle_chain 14)
-    conduit_identity.key   (32 bytes)
-    sessions\        (EMPTY - 0 entries)
-    workspace\
-    browser_profile\
-    session_count.txt
-    NO skills\ subdirectory
-    NO vault.enc
+C:\Users\benst\.cato\                      <- earlier notes: legacy production tree
+    cato.db          ABSENT as of 2026-08-06 (was last cited 2026-06-14)
+    (other benst files not re-enumerated in this path fix)
 
-C:\Users\benst\AppData\Roaming\cato\       <- DOES NOT EXIST
+C:\Users\benst\AppData\Roaming\cato\       <- previously reported DOES NOT EXIST
 C:\Users\Work\.cato\                       <- DOES NOT EXIST
 
-C:\Users\Work\AppData\Roaming\cato\        <- active dev tree, created 2026-08-01
-    cato.db          (audit_log 0, delegation_tokens 0, ledger_records 0)
-    flow_runs.db, routing_log.sqlite3, daemon.token
-    workspace\, businesses\, flows\, logs\, memory\, uploads\, browser_profile\
-    NO config.yaml
+C:\Users\Work\AppData\Roaming\cato\        <- active Work tree (filesystem VERIFIED 2026-08-06)
+    cato.db          present; LastWriteTime 2026-08-05 16:31:39
+    daemon.token     present; LastWriteTime 2026-08-05 16:31:25
+    config.yaml      present; LastWriteTime 2026-08-05 16:04:56
+    flow_runs.db, routing_log.sqlite3, workspace\, ...
+    Do NOT infer model-call counts from these mtimes — run `cato status`
 ```
 
 Two things follow that you must internalise:
 
 1. **`C:\Users\benst` and `C:\Users\Work` are separate Windows profiles, not
-   junctions.** Work is where development happens; benst is the production home.
-2. **The production `cato.db` has no `ledger_records` table at all.** It predates
-   the Causal Action Ledger. If you start today's build as `benst`, it will
-   migrate that database. Back it up first (Section 6).
+   junctions.** Work is where development happens; benst was the production home.
+2. **If you still have a legacy `benst` `cato.db`, it may lack `ledger_records`.**
+   Earlier notes said that DB predates the Causal Action Ledger. The file is
+   ABSENT on this machine as of 2026-08-06 — if it reappears elsewhere, back it
+   up before first start (Section 6).
 
-### Fact 3: At `8731f21`, the approval system is unreachable in the default configuration
+### Fact 3: Approval reachability depends on your HEAD — re-check
 
 With `safety_mode: strict` (the default) and a daemon with no TTY, **every
-HIGH_STAKES tool is denied before the approval-ticket gate is ever reached.**
-This is fail-closed behaviour, not a bypass — but it means the Telegram approval
-flow you may believe is protecting you is never actually exercised. See
-Section 4. You must make an explicit decision here before the daemon does
-anything useful.
+HIGH_STAKES tool is denied before the approval-ticket gate is ever reached**
+in the behaviour documented in the 2026-08-03 write-up. This is fail-closed
+behaviour, not a bypass — but it means the Telegram approval flow you may
+believe is protecting you may never actually be exercised. See Section 4. You
+must make an explicit decision here before the daemon does anything useful.
 
 > **An uncommitted fix for this is in the working tree.** The concurrent audit
 > added `SafetyGuard._defers_to_approval_gate`, which lets a *positively
@@ -114,13 +115,21 @@ anything useful.
 > No match → trap present, §4 applies as written. Match → the deferral fix is
 > present; re-read `cato/safety.py::check_and_confirm` before relying on §4.
 
-### Fact 4: Credentials are plaintext, and there are three open critical items
+### Fact 4: Credentials — vault is preferred; plaintext .env is legacy fill-only
 
-No `vault.enc` exists anywhere on this machine (verified: absent from
-`C:\Users\benst\.cato\`, `C:\Users\Work\.cato\`, and the repo root). Every
-credential lives in plaintext in `.env`, protected only by filesystem ACLs — and
-those ACLs are currently wrong. See Section 8. **Do not start the daemon before
-resolving those three items.**
+`%APPDATA%\cato\vault.enc` is the durable credential store. Launch paths
+(`cato start`, `cato_svc_runner.py`, `cato_service.py`, and the start/launch
+scripts) call `cato.vault_bootstrap.bootstrap_launch_credentials`:
+
+1. Require `CATO_VAULT_PASSWORD` in the environment (fail closed if unset).
+2. Fill missing keys from repo-root `.env` (never overwrites existing env).
+3. Unlock `vault.enc` and **prefer vault values** for operator secrets
+   (`TELEGRAM_BOT_TOKEN`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, …).
+
+`.env` remains a migration/legacy fill source — not the only path. ACL issues
+on plaintext `.env` files are still tracked in Section 8; migrate secrets into
+the vault, then rotate. See **§8 CRITICAL-3 remediation** for the one-command
+migrate path (`cato vault migrate-env`).
 
 ---
 
@@ -133,7 +142,7 @@ installed as the `cato` console script.
 
 **Genesis** is a remote HTTP gateway at `https://swarmsync-agents.onrender.com`,
 hosted on Render's free tier. Cato calls it; it is not part of the local process.
-Source at `C:\Users\Work\Desktop\GitHub\Genesis Agents`.
+Source at `C:\Users\Work\Desktop\vault\projects\My Github\Genesis Agents`.
 
 Together they are intended to act as an E4L runtime — Cato as the local
 gated executor, Genesis as the remote agent/tool surface. The E4L FinanceOS
@@ -145,16 +154,16 @@ integration itself is **not built**; see `LIMITATIONS.md`.
 
 | What | Path (as the launching user) | Notes |
 |---|---|---|
-| Config | `%APPDATA%\cato\config.yaml` | **Does not currently exist for either user.** Cato runs on dataclass defaults. |
+| Config | `%APPDATA%\cato\config.yaml` | Present under Work as of 2026-08-06 filesystem check; re-verify with `cato status`. |
 | Audit + ledger DB | `%APPDATA%\cato\cato.db` | SQLite. `audit_log`, `ledger_records`, `delegation_tokens`. |
-| Vault | `%APPDATA%\cato\vault.enc` | **Does not exist.** Encryption is not in use. |
+| Vault | `%APPDATA%\cato\vault.enc` | Encrypted AES-256-GCM store. Launch prefers vault over `.env`. |
 | PID / port files | `%APPDATA%\cato\cato.pid`, `cato.port` | Written by `cato start`, removed by `cato stop`. |
 | Emergency STOP file | `%APPDATA%\cato\STOP` | Create this file to halt all gated dispatch. |
 | Workspace | `%APPDATA%\cato\workspace` | Per `cato status`. |
 | Legacy home tree | `%USERPROFILE%\.cato\` | Written by the 46 `Path.home()` call sites. |
-| Secrets (Cato) | `C:\Users\Work\Desktop\GitHub\Cato\.env` | Gitignored (verified: `.gitignore:11`). |
-| Secrets (Genesis) | `C:\Users\Work\Desktop\GitHub\Genesis Agents\.env` | |
-| Approval policy | `C:\Users\Work\Desktop\GitHub\Cato\docs\approval-policy.yaml` | Override path with `CATO_APPROVAL_POLICY`. |
+| Secrets (Cato) | `C:\Users\Work\Desktop\vault\projects\My Github\Cato\.env` | Gitignored (verified: `.gitignore:11`). |
+| Secrets (Genesis) | `C:\Users\Work\Desktop\vault\projects\My Github\Genesis Agents\.env` | |
+| Approval policy | `C:\Users\Work\Desktop\vault\projects\My Github\Cato\docs\approval-policy.yaml` | Override path with `CATO_APPROVAL_POLICY`. |
 
 To see the resolved paths for whatever account you are logged in as, run:
 
@@ -201,7 +210,7 @@ switches every path in Section 2.
 
 ### 3.2 Pre-flight
 
-Run from `C:\Users\Work\Desktop\GitHub\Cato` (this is the only interpreter for
+Run from `C:\Users\Work\Desktop\vault\projects\My Github\Cato` (this is the only interpreter for
 Cato work — see `PREREQUISITES.md`):
 
 ```
@@ -251,8 +260,10 @@ Options, all verified present in `cato/cli.py:472`:
 
 What `cato start` does, read from source:
 
-1. Loads `.env` from the **current working directory** via `python-dotenv`. Start
-   from the repo root or the daemon will not see your credentials.
+1. Requires `CATO_VAULT_PASSWORD`. Runs vault bootstrap: `.env` fills missing
+   keys only, then `%APPDATA%\cato\vault.enc` overrides operator secrets when
+   present (`cato.vault_bootstrap.bootstrap_launch_credentials`). Secret values
+   are never printed — only key names / counts.
 2. Loads `CatoConfig`.
 3. Refuses to start if `cato.pid` names a live process — it prints
    `Cato already running (PID N). Use 'cato stop' first.`
@@ -260,6 +271,19 @@ What `cato start` does, read from source:
 5. Installs signal handlers, then runs the Gateway with the configured adapters.
 
 Foreground process. It does not daemonise itself.
+
+**One-command .env → vault migrate** (values never echoed):
+
+```
+set CATO_VAULT_PASSWORD=<your-strong-password>
+python -m cato vault migrate-env
+python -m cato vault list
+```
+
+Optional dry-run: `python -m cato vault migrate-env --dry-run`.
+Overwrite keys already in the vault: add `--overwrite`.
+Confirm `vault.enc` grew (`%APPDATA%\cato\vault.enc` size) and `cato vault list`
+shows key names only.
 
 ### 3.5 Confirm it is up
 
@@ -275,15 +299,15 @@ From a second terminal:
 That HTTP check is the only startup proof that is not self-reported by the CLI —
 **treat it as the definition of "started".**
 
-### 3.6 Startup wrappers in the repo (UNVERIFIED, use with care)
+### 3.6 Startup wrappers in the repo
 
 `start_daemon.ps1`, `launch_daemon.ps1`, `start_cato.bat`, `cato_service.py`,
-`cato_svc_runner.py`, `install_autostart.py`, and `scripts\watchdog.py` all exist
-at the repo root. **None were executed or reviewed for this runbook.** Before
-using any of them, read it and confirm which Windows account it will run as —
-a wrapper that runs as SYSTEM or as a scheduled task under a different user will
-silently pick a different state tree (Fact 2). Prefer the explicit
-`cato start` above until you have read the wrapper.
+and `cato_svc_runner.py` resolve the repo root from their own location (no
+hardcoded Administrator path) and require `CATO_VAULT_PASSWORD`. They all go
+through vault bootstrap (vault preferred, `.env` fill-only). Before using a
+scheduled-task / SYSTEM wrapper, confirm which Windows account it will run as —
+a different user silently picks a different `%APPDATA%\cato` tree (Fact 2).
+Prefer `cato start` until you have verified the wrapper account.
 
 ---
 
@@ -292,12 +316,12 @@ silently pick a different state tree (Fact 2). Prefer the explicit
 You must make this call consciously. It is the difference between a daemon that
 refuses everything interesting and one whose approval gates are actually live.
 
-> **Applies to committed state at `8731f21`.** Check
+> **Applies to the 2026-08-03 documented baseline; re-check your HEAD.** Check
 > `grep -n "_defers_to_approval_gate" cato\safety.py` first — see §0 Fact 3. If
 > that symbol exists, the deferral fix has landed and the "only `off` reaches the
 > approval flow" conclusion below no longer holds. Everything else in this
 > section — the gate order, the STOP file, the `off`-mode residual protections —
-> is unaffected.
+> is unaffected. Do not require historical SHA `8731f21` (absent from this clone).
 
 ### What happens
 
@@ -482,7 +506,7 @@ C:\Users\Work\Desktop ACEMAGIC-WINDOW\CodexSandboxUsers:(OI)(CI)(RX)
                       BUILTIN\Administrators:(I)(OI)(CI)(F)
                       ACEMAGIC-WINDOW\Work:(I)(OI)(CI)(F)
 
-> icacls "C:\Users\Work\Desktop\GitHub\Cato\.env"
+> icacls "C:\Users\Work\Desktop\vault\projects\My Github\Cato\.env"
 ...  ACEMAGIC-WINDOW\CodexSandboxUsers:(I)(RX)
 
 > net localgroup CodexSandboxUsers
@@ -529,7 +553,7 @@ Do this from an elevated shell that is **not** running as `Work`, or you may loc
 yourself out of the path you are standing in. Confirm `benst` can still log in
 and reach its own profile before you walk away.
 
-### CRITICAL-3 — `CATO_VAULT_PASSWORD` is a published value, and there is no vault
+### CRITICAL-3 — `CATO_VAULT_PASSWORD` is a published value; migrate into vault.enc
 
 Two independent problems, one root cause.
 
@@ -546,13 +570,9 @@ PROJECT_BLACKBOX_AUDIT.md
 `PROJECT_BLACKBOX_AUDIT.md:23` even describes it as a known problem. The value is
 13 characters. Anyone with repository access has the vault password.
 
-**3b.** There is no vault to protect. Verified absent:
-`C:\Users\benst\.cato\vault.enc`, `C:\Users\Work\.cato\vault.enc`,
-`C:\Users\Work\Desktop\GitHub\Cato\vault.enc` — all `False`. `cato doctor`
-confirms: `Vault  NOT FOUND`.
-
-**Net effect: every credential is plaintext in `.env`, protected only by the ACLs
-in CRITICAL-1 and CRITICAL-2, both of which are broken.**
+**3b.** `%APPDATA%\cato\vault.enc` may exist as an empty/placeholder blob under
+the Work profile. Launch now prefers vault-stored operator secrets over
+plaintext `.env`. Runner scripts fail closed when `CATO_VAULT_PASSWORD` is unset.
 
 **Remediation, in this order:**
 
@@ -563,16 +583,15 @@ in CRITICAL-1 and CRITICAL-2, both of which are broken.**
 3. Purge the old value from `CLAUDE.md` and `PROJECT_BLACKBOX_AUDIT.md`, and
    treat it as compromised in git history — a plain edit does not remove it from
    past commits.
-4. Create the vault and migrate credentials off plaintext:
+4. Migrate credentials off plaintext (**one command; values never echoed**):
    ```
-   .venv\Scripts\python.exe -m cato init
-   .venv\Scripts\python.exe -m cato vault set <KEY_NAME>
-   .venv\Scripts\python.exe -m cato vault list
+   set CATO_VAULT_PASSWORD=<your-strong-password>
+   python -m cato vault migrate-env
+   python -m cato vault list
    ```
-   `cato init`, `cato vault set`, `cato vault list` and `cato vault delete` are
-   all verified to exist (`cato/cli.py:142, 318, 332, 349`). **None have been
-   run — this migration path is UNVERIFIED.** Confirm success by re-running
-   `cato doctor` and seeing `Vault` stop reporting `NOT FOUND`.
+   Confirm: `vault.enc` size grows, `cato vault list` shows key names only, and
+   `cato doctor` stops reporting `Vault NOT FOUND`. Interactive alternative:
+   `python -m cato init` then `python -m cato vault set <KEY_NAME>`.
 5. Rotate every other credential in `PREREQUISITES.md`. They have been readable
    by the sandbox accounts for an unknown period.
 

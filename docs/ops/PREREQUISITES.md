@@ -2,7 +2,9 @@
 
 Everything required to run or verify Cato + Genesis on this machine.
 
-Verified 2026-08-03 against Cato commit `8731f21`.
+Verified originally 2026-08-03 (historical write-up cited `8731f21`, absent from
+this clone — use `git log -1`). Repo path on this machine:
+`C:\Users\Work\Desktop\vault\projects\My Github\Cato`.
 
 **No credential value appears in this document, and none ever should. Variables
 are documented by name and purpose only.**
@@ -34,7 +36,7 @@ variable; the launching account decides which state tree is used.
 | Item | Path | Version |
 |---|---|---|
 | System Python | `C:\Users\benst\AppData\Local\Programs\Python\Python312\python.exe` | 3.12.10 |
-| **Cato venv — the only interpreter for Cato work** | `C:\Users\Work\Desktop\GitHub\Cato\.venv\Scripts\python.exe` | 3.12.10 (verified: `--version`) |
+| **Cato venv — the only interpreter for Cato work** | `C:\Users\Work\Desktop\vault\projects\My Github\Cato\.venv\Scripts\python.exe` | Create per `VERIFICATION.md` §1 if missing (**UNVERIFIED** at this path as of 2026-08-06; former Desktop “GitHub” clone path is gone) |
 
 `pyproject.toml` declares `requires-python = ">=3.11"`.
 
@@ -111,7 +113,7 @@ Genesis runs on Render free tier: 30s proxy timeout; warm latency up to ~15s on
 
 ## 6. Credentials — `Cato\.env`
 
-Path: `C:\Users\Work\Desktop\GitHub\Cato\.env`
+Path: `C:\Users\Work\Desktop\vault\projects\My Github\Cato\.env`
 Gitignored: yes (verified, `.gitignore:11`).
 Loaded by: `cato start`, from the **current working directory**. Start the daemon
 from the repo root or none of these are visible to it.
@@ -143,7 +145,7 @@ degrades a channel; it does not stop the daemon.
 
 ## 7. Credentials — `Genesis Agents\.env`
 
-Path: `C:\Users\Work\Desktop\GitHub\Genesis Agents\.env`
+Path: `C:\Users\Work\Desktop\vault\projects\My Github\Genesis Agents\.env`
 
 23 keys, verified present by name:
 

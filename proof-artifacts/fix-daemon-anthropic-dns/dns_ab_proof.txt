@@ -1,0 +1,5 @@
+DEFAULT_ERR ClientConnectorDNSError Cannot connect to host api.anthropic.com:443 ssl:default [Could not contact DNS servers]
+FIXED_STATUS 404
+FIXED_OK True
+note=GET https://api.anthropic.com root returns 404 once DNS+TLS succeed (expected; not an API messages call)
+fix=ThreadedResolver + AF_INET via cato.http_session.make_outbound_session

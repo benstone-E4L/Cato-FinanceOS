@@ -1,0 +1,8 @@
+{
+  "path": "C:\\Users\\Work\\AppData\\Roaming\\cato\\vault.enc",
+  "exists": true,
+  "size_bytes": 84,
+  "appdata": "C:\\Users\\Work\\AppData\\Roaming",
+  "cato_vault_password_set": false,
+  "note": "84-byte blob is consistent with an empty encrypted JSON object; live unlock/migrate BLOCKED without CATO_VAULT_PASSWORD"
+}

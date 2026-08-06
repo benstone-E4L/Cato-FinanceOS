@@ -1,0 +1,57 @@
+# fix-ci-pytest-triggers — changed file list + new trigger description
+# Generated: 2026-08-06
+# TASK_ID: fix-ci-pytest-triggers
+
+## FILES_CHANGED
+
+1. .github/workflows/ci.yml
+2. .github/workflows/python-verify.yml
+
+## NEW TRIGGERS (ci.yml)
+
+BEFORE:
+  on:
+    workflow_dispatch:
+    pull_request:
+      branches:
+        - main
+  # Problem: origin has no `main` branch, so this never fired for
+  # e4l-runtime-hardening work.
+
+AFTER:
+  on:
+    workflow_dispatch:
+    push:
+      branches:
+        - e4l-runtime-hardening
+    pull_request:
+      branches:
+        - e4l-runtime-hardening
+  # Fires on: direct push to e4l-runtime-hardening, PRs targeting
+  # e4l-runtime-hardening, and manual workflow_dispatch.
+  # pytest step UNCHANGED (still: python -m pytest tests/ -q --tb=short).
+
+## NEW TRIGGERS (python-verify.yml) — optional companion update
+
+BEFORE:
+  on:
+    workflow_dispatch:
+
+AFTER:
+  on:
+    workflow_dispatch:
+    push:
+      branches:
+        - e4l-runtime-hardening
+    pull_request:
+      branches:
+        - e4l-runtime-hardening
+  # Same branch gates as ci.yml; Windows verify still intact.
+
+## DONE CRITERIA
+
+- [x] ci.yml includes push and/or pull_request that can fire for e4l-runtime-hardening
+- [x] Removed sole dependence on pull_request into main
+- [x] Tests not disabled
+- [x] No secrets/.env/cato code touched
+- [x] No push performed

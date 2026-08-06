@@ -1,0 +1,18 @@
+[
+  {
+    "id": "daemon-live-model-proof-1786042681556-0",
+    "role": "user",
+    "text": "Reply with exactly one word: PONG",
+    "channel": "web",
+    "session_id": "daemon-live-model-proof",
+    "timestamp": 1786042681556
+  },
+  {
+    "id": "daemon-live-model-proof-1786042786991-1",
+    "role": "assistant",
+    "text": "[error: 400, message='Bad Request', url='https://api.openai.com/v1/chat/completions']",
+    "channel": "web",
+    "session_id": "daemon-live-model-proof",
+    "timestamp": 1786042786991
+  }
+]

@@ -1,0 +1,29 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Work\Desktop\vault\projects\My Github\Cato
+configfile: pyproject.toml
+plugins: anyio-4.12.1, langsmith-0.7.22, asyncio-1.3.0, cov-7.0.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 18 items
+
+tests/test_financeos_client.py::TestAlreadyQueuedSuccess::test_helper_matches_exact_body PASSED [  5%]
+tests/test_financeos_client.py::TestAlreadyQueuedSuccess::test_submit_treats_503_queued_as_ok PASSED [ 11%]
+tests/test_financeos_client.py::TestAlreadyQueuedSuccess::test_other_503_is_error PASSED [ 16%]
+tests/test_financeos_client.py::TestCapabilityTokenFailClosed::test_mutating_without_token_raises PASSED [ 22%]
+tests/test_financeos_client.py::TestCapabilityTokenFailClosed::test_request_post_without_token_raises PASSED [ 27%]
+tests/test_financeos_client.py::TestCapabilityTokenFailClosed::test_get_without_token_still_allowed PASSED [ 33%]
+tests/test_financeos_client.py::TestCapabilityTokenFailClosed::test_mint_forbidden PASSED [ 38%]
+tests/test_financeos_client.py::TestCapabilityTokenFailClosed::test_approve_forbidden PASSED [ 44%]
+tests/test_financeos_client.py::TestDecimalMoney::test_parse_string_and_decimal PASSED [ 50%]
+tests/test_financeos_client.py::TestDecimalMoney::test_reject_float PASSED [ 55%]
+tests/test_financeos_client.py::TestDecimalMoney::test_wire_serialization PASSED [ 61%]
+tests/test_financeos_client.py::TestDecimalMoney::test_submit_rejects_float_amount PASSED [ 66%]
+tests/test_financeos_client.py::TestDecimalMoney::test_submit_stringifies_decimal_amount PASSED [ 72%]
+tests/test_financeos_client.py::TestPollHelper::test_202_is_not_applied PASSED [ 77%]
+tests/test_financeos_client.py::TestPollHelper::test_poll_until_terminal_applied PASSED [ 83%]
+tests/test_financeos_client.py::TestPollHelper::test_poll_stops_on_deferred_terminal PASSED [ 88%]
+tests/test_financeos_client.py::TestPollHelper::test_poll_timeout PASSED [ 94%]
+tests/test_financeos_client.py::TestPublicDict::test_result_public_dict_has_no_secrets PASSED [100%]
+
+============================= 18 passed in 0.52s ==============================

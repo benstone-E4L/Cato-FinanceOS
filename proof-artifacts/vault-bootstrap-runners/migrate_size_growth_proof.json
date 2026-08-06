@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "size_before": 84,
+  "size_after": 220,
+  "grew": true,
+  "migrated_keys": [
+    "ANTHROPIC_API_KEY",
+    "OPENROUTER_API_KEY",
+    "TELEGRAM_BOT_TOKEN"
+  ],
+  "list_keys": [
+    "ANTHROPIC_API_KEY",
+    "OPENROUTER_API_KEY",
+    "TELEGRAM_BOT_TOKEN"
+  ],
+  "note": "synthetic temp vault only; no production secrets"
+}

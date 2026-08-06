@@ -1,0 +1,8 @@
+doctor_vault_probe (redacted)
+data_dir=C:\Users\Work\AppData\Roaming\cato
+vault_enc_exists=True
+vault_enc_size_bytes=84
+CATO_VAULT_PASSWORD_set=False (session)
+live_unlock=BLOCKED without CATO_VAULT_PASSWORD — see migrate_env_blocked.txt
+unit_migrate_growth=see migrate_size_growth_proof.json
+pytest=24 passed (test_vault + test_vault_bootstrap + test_vault_crypto)

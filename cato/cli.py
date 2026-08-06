@@ -8,7 +8,7 @@ Commands:
     cato migrate --from-openclaw       Migrate workspace from OpenClaw
     cato doctor [--skills] [--attest]  Audit workspace health + attestation
     cato status                        Show running state and budget summary
-    cato vault set/list/delete         Manage vault credentials
+    cato vault set/list/delete/migrate-env  Manage vault credentials
     cato audit --session <id>          Export audit log for a session
     cato receipt --session <id>        Show signed fare receipt for a session
     cato replay --session <id> [--live] Replay a recorded session
@@ -399,6 +399,71 @@ def vault_delete(key: str) -> None:
     safe_print(f"Key '{key}' deleted from vault.")
 
 
+@vault_cmd.command("migrate-env")
+@click.option(
+    "--env-file",
+    type=click.Path(path_type=Path, exists=False),
+    default=None,
+    help="Path to .env (default: repo-root/.env). Values are never printed.",
+)
+@click.option(
+    "--overwrite/--no-overwrite",
+    default=False,
+    show_default=True,
+    help="Overwrite keys already present in the vault.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Report which keys would migrate; do not write the vault.",
+)
+def vault_migrate_env(
+    env_file: Optional[Path],
+    overwrite: bool,
+    dry_run: bool,
+) -> None:
+    """Copy operator secrets from .env into vault.enc (values never echoed).
+
+    One-command migrate (password required in the environment)::
+
+        set CATO_VAULT_PASSWORD=<your-strong-password>
+        python -m cato vault migrate-env
+
+    Then confirm with ``cato vault list`` (names only) or ``cato doctor``.
+    """
+    from cato.vault_bootstrap import migrate_env_to_vault
+
+    report = migrate_env_to_vault(
+        env_file=env_file,
+        overwrite=overwrite,
+        dry_run=dry_run,
+    )
+    if report.error:
+        safe_print(f"migrate-env FAILED: {report.error}")
+        raise SystemExit(1)
+
+    safe_print(f"env_file: {report.env_file}")
+    safe_print(f"vault:    {report.vault_path}")
+    safe_print(f"dry_run:  {report.dry_run}")
+    safe_print(f"migrated ({len(report.migrated)}):")
+    for key in report.migrated:
+        safe_print(f"  + {key}")
+    if report.skipped_existing:
+        safe_print(f"skipped_existing ({len(report.skipped_existing)}):")
+        for key in report.skipped_existing:
+            safe_print(f"  = {key}")
+    if report.skipped_empty:
+        # Only count — listing every absent OPERATOR key is noisy.
+        safe_print(f"skipped_empty: {len(report.skipped_empty)} operator key(s) absent from .env")
+    size = report.vault_path.stat().st_size if report.vault_path.exists() else 0
+    safe_print(f"vault.enc size_bytes: {size}")
+    if dry_run:
+        safe_print("Dry run complete — no vault writes performed.")
+    else:
+        safe_print("Done. Verify with: cato vault list")
+
+
 # ---------------------------------------------------------------------------
 # cato genesis  (AP2 identity + SwarmSync Genesis Agents)
 # ---------------------------------------------------------------------------
@@ -519,16 +584,28 @@ def genesis_health() -> None:
               help="Browser engine to use (conduit = opt-in per-action billing).")
 def cmd_start(agent: str, channel: str, browser: str) -> None:
     """Start the CATO daemon."""
-    # Load .env file if it exists
+    # Prefer vault.enc for operator secrets; .env only fills keys still missing.
+    # CATO_VAULT_PASSWORD must be set. Never prints secret values.
     import os
-    from pathlib import Path
-    env_file = Path.cwd() / ".env"
-    if env_file.exists():
-        try:
-            from dotenv import load_dotenv
-            load_dotenv(env_file)
-        except ImportError:
-            pass  # dotenv not installed, continue with existing env vars
+    from cato.vault_bootstrap import bootstrap_launch_credentials
+
+    try:
+        _vault, _boot = bootstrap_launch_credentials(
+            repo_root=Path.cwd(),
+            require_password=True,
+            load_dotenv=True,
+        )
+        safe_print(
+            "Credentials: "
+            f"vault_present={_boot.vault_present} "
+            f"unlocked={_boot.vault_unlocked} "
+            f"vault_keys={_boot.vault_keys_total} "
+            f"applied_from_vault={list(_boot.applied_from_vault)} "
+            f"filled_from_dotenv={list(_boot.filled_from_dotenv)}"
+        )
+    except VaultError as exc:
+        safe_print(f"Vault bootstrap failed: {exc}")
+        raise SystemExit(1) from exc
 
     config = CatoConfig.load()
 
@@ -581,8 +658,28 @@ def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
     import asyncio
     import logging
 
+    # Ensure vault is unlocked and preferred secrets are in environ even when
+    # callers (legacy launch scripts) skipped bootstrap_launch_credentials.
+    # Password may already live in the process-level vault cache (env var popped).
     vault_path = _CATO_DIR / "vault.enc"
-    vault = Vault(vault_path=vault_path) if vault_path.exists() else None
+    vault: Vault | None = None
+    if vault_path.exists():
+        try:
+            from cato.vault_bootstrap import apply_vault_to_environ, unlock_vault
+
+            vault = unlock_vault(vault_path=vault_path)
+            applied = apply_vault_to_environ(vault)
+            logging.getLogger("cato").info(
+                "Daemon vault ready: keys=%d applied=%s",
+                len(vault.list_keys()),
+                list(applied),
+            )
+        except VaultError:
+            # Password missing/wrong — keep a locked handle; adapters unlock later
+            # or fall back to environ filled by the outer runner.
+            vault = Vault(vault_path=vault_path)
+        except Exception:
+            vault = Vault(vault_path=vault_path)
     budget = BudgetManager(
         session_cap=config.session_cap,
         monthly_cap=config.monthly_cap,

@@ -1,0 +1,10 @@
+RESULT=PASS
+path=daemon WebSocket /ws -> gateway.ingest -> agent_loop -> AnthropicDirectClient (claude-sonnet-5)
+health=http://127.0.0.1:8080/health status=200 ok (after restart with ThreadedResolver fix)
+root_cause=aiohttp default async DNS (aiodns/c-ares) fails on this Windows host; OS DNS via ThreadedResolver works
+fix=cato/http_session.py make_outbound_session(ThreadedResolver + AF_INET); wired into anthropic_client.py and openai_client.py
+dns_ab=DEFAULT ClientConnectorDNSError "Could not contact DNS servers"; FIXED GET api.anthropic.com -> HTTP 404 (TLS reachable)
+model=claude-sonnet-5 decision=17d305090365 stop_reason=end_turn attempts=1 output_tokens=5
+reply_preview=PONG
+SECRETS_PRINTED=NO
+vault=unlocked applied ANTHROPIC_API_KEY (value not logged)

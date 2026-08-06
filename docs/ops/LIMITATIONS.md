@@ -16,54 +16,72 @@ reads. Written so an operator finds the gap here rather than in production.
 - UI status colors are informational only. A status label does not prove an
   external integration is healthy unless the associated runtime check says so.
 
-Verified 2026-08-03 against Cato commit `8731f21`.
+Verified originally 2026-08-03 (historical write-up cited `8731f21`, which is
+**not** in this clone's history — root `0b7b99d`; use `git log -1` for HEAD).
+Path/state notes refreshed 2026-08-06 against
+`C:\Users\Work\Desktop\vault\projects\My Github\Cato`.
 
 **A runbook that hides a gap is worse than no runbook.** Everything below is a
 gap.
 
-> **Concurrency notice.** A failure-mode audit was modifying this repository while
-> these documents were written. These notes describe **committed** state at
-> `8731f21`. Two limitations (§2, §4) have uncommitted fixes in flight and are
-> flagged as such. Line numbers will drift — prefer symbol names and `grep`. See
-> `RUNBOOK.md` for the full list of modified files.
+> **Concurrency / drift notice.** A failure-mode audit was modifying this
+> repository while these documents were first written. Two limitations (§2, §4)
+> described uncommitted fixes in flight at that time and are flagged as such.
+> Line numbers drift with HEAD — prefer symbol names and `grep`. See `RUNBOOK.md`.
 
 ---
 
-## 1. The daemon has never been started during this remediation
+## 1. Daemon live-proven status — do not greenwash filesystem activity
 
-**Last actual run: 2026-06-14.** Evidence: `C:\Users\benst\.cato\cato.db` last
-write 2026-06-14 15:25:18. Nothing in this remediation cycle started it.
+**Evidence re-checked 2026-08-06 (filesystem only):**
+
+| Path | Status |
+|---|---|
+| `C:\Users\benst\.cato\cato.db` | **ABSENT.** Earlier ops notes cited last-write 2026-06-14 15:25:18 on this file; that date **cannot be re-verified** here because the file is gone. |
+| `C:\Users\Work\AppData\Roaming\cato\cato.db` | Present; LastWriteTime **2026-08-05 16:31:39** (size 286720). |
+| `C:\Users\Work\AppData\Roaming\cato\daemon.token` | Present; LastWriteTime **2026-08-05 16:31:25**. |
+| `C:\Users\Work\AppData\Roaming\cato\config.yaml` | Present; LastWriteTime **2026-08-05 16:04:56**. |
+
+**What that does and does not prove:**
+
+- **VERIFIED:** the Work `%APPDATA%\cato` tree had Aug 2026 filesystem activity
+  (DB, token, config touched).
+- **NOT proven by those mtimes alone:** a successful model call, a green
+  `/health`, or an end-to-end gate → dispatch → ledger `CONFIRMED` path.
+  Do **not** invent call counts. Run `.venv\Scripts\python.exe -m cato status`
+  and read the budget counters yourself.
 
 That means:
 
-- No startup sequence in `RUNBOOK.md` §3 has been observed working.
+- No startup sequence in `RUNBOOK.md` §3 is claimed live-proven by this
+  documentation update.
 - `cato start`, `cato stop` and `cato init` are verified to **exist** in
-  `cato/cli.py` (lines 472, 633, 142) and their source was read — but none has
-  been executed.
-- No model call has been made. Budget counters read `Calls today: 0`,
-  `Calls this month: 0`.
-- No end-to-end path — gate → dispatch → ledger `CONFIRMED` — has been exercised
-  by a running daemon at this commit.
+  `cato/cli.py` (lines drifted — grep the symbols) and their source was read in
+  the original write-up — treat runtime behaviour as **UNVERIFIED** until you
+  observe it.
+- Model-call counts are whatever `cato status` reports now; this note does not
+  paste fabricated numbers.
 
-Everything verified in `VERIFICATION.md` is offline or read-only: the test suite,
-CLI read commands, database inspection, source reading, and one live HTTP call to
-Genesis. **That is a real and important scope limit. Do not read "2435 tests
+Everything verified in the original `VERIFICATION.md` pass was offline or
+read-only: the test suite, CLI read commands, database inspection, source
+reading, and one live HTTP call to Genesis. **Do not read historical "2435 tests
 passed" as "the system runs."**
 
-The first real start is an experiment. Treat it as one.
+The next real start you have not watched yourself is still an experiment. Treat
+it as one.
 
 ---
 
 ## 2. Approval gates are unreachable in the shipped configuration
 
-> **Status: uncommitted fix in flight.** At committed `8731f21` this limitation is
-> real — verified: `git show HEAD:cato/safety.py` contains no
-> `_defers_to_approval_gate`. The concurrent audit has added that method in the
-> working tree so that a positively classified, policy-gated tool **defers** to
-> the approval gate rather than being denied, while unclassified and un-gated
-> tools are still denied outright. Check with
+> **Status: check your tree.** The 2026-08-03 write-up found this limitation real
+> in committed `cato/safety.py` (no `_defers_to_approval_gate`). A concurrent
+> audit later added that method so a positively classified, policy-gated tool
+> **defers** to the approval gate rather than being denied, while unclassified
+> and un-gated tools are still denied outright. Check with
 > `grep -n "_defers_to_approval_gate" cato\safety.py` — a match means this
-> limitation is being retired.
+> limitation may be retired on your HEAD. Do not require historical SHA
+> `8731f21` (absent from this clone).
 
 With `safety_mode: "strict"` (the default, `cato/config.py:178`) and a headless
 daemon, `SafetyGuard.check_and_confirm` denies **any** HIGH_STAKES tool at gate 3,
@@ -125,7 +143,9 @@ selects. Do not read it as the live model.
 > you have with `grep -n "BudgetManager(cfg)" cato\cli.py` — no match means the
 > fix is present.
 
-Verified at commit `8731f21`. `cato/cli.py:901`, inside `cato night-shift status`:
+Verified in the 2026-08-03 write-up (historical SHA cited then is not in this
+clone — use `git log -1`). `cato/cli.py` night-shift status path, inside
+`cato night-shift status`:
 
 ```python
 budget = BudgetManager(cfg)
@@ -184,30 +204,32 @@ Do not present current proof bundles as cryptographically attributable. Set
 
 ---
 
-## 6. No vault; credentials are plaintext
+## 6. Vault preferred; plaintext `.env` is legacy fill-only
 
-No `vault.enc` exists anywhere (verified absent from `C:\Users\benst\.cato\`,
-`C:\Users\Work\.cato\`, and the repo root). `cato doctor` reports
-`Vault  NOT FOUND`.
+`%APPDATA%\cato\vault.enc` under the Work profile is the durable credential
+store. Launch paths prefer vault values for operator secrets
+(`TELEGRAM_BOT_TOKEN`, `OPENROUTER_API_KEY`, …) and use repo-root `.env` only
+to fill keys still missing (`cato.vault_bootstrap`).
 
-Every credential in `PREREQUISITES.md` §6 and §7 is plaintext in a `.env` file,
-protected only by filesystem ACLs — and those ACLs are currently wrong in two
-distinct ways. The live `CATO_VAULT_PASSWORD` value is additionally present
-verbatim in two git-tracked files.
+An empty / placeholder `vault.enc` may still exist until
+`cato vault migrate-env` (or `cato init` + `cato vault set`) has been run with
+`CATO_VAULT_PASSWORD` set. The migrate path is implemented and unit-tested;
+live migration still requires the operator password (never print it).
 
-**All three items are OUTSTANDING and awaiting operator action.** Full detail,
-verification commands and remediation commands are in `RUNBOOK.md` §8. Summary:
+Credentials that remain only in `.env` are still protected only by filesystem
+ACLs — and those ACLs are currently wrong in two distinct ways. The live
+`CATO_VAULT_PASSWORD` value is additionally present verbatim in two git-tracked
+files (rotate + purge — see `RUNBOOK.md` §8).
+
+**Outstanding operator actions** (full detail in `RUNBOOK.md` §8):
 
 1. `ACEMAGIC-WINDOW\CodexSandboxUsers` has `(OI)(CI)(RX)` on
    `C:\Users\Work\Desktop`, inherited onto both `.env` files. Members:
    `CodexSandboxOffline`, `CodexSandboxOnline`.
 2. `ACEMAGIC-WINDOW\Work` has `(OI)(CI)(F)` on the entire `C:\Users\benst`
    profile, reaching `conduit_identity.key` and `cato.db`.
-3. `CATO_VAULT_PASSWORD`'s live value appears in `CLAUDE.md` and
-   `PROJECT_BLACKBOX_AUDIT.md`, both git-tracked, and no vault exists to protect.
-
-The vault migration path (`cato init`, `cato vault set`) is **UNVERIFIED** — those
-commands exist but have never been run on this machine.
+3. Rotate `CATO_VAULT_PASSWORD`, purge it from git-tracked docs, then:
+   `python -m cato vault migrate-env` (values never echoed).
 
 ---
 
@@ -224,17 +246,17 @@ So Cato writes to **two roots**, and both move with the account. A daemon starte
 by a scheduled task, a service wrapper, or a different console session will use a
 different state tree from your interactive shell, with no error and no warning.
 
-Current split, verified:
+Current split, re-checked 2026-08-06 where noted:
 
-- `C:\Users\benst\.cato\` — production, last write 2026-06-14,
-  `cato.db` with `audit_log` 44 / `conduit_billing` 44 / `conduit_bundle_chain` 14,
-  **and no `ledger_records` table at all.**
-- `C:\Users\benst\AppData\Roaming\cato\` — **does not exist**, which proves this
-  build of Cato has never been imported under the `benst` account
-  (`get_data_dir()` calls `mkdir(exist_ok=True)` on every import).
-- `C:\Users\Work\.cato\` — does not exist.
-- `C:\Users\Work\AppData\Roaming\cato\` — active dev tree, created 2026-08-01,
-  ledger empty.
+- `C:\Users\benst\.cato\cato.db` — **ABSENT** as of 2026-08-06 (earlier notes
+  described a production tree last write 2026-06-14 with `audit_log` 44 /
+  `conduit_billing` 44 / `conduit_bundle_chain` 14 and **no `ledger_records`
+  table**; that DB file is no longer present to re-verify).
+- `C:\Users\benst\AppData\Roaming\cato\` — previously reported absent.
+- `C:\Users\Work\.cato\` — does not exist (as previously).
+- `C:\Users\Work\AppData\Roaming\cato\` — active Work tree. **VERIFIED 2026-08-06
+  filesystem:** `config.yaml`, `cato.db`, `daemon.token` present with Aug 2026
+  mtimes on 2026-08-05 (see §1). Do not infer model-call counts from mtimes.
 
 `INCIDENTS.md` §7 covers the symptoms and recovery. There is no clean fix short of
 introducing an explicit state-root variable, which is a code change and is not
@@ -393,8 +415,8 @@ Saving the next reader an hour:
 | `cato ledger recover` | `LedgerMiddleware.record_recovery()` in Python (`INCIDENTS.md` §1). |
 | `cato approval` command group | Read `docs/approval-policy.yaml`; verify via the test suite. |
 | A ledger repair tool | Deliberate. Restore a backup or start a fresh chain, and write down which. |
-| `%APPDATA%\cato\config.yaml` | Not present for either account. Create with `cato init` (UNVERIFIED). |
-| `vault.enc` | Not present anywhere. See §6. |
+| `%APPDATA%\cato\config.yaml` | Present under Work as of 2026-08-06 filesystem check; re-verify. Vault still historically absent — see §6. |
+| `vault.enc` | Present under Work `%APPDATA%\cato\` (may be empty until migrate-env). See §6. |
 | `C:\Users\benst\.cato\skills\` | Not present. |
 | `ledger_records` table in the production `cato.db` | Not present. That DB predates the Causal Action Ledger. |
 | A FinanceOS CLI | HTTP API and worker only (§8). |
@@ -406,9 +428,11 @@ Saving the next reader an hour:
 
 ## 14. Scope of this documentation
 
-Written from: reading source at commit `8731f21`, running the test suite, running
-read-only CLI commands, inspecting both SQLite databases read-only, checking
-filesystem ACLs, and one live HTTP probe of Genesis.
+Written from: reading source during the 2026-08-03 ops write-up (historical SHA
+cited then is absent from this clone — use `git log -1`), running the test suite,
+running read-only CLI commands, inspecting SQLite databases read-only, checking
+filesystem ACLs, and one live HTTP probe of Genesis. Paths refreshed 2026-08-06
+to `C:\Users\Work\Desktop\vault\projects\My Github\Cato`.
 
 Not written from: a running daemon, a live model call, a live Xero write, a
 FinanceOS call, an executed startup wrapper, or the FinanceOS source tree (which

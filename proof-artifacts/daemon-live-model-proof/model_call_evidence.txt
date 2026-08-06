@@ -1,0 +1,9 @@
+RESULT=BLOCKED
+see=blocked.txt
+path=daemon WebSocket /ws -> gateway.ingest -> agent_loop direct Anthropic (claude-sonnet-5) -> fail DNS -> fallback openai/gpt-4o-mini -> HTTP 400
+health=http://127.0.0.1:8080/health status=200 ok
+vault=unlocked applied ANTHROPIC_API_KEY (value not logged)
+SECRETS_PRINTED=NO
+reply_preview=[error: 400, message='Bad Request', url='https://api.openai.com/v1/chat/completions']
+exact_primary=Cannot connect to host api.anthropic.com:443 ssl:default [Timeout while contacting DNS servers]
+exact_fallback=400 Bad Request https://api.openai.com/v1/chat/completions (format_error)

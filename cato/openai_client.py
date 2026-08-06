@@ -197,8 +197,11 @@ class OpenAIDirectClient:
     ) -> tuple[int, dict, dict]:
         import aiohttp
 
+        from .http_session import make_outbound_session
+
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(
+            # Same Windows DNS fix as anthropic_client — see http_session.py.
+            self._session = make_outbound_session(
                 timeout=aiohttp.ClientTimeout(total=600)
             )
         async with self._session.post(url, json=payload, headers=headers) as resp:

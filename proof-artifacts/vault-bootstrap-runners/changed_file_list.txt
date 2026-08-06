@@ -1,0 +1,12 @@
+cato/vault_bootstrap.py
+cato/vault.py
+cato/cli.py
+cato_svc_runner.py
+cato_service.py
+start_daemon.ps1
+launch_daemon.ps1
+start_cato.bat
+docs/ops/RUNBOOK.md
+docs/ops/LIMITATIONS.md
+tests/test_vault_bootstrap.py
+proof-artifacts/vault-bootstrap-runners/

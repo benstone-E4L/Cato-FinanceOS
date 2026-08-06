@@ -1,0 +1,3 @@
+status=200
+{"status": "ok", "version": "0.2.0", "sessions": 1, "uptime": 996, "ledger_recovery": {"scanned": true, "clean": true, "scanned_at": 1786042050.3869822, "unresolved_intents": 0, "unreconciled_indeterminate": 0, "actions": [], "indeterminate_actions": [], "error": null}, "mcp": {"enabled": false, "mount_path": null, "port": null}}
+

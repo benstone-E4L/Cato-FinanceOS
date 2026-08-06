@@ -1,0 +1,24 @@
+{
+  "audit_verdict": "CONDITIONAL_PASS",
+  "safe_to_claim_done": false,
+  "requires_reaudit": true,
+  "method": "mechanical_obstacle_override",
+  "agent_auditors_attempted": ["Kraken", "reality-check-manager", "Hudson"],
+  "agent_auditors_result": "usage_limit_blocked",
+  "claims": {
+    "main_deleted": "PASS",
+    "ops_docs_paths": "PASS",
+    "shell_c2": "PASS",
+    "ci_triggers": "PASS",
+    "vault_bootstrap_code": "PASS",
+    "vault_live_migrate": "OPEN",
+    "financeos_client_unit": "PASS",
+    "financeos_live": "OPEN",
+    "github_release": "PASS",
+    "packaged_checksum_contracts": "PARTIAL",
+    "daemon_live": "BLOCKED",
+    "git_push": "OPEN"
+  },
+  "blocker_for_daemon": "CATO_VAULT_PASSWORD unset",
+  "release_url": "https://github.com/benstone-E4L/Cato-FinanceOS/releases/tag/v0.2.0-50a4832d"
+}

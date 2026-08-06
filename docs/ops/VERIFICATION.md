@@ -4,49 +4,57 @@ This document is the binding test for the rest of `docs/ops/`. Another qualified
 agent, with no memory of this work, must be able to follow it start to finish and
 land on the same numbers.
 
-Every command below was executed on 2026-08-03 against Cato commit `8731f21`. The
-recorded outputs are real. Anything not executed is marked **UNVERIFIED** with a
-note on what would confirm it.
+Every command below was originally executed on 2026-08-03. The recorded outputs
+are historical snapshots from that write-up. That write-up cited commit
+`8731f21`, which is **not present in this clone's git history** (this repo's
+root is `0b7b99d`; do not require `8731f21`). Anything not re-executed on your
+tree is marked **UNVERIFIED** with a note on what would confirm it.
+
+**Working copy on this machine:**
+`C:\Users\Work\Desktop\vault\projects\My Github\Cato`
+(branch `e4l-runtime-hardening` as of the 2026-08-06 path fix). Do **not** use
+the former Desktop “GitHub” clone path (gone) or a nested `Main\` folder (deleted
+2026-08-06).
 
 **Nothing in this document starts the daemon.** All checks are read-only or
-offline. The daemon has not been started during this remediation cycle — see §8.
+offline. Do not treat offline suite numbers as proof the daemon is live — see §8.
 
 ---
 
 ## 0. Before you start
 
-Work from `C:\Users\Work\Desktop\GitHub\Cato`. Use the venv interpreter for every
-Python command:
+Work from `C:\Users\Work\Desktop\vault\projects\My Github\Cato`. Use the venv
+interpreter for every Python command (create it per §1 if `.venv` is missing —
+**UNVERIFIED** whether a venv already exists at this path):
 
 ```
-C:\Users\Work\Desktop\GitHub\Cato\.venv\Scripts\python.exe
+C:\Users\Work\Desktop\vault\projects\My Github\Cato\.venv\Scripts\python.exe
 ```
 
 Commands are written for a Windows shell from the repo root. The `.venv\...`
 relative form assumes your working directory is the repo root.
 
-Confirm you are on the same commit:
+Record your actual HEAD — do **not** chase a fixed SHA:
 
 ```
-git -C "C:\Users\Work\Desktop\GitHub\Cato" log --oneline -1
+git -C "C:\Users\Work\Desktop\vault\projects\My Github\Cato" log --oneline -1
 ```
 
-Expected: `8731f21 fix(ui): /api/action-guard/status reports only controls that are enforced`
-
-If your commit differs, the test counts in §4 may differ too. Record what you
-actually see rather than forcing a match.
+Example shape only (will drift): `50a4832 fix: declare raster validation build dependencies`.
+If your commit differs from the 2026-08-03 write-up, the test counts in §4 may
+differ too. Record what you actually see.
 
 **Also check for uncommitted changes:**
 
 ```
-git -C "C:\Users\Work\Desktop\GitHub\Cato" status --short
+git -C "C:\Users\Work\Desktop\vault\projects\My Github\Cato" status --short
 ```
 
-When these documents were written, a concurrent failure-mode audit had
+When these documents were first written, a concurrent failure-mode audit had
 uncommitted modifications to twelve files including `cato/safety.py` and
 `cato/cli.py`, two of which change documented behaviour (§6, and `LIMITATIONS.md`
-§2 and §4). **All line numbers in `docs/ops/` are as-of-`8731f21` and drift.**
-Prefer symbol names and `grep` to relocate anything that has moved.
+§2 and §4). **All line numbers in `docs/ops/` drift with HEAD.** Prefer symbol
+names and `grep` to relocate anything that has moved.
 
 ---
 
@@ -78,7 +86,7 @@ Recorded output:
 
 ```
 Python 3.12.10
-pip 26.2 from C:\Users\Work\Desktop\GitHub\Cato\.venv\Lib\site-packages\pip (python 3.12)
+pip 26.2 from C:\Users\Work\Desktop\vault\projects\My Github\Cato\.venv\Lib\site-packages\pip (python 3.12)
 Name: cato-daemon
 Version: 0.2.0
 Summary: The AI agent daemon you can audit in a coffee break
@@ -268,8 +276,8 @@ Genesis has no venv of its own. Run its containment tests under Cato's
 interpreter. Verified working:
 
 ```
-cd "C:\Users\Work\Desktop\GitHub\Genesis Agents"
-"C:\Users\Work\Desktop\GitHub\Cato\.venv\Scripts\python.exe" -m pytest tests\test_escrow_containment.py tests\test_prohibited_tools.py -q
+cd "C:\Users\Work\Desktop\vault\projects\My Github\Genesis Agents"
+"C:\Users\Work\Desktop\vault\projects\My Github\Cato\.venv\Scripts\python.exe" -m pytest tests\test_escrow_containment.py tests\test_prohibited_tools.py -q
 ```
 
 Recorded output:
@@ -285,8 +293,8 @@ guard, including a negative control.
 ### Verify the prohibited-tool set directly
 
 ```
-cd "C:\Users\Work\Desktop\GitHub\Genesis Agents"
-"C:\Users\Work\Desktop\GitHub\Cato\.venv\Scripts\python.exe" -c "from runtime.tool_policy import PROHIBITED_TOOLS, PROHIBITION_GROUPS, prohibition_manifest_digest; print(len(PROHIBITED_TOOLS), len(PROHIBITION_GROUPS)); print(prohibition_manifest_digest())"
+cd "C:\Users\Work\Desktop\vault\projects\My Github\Genesis Agents"
+"C:\Users\Work\Desktop\vault\projects\My Github\Cato\.venv\Scripts\python.exe" -c "from runtime.tool_policy import PROHIBITED_TOOLS, PROHIBITION_GROUPS, prohibition_manifest_digest; print(len(PROHIBITED_TOOLS), len(PROHIBITION_GROUPS)); print(prohibition_manifest_digest())"
 ```
 
 **UNVERIFIED as a standalone one-liner** — the names, the counts and
@@ -437,10 +445,10 @@ by reading two files:
 Also confirm the default: `cato/config.py:178` — `safety_mode: str = "strict"`,
 and `cato status` prints `Safety:  strict`.
 
-**Conclusion the reader should reach independently: at commit `8731f21`, with the
-shipped defaults, the Telegram approval flow is unreachable in a headless
-daemon.** It is fail-closed, not a bypass — but it is not doing the job you think
-it is doing.
+**Conclusion the 2026-08-03 write-up reached: with the shipped defaults then, the
+Telegram approval flow was unreachable in a headless daemon.** It is fail-closed,
+not a bypass — but it is not doing the job you think it is doing. Re-derive this
+on **your** HEAD; do not assume the historical SHA still exists in this clone.
 
 **Then check whether that is still true on your tree:**
 
@@ -448,11 +456,11 @@ it is doing.
 grep -n "_defers_to_approval_gate" cato\safety.py
 ```
 
-Verified: `git show HEAD:cato/safety.py` at `8731f21` contains **no** match, so
-the trap is real at that commit. The concurrent audit added that method in the
-working tree, letting a positively classified, policy-gated tool **defer** to the
-approval gate rather than be denied — while still denying unclassified tools and
-tools the policy does not gate. If you get a match, read
+Historical note: the 2026-08-03 write-up found **no** match in committed
+`cato/safety.py` at that time. A concurrent audit later added that method so a
+positively classified, policy-gated tool could **defer** to the approval gate
+rather than be denied — while still denying unclassified tools and tools the
+policy does not gate. If you get a match, read
 `cato/safety.py::check_and_confirm` in full and re-derive the conclusion yourself
 rather than trusting this paragraph.
 
@@ -494,7 +502,7 @@ State these plainly rather than letting a reader assume coverage.
 
 | Not verified | Why | What would confirm it |
 |---|---|---|
-| **`cato start`** | The daemon has not been started during this remediation. Last actual run: 2026-06-14 (`C:\Users\benst\.cato\cato.db` mtime). | Run it, then `cato doctor` and see the `/health FAIL` line flip to a pass. That HTTP check is the only non-self-reported startup proof. |
+| **`cato start`** | This verification pass does not start the daemon. Earlier notes cited a 2026-06-14 `benst` DB mtime; that file is **ABSENT** as of 2026-08-06. Work `%APPDATA%\cato` shows Aug 2026 filesystem activity — see `LIMITATIONS.md` §1. Filesystem mtimes ≠ live-proven daemon / model calls. | Run it, then `cato doctor` and see the `/health FAIL` line flip to a pass. That HTTP check is the only non-self-reported startup proof. |
 | `cato stop` | Nothing was started, so nothing was stopped. | Start, then stop, then confirm `cato.pid` and `cato.port` are gone. |
 | `cato init` | Never run. No `config.yaml` or `vault.enc` exists on this machine. | Run it, then `cato doctor` should stop reporting `Config NOT FOUND` / `Vault NOT FOUND`. |
 | `cato vault set` / `list` / `delete` | Never run. There is no vault. | Create a vault via `cato init`, then round-trip a throwaway key. |
@@ -513,7 +521,7 @@ State these plainly rather than letting a reader assume coverage.
 Tick these in order. If any step diverges from the recorded output, stop and read
 the relevant section rather than continuing.
 
-- [ ] `git log --oneline -1` → `8731f21`
+- [ ] `git log --oneline -1` → record the actual HEAD SHA (do not require `8731f21`; it is not in this clone)
 - [ ] `.venv\Scripts\python.exe --version` → `Python 3.12.10`
 - [ ] `.venv\Scripts\python.exe -m pip show cato-daemon` → `cato-daemon 0.2.0`
 - [ ] `.venv\Scripts\python.exe -m pytest --version` → `pytest 9.1.1`

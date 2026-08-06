@@ -1,0 +1,29 @@
+BEFORE -> AFTER (path / commit pointers)
+
+Cato repo working directory:
+  BEFORE: C:\Users\Work\Desktop\GitHub\Cato  (ABSENT on this machine)
+  AFTER:  C:\Users\Work\Desktop\vault\projects\My Github\Cato  (PRESENT; HEAD example 50a4832)
+
+Genesis Agents (path corrections in VERIFICATION/RUNBOOK/PREREQUISITES):
+  BEFORE: C:\Users\Work\Desktop\GitHub\Genesis Agents  (ABSENT)
+  AFTER:  C:\Users\Work\Desktop\vault\projects\My Github\Genesis Agents  (PRESENT)
+
+Commit SHA requirement:
+  BEFORE: docs required/expected git log -1 == 8731f21 (NOT in this clone; git cat-file fails)
+  AFTER:  record actual HEAD via git log --oneline -1; note root is 0b7b99d; do not chase 8731f21
+
+Nested Main\:
+  BEFORE: risk of agents looking for ...\Cato\Main
+  AFTER:  explicit "Main deleted 2026-08-06 — do not use"
+
+LIMITATIONS last-run language:
+  BEFORE: "Last actual run: 2026-06-14" based on benst\.cato\cato.db mtime
+  AFTER:  benst cato.db ABSENT (2026-08-06); Work APPDATA Aug 2026 filesystem mtimes listed;
+          no invented model-call counts; daemon not claimed live-proven from mtimes alone
+
+DoD check — Select-String Desktop\GitHub\Cato in docs/ops:
+  hits=0 (must be 0)
+VERIFICATION 'Expected: 8731f21' matches: 0
+VERIFICATION lines mentioning vault\projects\My Github\Cato: 14, 26, 31
+Remaining Desktop\GitHub (any) hits:
+

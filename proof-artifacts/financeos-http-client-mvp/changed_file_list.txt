@@ -1,0 +1,30 @@
+financeos-http-client-mvp — changed / created files
+====================================================
+Date: 2026-08-06
+Repo: C:\Users\Work\Desktop\vault\projects\My Github\Cato
+
+CREATED
+- cato/integrations/financeos_client.py
+- tests/test_financeos_client.py
+- proof-artifacts/financeos-http-client-mvp/test_output.txt
+- proof-artifacts/financeos-http-client-mvp/changed_file_list.txt
+- proof-artifacts/financeos-http-client-mvp/summary.md
+
+MODIFIED
+- cato/integrations/__init__.py  (export FinanceOSClient + related errors)
+
+OUT OF SCOPE (not touched)
+- Xero code
+- Approvals-as-Cato
+- .env / secrets
+- Arbitrage
+- Desktop UI
+- git push
+
+§8 TRAPS ENCODED
+1. Capability token required for mutating calls (fail-closed)
+2. mint_capability_token() raises FinanceOSMintForbidden (no mint)
+3. HTTP 503 + body "That request is already queued." → ok=True, deduplicated
+4. HTTP 202 → accepted_not_applied; applied=False; poll GET /api/intents/:id
+5. Money via Decimal/strings; floats rejected
+6. approve() / approve_intent() raise FinanceOSApproveForbidden

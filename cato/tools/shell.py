@@ -74,13 +74,20 @@ class ShellTool:
         "ls", "cat", "head", "tail", "grep", "find", "wc", "echo", "printf",
         "python3", "python", "git",
         "mkdir", "cp", "mv", "chmod", "pwd", "env", "which", "date",
-        "sort", "uniq", "sed", "awk", "tr", "cut", "tee", "touch", "rm",
-        "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe",
+        "sort", "uniq", "sed", "awk", "tr", "cut", "tee", "touch",
+        # NOTE: rm / shell hosts (cmd, powershell, pwsh) are NOT default —
+        # on Windows gateway mode routes through create_subprocess_shell, so an
+        # allowlisted host would execute an attacker-controlled payload string.
+        # Opt them in via ~/.cato/exec-approvals.json (EXTENDED) if required.
     ]
 
     # Extended allowlist — opt-in only, NOT in DEFAULT_ALLOWLIST
     # Add these to ~/.cato/exec-approvals.json if you need them
-    EXTENDED_ALLOWLIST: list[str] = ["curl", "wget", "pip", "pip3", "npm", "node"]
+    EXTENDED_ALLOWLIST: list[str] = [
+        "curl", "wget", "pip", "pip3", "npm", "node",
+        "rm",
+        "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe",
+    ]
 
     def __init__(self) -> None:
         _AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
@@ -159,7 +166,17 @@ class ShellTool:
                 except ValueError:
                     cwd = str(workspace_root)
 
-        result = await self._run(command=command, mode=mode, timeout=timeout, cwd=cwd)
+        try:
+            result = await self._run(command=command, mode=mode, timeout=timeout, cwd=cwd)
+        except PermissionError as exc:
+            # Fail closed with a structured refusal so callers/agents never see
+            # an uncaught exception as a soft signal to retry unrestricted.
+            return json.dumps({
+                "error": str(exc),
+                "blocked": True,
+                "approval_required": True,
+                "requested_mode": mode,
+            })
         return json.dumps(result)
 
     async def _run(
@@ -186,13 +203,36 @@ class ShellTool:
 
         if mode == "gateway":
             allowlist = self._load_allowlist()
-            first_word = shlex.split(command)[0] if command.strip() else ""
-            base_cmd = Path(first_word).name  # strip path prefix if any
-            if base_cmd not in allowlist:
+            try:
+                first_word = shlex.split(command)[0] if command.strip() else ""
+            except ValueError:
+                # Unbalanced quotes etc. — refuse rather than guess a first token.
+                self._audit(mode, command, -1, blocked=True)
+                raise PermissionError(
+                    "Command could not be parsed for gateway allowlist check "
+                    "(fail-closed)."
+                )
+            base_cmd = Path(first_word).name.lower()  # strip path prefix if any
+            if base_cmd not in allowlist and base_cmd.removesuffix(".exe") not in allowlist:
                 self._audit(mode, command, -1, blocked=True)
                 raise PermissionError(
                     f"Command '{base_cmd}' not in gateway allowlist. "
                     f"Allowed: {sorted(allowlist)}"
+                )
+
+            # C-2: Windows gateway executes the *full* string under shell
+            # interpretation. First-token allowlisting is not enough — refuse
+            # irreversible / high-stakes payloads (incl. quote/escape/concat
+            # dodges that _classify_shell now catches). Full mode + execution
+            # grant remains the only escape hatch.
+            from ..safety import RiskTier, _classify_shell
+            risk = _classify_shell({"command": command})
+            if risk >= RiskTier.IRREVERSIBLE:
+                self._audit(mode, command, -1, blocked=True)
+                raise PermissionError(
+                    f"Gateway mode refuses {risk.name} shell payload without an "
+                    f"execution grant (fail-closed). Re-submit via approved "
+                    f"mode='full' after human approval."
                 )
 
         try:

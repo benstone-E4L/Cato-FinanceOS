@@ -10,13 +10,19 @@ Remove:   python cato_service.py remove
 import sys
 import os
 import threading
+from pathlib import Path
+
 import servicemanager
 import win32event
 import win32service
 import win32serviceutil
 
-# Set working directory before anything else
-os.chdir(r"C:\Users\Administrator\Desktop\Cato")
+# Repo root = directory containing this script (any Windows profile / clone path).
+_REPO_ROOT = Path(__file__).resolve().parent
+os.chdir(_REPO_ROOT)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 # Vault password must be set in the environment before installing/starting the service.
 # Example: set CATO_VAULT_PASSWORD=your-strong-password
 _vault_pw = os.environ.get("CATO_VAULT_PASSWORD")
@@ -59,24 +65,39 @@ class CatoDaemonService(win32serviceutil.ServiceFramework):
         import asyncio
         import logging
 
+        from cato.platform import get_data_dir
+
+        log_path = get_data_dir() / "cato_service.log"
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s %(name)s %(levelname)s %(message)s",
-            filename=r"C:\Users\Administrator\AppData\Roaming\cato\cato_service.log",
+            filename=str(log_path),
         )
 
-        # Load .env
+        from cato.vault import VaultError
+        from cato.vault_bootstrap import bootstrap_launch_credentials
+
         try:
-            from dotenv import load_dotenv
-            load_dotenv(r"C:\Users\Administrator\Desktop\Cato\.env")
-        except ImportError:
-            pass
+            _vault, _boot = bootstrap_launch_credentials(
+                repo_root=_REPO_ROOT,
+                require_password=True,
+                load_dotenv=True,
+            )
+            logging.info(
+                "Launch credentials: vault_present=%s unlocked=%s vault_keys=%d "
+                "applied_from_vault=%s filled_from_dotenv=%s",
+                _boot.vault_present,
+                _boot.vault_unlocked,
+                _boot.vault_keys_total,
+                list(_boot.applied_from_vault),
+                list(_boot.filled_from_dotenv),
+            )
+        except VaultError as exc:
+            logging.error("Vault bootstrap failed: %s", exc)
+            return
 
-        sys.path.insert(0, r"C:\Users\Administrator\Desktop\Cato")
-        from cato.cli import CatoConfig, Vault, BudgetManager, _CATO_DIR, _run_daemon, _PID_FILE
+        from cato.cli import CatoConfig, BudgetManager, _run_daemon, _PID_FILE
 
-        vault_path = _CATO_DIR / "vault.enc"
-        vault = Vault(vault_path=vault_path) if vault_path.exists() else None
         config = CatoConfig.load()
         budget = BudgetManager(session_cap=config.session_cap, monthly_cap=config.monthly_cap)
 

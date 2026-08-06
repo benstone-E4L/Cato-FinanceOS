@@ -1,0 +1,4 @@
+docs/ops/VERIFICATION.md
+docs/ops/LIMITATIONS.md
+docs/ops/RUNBOOK.md
+docs/ops/PREREQUISITES.md

@@ -1,0 +1,8 @@
+session_id=fix-daemon-anthropic-dns-1786043702
+path=daemon WebSocket /ws -> gateway -> agent_loop -> AnthropicDirectClient
+SECRETS_PRINTED=NO
+reply_type=response
+reply_preview=PONG
+raw_keys=['channel', 'model', 'session_id', 'text', 'type']
+n_frames=8
+RESULT=PASS

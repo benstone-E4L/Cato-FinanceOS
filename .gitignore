@@ -168,3 +168,9 @@ final-outcome-audit-reports/
 # These contain client_id + client_secret and must never land in git.
 client_secret*.json
 client_secret*.txt
+
+# O2O proof downloads (installers live on GitHub Releases)
+proof-artifacts/**/downloads/*.exe
+proof-artifacts/**/dist/*.exe
+proof-artifacts/**/*-setup.exe
+

@@ -260,6 +260,34 @@ class Vault:
         assert self._data is not None
         return sorted(k for k in self._data.keys() if k != CANARY_KEY_NAME)
 
+    def get_stored(self, key: str) -> Optional[str]:
+        """Return the vault-stored value for *key* with no environment fallback.
+
+        Use this when the caller must know whether the encrypted vault itself
+        holds a secret (launch bootstrap, migrate checks). ``get()`` still
+        falls back to ``os.environ`` for runtime convenience.
+        """
+        self._unlock()
+        assert self._data is not None
+        value = self._data.get(key)
+        if value is None or str(value).strip() == "":
+            return None
+        return str(value)
+
+    def stored_mapping(self) -> dict[str, str]:
+        """Return a copy of non-empty vault entries (excludes the canary key).
+
+        Values are returned to the caller for in-process use only — never log
+        or print them.
+        """
+        self._unlock()
+        assert self._data is not None
+        return {
+            k: str(v)
+            for k, v in self._data.items()
+            if k != CANARY_KEY_NAME and v is not None and str(v).strip() != ""
+        }
+
     # ------------------------------------------------------------------
     # Canary key (P2-11)
     # ------------------------------------------------------------------

@@ -1,0 +1,4 @@
+BLOCKED: Primary Anthropic direct path failed — Cannot connect to host api.anthropic.com:443 ssl:default [Timeout while contacting DNS servers] (also earlier: Could not contact DNS servers). Routed model was claude-sonnet-5 ([model-route] decision=48a930224aa5). Fallback openai/gpt-4o-mini then failed 3x: HTTP 400 Bad Request url=https://api.openai.com/v1/chat/completions (reason=format_error, retryable=False). Daemon surfaced WS response type=response text="[error: 400, message='Bad Request', url='https://api.openai.com/v1/chat/completions']".
+
+NOT a usage-limit block (no 429 / rate_limit_error observed). Health remained OK throughout.
+Host DNS resolve + TCP/443 to api.anthropic.com succeeded from PowerShell at retry time; aiohttp inside the daemon still timed out on DNS.

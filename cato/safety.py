@@ -154,23 +154,87 @@ _IRREVERSIBLE_SHELL_KEYWORDS = frozenset({
     # PowerShell destructive verbs and their common aliases
     "remove-item", "clear-content", "format-volume", "stop-process",
     "invoke-expression", "iex",
+    # Dotted PS form after normalisation (Remove.Item → remove.item → remove-item
+    # is handled in _normalize_shell_for_scan; keep dotted aliases as belt+braces)
+    "remove.item", "clear.content", "format.volume", "stop.process",
+    "invoke.expression",
 })
 
 _HIGH_STAKES_SHELL_KEYWORDS = frozenset({
     "mail", "send", "post", "publish", "payment", "pay", "transfer",
     "deploy", "push", "submit", "commit --amend",
+    # Encoded / hidden payload carriers — keyword scan cannot see the decoded body
+    "encodedcommand", "encodedcommand:", "-encodedcommand", "-enc",
+})
+
+# Multi-word / flag phrases checked against the normalised haystack (not tokens).
+_HIGH_STAKES_SHELL_PHRASES = frozenset({
+    "commit --amend",
+    "commit amend",  # after dash stripping in normaliser
+    "-encodedcommand",
+    "-enc ",
+    " -enc",
+    "encodedcommand",
 })
 
 
+def _normalize_shell_for_scan(command: str) -> str:
+    """Strip common quoting / escaping / concatenation dodges.
+
+    Fail-closed: prefer false positives over missing a destructive verb.
+    Handles CMD carets, PowerShell backticks, quote-splitting, and ``"a"+"b"``
+    style concatenation used to rebuild verbs the plain ``str.split()`` scan
+    would otherwise miss.
+    """
+    import re
+
+    s = str(command).lower()
+    # PowerShell escape / CMD escape
+    s = s.replace("`", "").replace("^", "")
+    # Quotes used to split tokens ("rm", remove""-item, 'remove-item')
+    s = s.replace('"', "").replace("'", "")
+    # String-concatenation operators joining verb fragments
+    s = re.sub(r"\s*\+\s*", "", s)
+    # PowerShell dotted verbs → hyphenated form (Remove.Item)
+    s = re.sub(r"([a-z])\.([a-z])", r"\1-\2", s)
+    # Collapse remaining punctuation to spaces so tokens stay separable,
+    # but keep hyphens inside PS verbs (remove-item) and dots already fixed.
+    s = re.sub(r"[^\w\s\-]+", " ", s, flags=re.UNICODE)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def _shell_scan_tokens(normalized: str) -> set[str]:
+    """Token set for keyword membership after normalisation."""
+    if not normalized:
+        return set()
+    return set(normalized.split())
+
+
 def _classify_shell(inputs: dict) -> RiskTier:
-    """Classify a shell tool call based on the command string."""
-    cmd = str(inputs.get("command", inputs.get("cmd", ""))).lower()
-    tokens = set(cmd.split())
+    """Classify a shell tool call based on the command string.
+
+    Scans a de-obfuscated form of the command so quoting, caret/backtick
+    escaping, and string-concatenation cannot dodge the irreversible /
+    high-stakes keyword gates (C-2 / Phase A).
+    """
+    raw = str(inputs.get("command", inputs.get("cmd", ""))) if isinstance(inputs, dict) else ""
+    normalized = _normalize_shell_for_scan(raw)
+    tokens = _shell_scan_tokens(normalized)
+    raw_lower = raw.lower()
 
     if tokens & _HIGH_STAKES_SHELL_KEYWORDS:
         return RiskTier.HIGH_STAKES
+    for phrase in _HIGH_STAKES_SHELL_PHRASES:
+        if phrase in normalized or phrase in raw_lower:
+            return RiskTier.HIGH_STAKES
     if tokens & _IRREVERSIBLE_SHELL_KEYWORDS:
         return RiskTier.IRREVERSIBLE
+    # Hyphenated PS verbs glued across residual separators after normalisation
+    compact = normalized.replace(" ", "")
+    for kw in _IRREVERSIBLE_SHELL_KEYWORDS:
+        if "-" in kw and kw in compact:
+            return RiskTier.IRREVERSIBLE
     return RiskTier.REVERSIBLE_WRITE  # shell by default is a write
 
 

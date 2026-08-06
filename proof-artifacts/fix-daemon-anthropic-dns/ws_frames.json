@@ -1,0 +1,64 @@
+[
+  {
+    "type": "activity",
+    "busy": true,
+    "session_id": "fix-daemon-anthropic-dns-1786043702",
+    "task": "Reply with exactly one word: PONG",
+    "current_tool": null,
+    "tool_started_at": null
+  },
+  {
+    "type": "progress",
+    "session_id": "fix-daemon-anthropic-dns-1786043702",
+    "event": "turn_start",
+    "timestamp": 1786043723666,
+    "turn": 1,
+    "max_turns": 6
+  },
+  {
+    "type": "progress",
+    "session_id": "fix-daemon-anthropic-dns-1786043702",
+    "event": "llm_start",
+    "timestamp": 1786043723674,
+    "model": "openai/gpt-4o-mini",
+    "token_budget": 1960
+  },
+  {
+    "type": "progress",
+    "session_id": "fix-daemon-anthropic-dns-1786043702",
+    "event": "llm_token",
+    "timestamp": 1786043726132,
+    "delta": "PONG"
+  },
+  {
+    "type": "progress",
+    "session_id": "fix-daemon-anthropic-dns-1786043702",
+    "event": "llm_end",
+    "timestamp": 1786043726133,
+    "elapsed_s": 2.459,
+    "tokens_used": 1
+  },
+  {
+    "type": "progress",
+    "session_id": "fix-daemon-anthropic-dns-1786043702",
+    "event": "turn_end",
+    "timestamp": 1786043726135,
+    "turn": 1,
+    "has_final_answer": true
+  },
+  {
+    "type": "progress",
+    "session_id": "fix-daemon-anthropic-dns-1786043702",
+    "event": "session_end",
+    "timestamp": 1786043726135,
+    "total_turns": 0,
+    "total_elapsed_s": 4.68
+  },
+  {
+    "type": "response",
+    "session_id": "fix-daemon-anthropic-dns-1786043702",
+    "text": "PONG",
+    "channel": "web",
+    "model": "openai/gpt-4o-mini"
+  }
+]
