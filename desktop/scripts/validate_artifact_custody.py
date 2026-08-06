@@ -27,6 +27,9 @@ def main() -> int:
     cargo_version = re.search(r'^version\s*=\s*"([^"]+)"', cargo, re.MULTILINE)
     require(bool(cargo_version), "Cargo.toml package version is missing")
     require(cargo_version.group(1) == package["version"], "Cargo.toml version differs from desktop version")
+    icon_paths = [tauri["app"]["trayIcon"]["iconPath"], *tauri["bundle"]["icon"]]
+    for relative_icon in icon_paths:
+        require((desktop_dir / "src-tauri" / relative_icon).is_file(), f"configured icon is missing: {relative_icon}")
 
     workflow = workflow_path.read_text(encoding="utf-8")
     for marker in (
