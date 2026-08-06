@@ -22,7 +22,7 @@ def recolor(path: Path) -> int:
     original_size = image.size
     changed = 0
     output = []
-    for r, g, b, alpha in image.get_flattened_data():
+    for r, g, b, alpha in image.getdata():
         hue, saturation, value = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
         if alpha and saturation < 0.05:
             gray = round(value * 255)

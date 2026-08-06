@@ -35,7 +35,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install daemon and bundling dependencies
-        run: python -m pip install ".[dev]" pyinstaller
+        run: python -m pip install ".[dev,bundle]"
       - name: Install desktop dependencies
         working-directory: desktop
         run: npm ci

@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import colorsys
 import re
+import tomllib
 from pathlib import Path
 
 from PIL import Image
@@ -19,7 +20,7 @@ def require(condition: bool, message: str) -> None:
 def prohibited_pixel_count(path: Path) -> int:
     image = Image.open(path).convert("RGBA")
     count = 0
-    for red, green, blue, alpha in image.get_flattened_data():
+    for red, green, blue, alpha in image.getdata():
         if alpha == 0:
             continue
         hue, saturation, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
@@ -37,8 +38,12 @@ def main() -> int:
 
     package = json.loads((desktop_dir / "package.json").read_text(encoding="utf-8"))
     tauri = json.loads((desktop_dir / "src-tauri" / "tauri.conf.json").read_text(encoding="utf-8"))
+    project = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))
     cargo = (desktop_dir / "src-tauri" / "Cargo.toml").read_text(encoding="utf-8")
     require(package["version"] == tauri["version"], "package.json and tauri.conf.json versions differ")
+    bundle_dependencies = set(project["project"]["optional-dependencies"]["bundle"])
+    require("pyinstaller==6.15.0" in bundle_dependencies, "bundle extra must pin PyInstaller")
+    require("pillow==11.3.0" in bundle_dependencies, "bundle extra must pin Pillow for raster validation")
     cargo_version = re.search(r'^version\s*=\s*"([^"]+)"', cargo, re.MULTILINE)
     require(bool(cargo_version), "Cargo.toml package version is missing")
     require(cargo_version.group(1) == package["version"], "Cargo.toml version differs from desktop version")
@@ -53,6 +58,7 @@ def main() -> int:
     workflow = workflow_path.read_text(encoding="utf-8")
     for marker in (
         "e4l-runtime-hardening",
+        'python -m pip install ".[dev,bundle]"',
         "VITE_CATO_BUILD_SHA: ${{ github.sha }}",
         "VITE_CATO_BUILD_VERSION=$version",
         "npx tauri build --bundles nsis",
