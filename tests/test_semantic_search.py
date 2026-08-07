@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import tempfile
 from datetime import datetime
+import hashlib
 
 import numpy as np
 
@@ -26,9 +27,17 @@ class _BagOfWordsEmbedder:
     Token + character-trigram hash vectors keep unit tests independent of
     HuggingFace downloads (CI sets TRANSFORMERS_OFFLINE=1) while still
     ranking shared vocabulary above unrelated text.
+
+    Uses hashlib (not builtin hash()) so ranking is stable across processes —
+    Python's per-process hash seed made this flaky on Windows CI.
     """
 
     dim = 128
+
+    @staticmethod
+    def _bucket(tok: str) -> int:
+        digest = hashlib.md5(tok.encode("utf-8")).digest()
+        return int.from_bytes(digest[:4], "little") % _BagOfWordsEmbedder.dim
 
     @staticmethod
     def _tokens(text: str) -> list[str]:
@@ -49,7 +58,7 @@ class _BagOfWordsEmbedder:
         for text in texts:
             vec = np.zeros(self.dim, dtype=np.float32)
             for tok in self._tokens(text):
-                vec[hash(tok) % self.dim] += 1.0
+                vec[self._bucket(tok)] += 1.0
             norm = float(np.linalg.norm(vec)) or 1.0
             out.append((vec / norm).tolist())
         if single:
@@ -350,9 +359,11 @@ class TestSemanticSearchIntegration:
         engine.add_chunks(chunks)
 
         # Search for user preference
-        results = engine.search("timezone and location", top_k=2)
+        results = engine.search("timezone and location", top_k=2, threshold=0.05)
         assert len(results) > 0
-        assert "zone" in " ".join(results).lower() or "time" in " ".join(results).lower()
+        joined = " ".join(results).lower()
+        assert "zone" in joined or "time" in joined
+        assert any("mountain" in r.lower() or "zone" in r.lower() for r in results)
 
     def test_search_model_embedding_dimension(self):
         """Test that embeddings have consistent dimensionality."""
