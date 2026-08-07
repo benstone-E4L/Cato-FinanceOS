@@ -73,6 +73,24 @@ class TestPidAlive:
             time.sleep(0.1)
         assert cato_platform.pid_alive(live_child.pid) is False
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="POSIX zombie semantics")
+    def test_zombie_child_is_not_reported_alive(self, live_child):
+        """SIGKILL without wait() leaves a zombie; stop must still succeed.
+
+        Regression for CI: terminate_pid returned False because os.kill(pid, 0)
+        succeeds for zombies until the parent reaps them.
+        """
+        os.kill(live_child.pid, 9)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            # Wait until /proc shows zombie or the pid vanishes.
+            if not cato_platform.pid_alive(live_child.pid):
+                break
+            time.sleep(0.05)
+        assert cato_platform.pid_alive(live_child.pid) is False
+        # Reap so the fixture teardown is clean.
+        live_child.wait(timeout=10)
+
     def test_nonexistent_pid_is_not_alive(self):
         assert cato_platform.pid_alive(999_999_999) is False
 

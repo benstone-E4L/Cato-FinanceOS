@@ -14,6 +14,7 @@ Covers:
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -355,9 +356,28 @@ class TestSchedulerDaemonLifecycle:
     @pytest.mark.asyncio
     async def test_croniter_not_installed_graceful(self, schedules_dir: Path):
         from cato.core.schedule_manager import SchedulerDaemon
+        import builtins
+        import importlib
+
         make_yaml(schedules_dir, "noop")
         daemon = SchedulerDaemon(schedules_dir=schedules_dir)
-        with patch("builtins.__import__", side_effect=lambda name, *a, **kw: (_ for _ in ()).throw(ImportError()) if name == "croniter" else __import__(name, *a, **kw)):
-            # Should not raise
+        real_import = builtins.__import__
+
+        def _selective_import(name, globals=None, locals=None, fromlist=(), level=0):
+            # Only block the top-level croniter package. Nested imports during
+            # logging must use the real importer — patching builtins.__import__
+            # and then calling __import__ recursively causes RecursionError.
+            if name == "croniter" or name.startswith("croniter."):
+                raise ImportError("croniter mocked missing")
+            return real_import(name, globals, locals, fromlist, level)
+
+        with patch("builtins.__import__", side_effect=_selective_import):
+            # Drop a cached module so start()'s import path re-runs.
+            sys.modules.pop("croniter", None)
             await daemon.start()
             assert len(daemon._tasks) == 0
+        # Restore for later tests if croniter was previously imported.
+        try:
+            importlib.import_module("croniter")
+        except ImportError:
+            pass

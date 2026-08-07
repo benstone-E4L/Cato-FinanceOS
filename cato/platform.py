@@ -161,12 +161,36 @@ def _win_pid_alive(pid: int) -> bool:
         kernel32.CloseHandle(handle)
 
 
+def _posix_is_zombie(pid: int) -> bool:
+    """True when */proc/<pid>* exists but the process is a zombie (state ``Z``).
+
+    Zombies still answer ``os.kill(pid, 0)``, so a stop that only checks that
+    probe never reports success after SIGKILL until some other process reaps
+    the child. For daemon lifecycle that is a false "still running".
+    """
+    try:
+        with open(f"/proc/{pid}/stat", encoding="utf-8") as fh:
+            # Format: pid (comm) state ... — comm may contain spaces/parens.
+            data = fh.read()
+    except (FileNotFoundError, PermissionError, OSError):
+        return False
+    rparen = data.rfind(")")
+    if rparen < 0 or rparen + 2 >= len(data):
+        return False
+    state = data[rparen + 2 : rparen + 3]
+    return state == "Z"
+
+
 def pid_alive(pid: int) -> bool:
     """Return True when *pid* currently refers to a live process.
 
     Fails closed: when liveness cannot be determined the pid is reported alive,
     because acting on a false "dead" answer is what lets a second daemon start
     against the same hash-chained ledger.
+
+    POSIX zombies are treated as **not** alive — they cannot run code, and
+    treating them as live breaks ``terminate_pid`` / ``cato stop`` after a
+    successful SIGKILL when the caller is not the parent that will wait().
     """
     if pid <= 0:
         return False
@@ -183,6 +207,8 @@ def pid_alive(pid: int) -> bool:
     except PermissionError:
         return True
     except OSError:
+        return False
+    if _posix_is_zombie(pid):
         return False
     return True
 

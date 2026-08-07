@@ -22,15 +22,74 @@ from pathlib import Path
 import pytest
 
 # ── Path helpers ──────────────────────────────────────────────────────────────
-SCRIPTS_DIR = Path(r"C:\Users\Administrator\.claude\skills\one-shot-pipeline\scripts")
-RALPH_DIR   = Path(r"C:\Users\Administrator\.claude\skills\ralph-wiggum-loop")
-BRIDGE_SCRIPT = Path(r"C:\Users\Administrator\Desktop\Cato\cato_telegram_bridge.py")
+# These scripts live outside the Cato repo on operator machines. Hardcoding a
+# single Administrator profile path made every CI/Linux run ERROR at fixture
+# load. Resolve from env + common locations; skip the module when absent.
+
+
+def _first_existing(*candidates: Path) -> Path | None:
+    for path in candidates:
+        if path and path.is_dir():
+            return path
+    return None
+
+
+def _resolve_scripts_dir() -> Path | None:
+    env = os.environ.get("CATO_PIPELINE_SCRIPTS", "").strip()
+    if env:
+        # Explicit override: do not fall back to machine-local defaults when set.
+        path = Path(env)
+        return path if path.is_dir() else None
+    return _first_existing(
+        Path.home() / ".claude" / "skills" / "one-shot-pipeline" / "scripts",
+        Path(r"C:\Users\Administrator\.claude\skills\one-shot-pipeline\scripts"),
+        Path(r"C:\Users\Work\.claude\skills\one-shot-pipeline\scripts"),
+    )
+
+
+def _resolve_ralph_dir() -> Path | None:
+    env = os.environ.get("CATO_RALPH_SKILL_DIR", "").strip()
+    if env:
+        path = Path(env)
+        return path if path.is_dir() else None
+    return _first_existing(
+        Path.home() / ".claude" / "skills" / "ralph-wiggum-loop",
+        Path(r"C:\Users\Administrator\.claude\skills\ralph-wiggum-loop"),
+        Path(r"C:\Users\Work\.claude\skills\ralph-wiggum-loop"),
+    )
+
+
+def _resolve_bridge_script() -> Path | None:
+    env = os.environ.get("CATO_TELEGRAM_BRIDGE", "").strip()
+    candidates = [
+        Path(env) if env else None,
+        Path(__file__).resolve().parents[2] / "cato_telegram_bridge.py",
+        Path(r"C:\Users\Administrator\Desktop\Cato\cato_telegram_bridge.py"),
+        Path(r"C:\Users\Work\Desktop\vault\projects\My Github\Cato\cato_telegram_bridge.py"),
+    ]
+    for path in candidates:
+        if path and path.is_file():
+            return path
+    return None
+
+
+SCRIPTS_DIR = _resolve_scripts_dir()
+RALPH_DIR = _resolve_ralph_dir()
+BRIDGE_SCRIPT = _resolve_bridge_script()
+
+pytestmark = pytest.mark.skipif(
+    SCRIPTS_DIR is None,
+    reason=(
+        "one-shot-pipeline scripts not installed on this machine "
+        "(set CATO_PIPELINE_SCRIPTS to enable)"
+    ),
+)
 
 
 def _load_module(name: str, path: Path):
     """Dynamically load a Python module from an absolute path."""
     spec = importlib.util.spec_from_file_location(name, path)
-    mod  = importlib.util.module_from_spec(spec)
+    mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
@@ -332,7 +391,8 @@ class TestInvokeAgentCLI:
     These tests don't spawn Codex or Cursor.
     """
     PYTHON = r"C:\Python313\python.exe"
-    SCRIPT = str(SCRIPTS_DIR / "invoke_agent.py")
+    # Class body runs even when pytestmark skips the module — guard None.
+    SCRIPT = str(SCRIPTS_DIR / "invoke_agent.py") if SCRIPTS_DIR else ""
 
     def _run(self, *args, timeout=15):
         import subprocess
@@ -364,7 +424,7 @@ class TestInvokeAgentCLI:
 
 class TestInvokeCodexCLI:
     PYTHON = r"C:\Python313\python.exe"
-    SCRIPT = str(SCRIPTS_DIR / "invoke_codex.py")
+    SCRIPT = str(SCRIPTS_DIR / "invoke_codex.py") if SCRIPTS_DIR else ""
 
     def _run(self, *args, timeout=15):
         import subprocess
@@ -395,7 +455,7 @@ class TestInvokeCodexCLI:
 
 class TestInvokeCursorCLI:
     PYTHON = r"C:\Python313\python.exe"
-    SCRIPT = str(SCRIPTS_DIR / "invoke_cursor.py")
+    SCRIPT = str(SCRIPTS_DIR / "invoke_cursor.py") if SCRIPTS_DIR else ""
 
     def _run(self, *args, timeout=15):
         import subprocess

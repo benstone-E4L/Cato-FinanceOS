@@ -31,17 +31,38 @@ class SemanticSearchEngine:
     No persistent storage — vectors are computed on demand or batch-loaded.
     """
 
-    def __init__(self, model_name: str = EMBEDDING_MODEL) -> None:
-        """Initialize the embedding model."""
-        if SentenceTransformer is None:
-            raise ImportError("sentence-transformers not installed: pip install sentence-transformers")
+    def __init__(
+        self,
+        model_name: str = EMBEDDING_MODEL,
+        *,
+        model: object | None = None,
+    ) -> None:
+        """Initialize the embedding model.
 
-        try:
-            self.model = SentenceTransformer(model_name)
-            logger.info(f"Loaded embedding model: {model_name}")
-        except Exception as e:
-            logger.error(f"Failed to load embedding model {model_name}: {e}")
-            raise
+        Parameters
+        ----------
+        model_name:
+            HuggingFace / sentence-transformers model id used when *model* is
+            not supplied.
+        model:
+            Optional pre-built encoder (must implement ``encode``). Injected in
+            unit tests so CI can run offline without downloading weights.
+        """
+        if model is not None:
+            self.model = model
+            self._model_name = getattr(model, "model_name", model_name)
+        else:
+            if SentenceTransformer is None:
+                raise ImportError(
+                    "sentence-transformers not installed: pip install sentence-transformers"
+                )
+            try:
+                self.model = SentenceTransformer(model_name)
+                logger.info(f"Loaded embedding model: {model_name}")
+            except Exception as e:
+                logger.error(f"Failed to load embedding model {model_name}: {e}")
+                raise
+            self._model_name = model_name
 
         # In-memory vector store: chunk_text -> embedding (list of floats)
         self.chunks: dict[str, list[float]] = {}

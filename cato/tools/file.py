@@ -328,10 +328,26 @@ class FileTool:
 
     @staticmethod
     def _resolve_safe_path(workspace: Path, rel_path: str) -> Path:
-        """Resolve rel_path within workspace, raising ValueError on traversal."""
+        """Resolve rel_path within workspace, raising ValueError on traversal.
+
+        Windows-style separators (``\\``) are normalized before the check so
+        payloads like ``..\\..\\Windows\\System32`` cannot bypass detection on
+        POSIX, where backslash is otherwise a literal filename character.
+        """
         if not rel_path:
             return workspace
-        candidate = (workspace / rel_path).resolve()
+        # Normalize separators first — do not let platform path rules hide `..`.
+        normalized = str(rel_path).replace("\\", "/")
+        # Reject empty segments after normalization that still encode escapes.
+        parts = [p for p in normalized.split("/") if p not in ("", ".")]
+        if any(p == ".." for p in parts):
+            # Absolute escape or parent walk — resolve and verify, but fail
+            # closed immediately when `..` is present in the logical path.
+            # (resolve() alone is insufficient on POSIX for `..\..\` forms.)
+            raise ValueError(
+                f"Path traversal detected: {rel_path!r} escapes workspace {workspace}"
+            )
+        candidate = (workspace / normalized).resolve()
         try:
             candidate.relative_to(workspace.resolve())
         except ValueError:

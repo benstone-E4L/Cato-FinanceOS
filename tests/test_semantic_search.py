@@ -15,61 +15,98 @@ from unittest.mock import patch, MagicMock
 import tempfile
 from datetime import datetime
 
+import numpy as np
+
 from cato.core.semantic_search import SemanticSearchEngine, EMBEDDING_MODEL
+
+
+class _BagOfWordsEmbedder:
+    """Deterministic offline stand-in for SentenceTransformer.encode.
+
+    Token + character-trigram hash vectors keep unit tests independent of
+    HuggingFace downloads (CI sets TRANSFORMERS_OFFLINE=1) while still
+    ranking shared vocabulary above unrelated text.
+    """
+
+    dim = 128
+
+    @staticmethod
+    def _tokens(text: str) -> list[str]:
+        t = str(text).lower()
+        toks = t.split()
+        compact = "".join(ch for ch in t if ch.isalnum() or ch.isspace())
+        for i in range(max(0, len(compact) - 2)):
+            toks.append(compact[i : i + 3])
+        return toks
+
+    def encode(self, texts, convert_to_tensor=False):
+        if isinstance(texts, str):
+            texts = [texts]
+            single = True
+        else:
+            single = False
+        out = []
+        for text in texts:
+            vec = np.zeros(self.dim, dtype=np.float32)
+            for tok in self._tokens(text):
+                vec[hash(tok) % self.dim] += 1.0
+            norm = float(np.linalg.norm(vec)) or 1.0
+            out.append((vec / norm).tolist())
+        if single:
+            return out[0]
+        return out
+
+
+@pytest.fixture
+def engine():
+    return SemanticSearchEngine(model=_BagOfWordsEmbedder())
 
 
 class TestSemanticSearchEngine:
     """Test core semantic search functionality."""
 
-    def test_init_loads_model(self):
+    def test_init_loads_model(self, engine):
         """Test SemanticSearchEngine initializes with embedding model."""
-        engine = SemanticSearchEngine()
         assert engine.model is not None
         assert engine.chunks == {}
         assert engine.embeddings == []
 
-    def test_add_chunks_single(self):
+    def test_add_chunks_single(self, engine):
         """Test adding a single text chunk."""
-        engine = SemanticSearchEngine()
         count = engine.add_chunks(["Hello world"])
         assert count == 1
         assert len(engine.chunks) == 1
         assert len(engine.embeddings) == 1
 
-    def test_add_chunks_multiple(self):
+    def test_add_chunks_multiple(self, engine):
         """Test adding multiple text chunks."""
-        engine = SemanticSearchEngine()
         chunks = ["First chunk", "Second chunk", "Third chunk"]
         count = engine.add_chunks(chunks)
         assert count == 3
         assert len(engine.chunks) == 3
         assert len(engine.embeddings) == 3
 
-    def test_add_chunks_empty_list(self):
+    def test_add_chunks_empty_list(self, engine):
         """Test adding empty list returns 0."""
-        engine = SemanticSearchEngine()
         count = engine.add_chunks([])
         assert count == 0
         assert len(engine.chunks) == 0
 
-    def test_add_chunks_duplicate(self):
+    def test_add_chunks_duplicate(self, engine):
         """Test that duplicate chunks are not re-indexed."""
-        engine = SemanticSearchEngine()
         engine.add_chunks(["Duplicate chunk"])
         count = engine.add_chunks(["Duplicate chunk"])
         assert count == 0  # Not added again
         assert len(engine.chunks) == 1
         assert len(engine.embeddings) == 1
 
-    def test_search_empty_index(self):
+    def test_search_empty_index(self, engine):
         """Test search on empty index returns empty list."""
-        engine = SemanticSearchEngine()
         results = engine.search("query")
         assert results == []
 
-    def test_search_returns_top_k(self):
+    def test_search_returns_top_k(self, engine):
         """Test search returns at most top_k results."""
-        engine = SemanticSearchEngine()
         chunks = [
             "The cat sat on the mat",
             "The dog played in the park",
@@ -82,22 +119,21 @@ class TestSemanticSearchEngine:
         results = engine.search("cat", top_k=2)
         assert len(results) <= 2
 
-    def test_search_with_threshold(self):
+    def test_search_with_threshold(self, engine):
         """Test search respects similarity threshold."""
-        engine = SemanticSearchEngine()
         chunks = [
             "The quick brown fox jumps over the lazy dog",
             "Machine learning is a subset of artificial intelligence",
         ]
         engine.add_chunks(chunks)
 
-        # Search with high threshold should filter out low similarity
-        results = engine.search("fox", top_k=10, threshold=0.5)
+        # Offline bag-of-words embedder: require positive overlap, not MiniLM thresholds.
+        results = engine.search("fox", top_k=10, threshold=0.05)
         assert len(results) >= 1
+        assert any("fox" in r.lower() for r in results)
 
-    def test_search_similarity_ordering(self):
+    def test_search_similarity_ordering(self, engine):
         """Test search results are ordered by similarity (best first)."""
-        engine = SemanticSearchEngine()
         chunks = [
             "I love cats",
             "Cats are animals",
@@ -112,9 +148,8 @@ class TestSemanticSearchEngine:
         # First result should mention cats
         assert "cat" in results[0].lower()
 
-    def test_clear_empties_index(self):
+    def test_clear_empties_index(self, engine):
         """Test clear() removes all chunks and embeddings."""
-        engine = SemanticSearchEngine()
         engine.add_chunks(["Chunk 1", "Chunk 2"])
         assert len(engine.chunks) == 2
 
@@ -122,9 +157,8 @@ class TestSemanticSearchEngine:
         assert len(engine.chunks) == 0
         assert len(engine.embeddings) == 0
 
-    def test_stats_returns_count(self):
+    def test_stats_returns_count(self, engine):
         """Test stats() returns indexed chunk count."""
-        engine = SemanticSearchEngine()
         stats = engine.stats()
         assert "chunks_indexed" in stats
         assert "model" in stats
@@ -170,7 +204,7 @@ AI agent development
 ## Technical Notes
 Database optimization techniques""")
 
-            engine = SemanticSearchEngine()
+            engine = SemanticSearchEngine(model=_BagOfWordsEmbedder())
             count = engine.load_memory_file(memory_path)
             assert count > 0
             assert len(engine.chunks) > 0
@@ -179,7 +213,7 @@ Database optimization techniques""")
         """Test loading non-existent file returns 0."""
         with tempfile.TemporaryDirectory() as tmpdir:
             memory_path = Path(tmpdir) / "missing.md"
-            engine = SemanticSearchEngine()
+            engine = SemanticSearchEngine(model=_BagOfWordsEmbedder())
             count = engine.load_memory_file(memory_path)
             assert count == 0
             assert len(engine.chunks) == 0
@@ -303,7 +337,7 @@ class TestSemanticSearchIntegration:
 
     def test_end_to_end_search_flow(self):
         """Test complete flow: add chunks → search → verify results."""
-        engine = SemanticSearchEngine()
+        engine = SemanticSearchEngine(model=_BagOfWordsEmbedder())
 
         # Add domain-specific chunks
         chunks = [
@@ -322,7 +356,7 @@ class TestSemanticSearchIntegration:
 
     def test_search_model_embedding_dimension(self):
         """Test that embeddings have consistent dimensionality."""
-        engine = SemanticSearchEngine()
+        engine = SemanticSearchEngine(model=_BagOfWordsEmbedder())
         engine.add_chunks(["Chunk one", "Chunk two"])
 
         # All embeddings should have the same length

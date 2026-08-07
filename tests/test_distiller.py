@@ -81,7 +81,21 @@ CODE_TURNS = [
 
 @pytest.fixture(scope="module")
 def distiller():
-    return Distiller()
+    """Unit Distiller with an injected embedder — no HuggingFace download."""
+    import numpy as np
+
+    d = Distiller()
+
+    class _FakeEmbed:
+        def encode(self, texts, normalize_embeddings=True, show_progress_bar=False):
+            n = len(texts)
+            # Must match MiniLM width (384). Narrower vectors crash
+            # MemorySystem.search_distilled when the query path loads the
+            # real model from a local HF cache (shape mismatch on cosine).
+            return np.full((n, 384), 0.125, dtype=np.float32)
+
+    d._embed_model = _FakeEmbed()
+    return d
 
 
 @pytest.fixture()
