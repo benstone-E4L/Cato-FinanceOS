@@ -79,7 +79,7 @@ scripts/install_watchdog.ps1
 
 # Utility scripts (local dev only)
 scripts/sync_version.py
-scripts/verify_python_build.py
+# verify_python_build.py is tracked — required by Python Verify CI
 
 # Night-shift local session state (operator machine)
 night_shift_session_state.json
