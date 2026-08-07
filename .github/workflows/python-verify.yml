@@ -14,6 +14,12 @@ on:
 jobs:
   verify:
     runs-on: windows-latest
+    env:
+      # Same contract as ci.yml — tests that reach a real start path need a
+      # non-empty unlock secret (dummy is fine; never a production password).
+      CATO_VAULT_PASSWORD: ${{ secrets.CATO_VAULT_PASSWORD || 'testpassword123' }}
+      TRANSFORMERS_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

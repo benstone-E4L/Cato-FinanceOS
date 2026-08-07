@@ -268,11 +268,21 @@ class TestCmdStartRefusesDuplicate:
         run_daemon.assert_not_called()
         assert not pid_file.exists()
 
-    def test_starts_when_nothing_is_running(self, tmp_path):
+    def test_starts_when_nothing_is_running(self, tmp_path, monkeypatch):
         from cato import cli as cli_mod
+        from cato.vault_bootstrap import BootstrapReport
 
         pid_file = tmp_path / "cato.pid"
         port_file = tmp_path / "cato.port"
+        monkeypatch.setenv("CATO_VAULT_PASSWORD", "unit-test-vault-pw")
+        boot = BootstrapReport(
+            vault_path=tmp_path / "vault.enc",
+            vault_present=False,
+            vault_unlocked=False,
+            vault_keys_total=0,
+            applied_from_vault=(),
+            filled_from_dotenv=(),
+        )
 
         with (
             patch.object(cli_mod, "_PID_FILE", pid_file),
@@ -280,6 +290,10 @@ class TestCmdStartRefusesDuplicate:
             patch.object(cli_mod, "_daemon_health_responding", return_value=False),
             patch.object(cli_mod, "setup_signal_handlers"),
             patch.object(cli_mod, "_run_daemon") as run_daemon,
+            patch(
+                "cato.vault_bootstrap.bootstrap_launch_credentials",
+                return_value=(None, boot),
+            ),
         ):
             result = CliRunner().invoke(main, ["start", "--channel", "webchat"])
 

@@ -584,9 +584,37 @@ def genesis_health() -> None:
               help="Browser engine to use (conduit = opt-in per-action billing).")
 def cmd_start(agent: str, channel: str, browser: str) -> None:
     """Start the CATO daemon."""
-    # Prefer vault.enc for operator secrets; .env only fills keys still missing.
-    # CATO_VAULT_PASSWORD must be set. Never prints secret values.
     import os
+
+    # Refuse duplicates *before* vault unlock. Telling the operator "already
+    # running" must not require CATO_VAULT_PASSWORD — and Windows CI verify
+    # exercises this path without a vault secret in the job env.
+    live_pid = _read_live_pid()
+    if live_pid is not None:
+        pid = str(live_pid)
+        safe_print(f"Cato already running (PID {pid}). Use 'cato stop' first.")
+        raise SystemExit(1)
+
+    config = CatoConfig.load()
+
+    if browser == "conduit":
+        config.conduit_enabled = True
+        safe_print("Conduit browser engine enabled (per-action billing).")
+
+    # Second gate: the pid file can be missing while a daemon is still serving
+    # (deleted by hand, or by older advice from 'cato doctor'). Starting anyway
+    # produced two daemons appending to the same hash-chained ledger.
+    probe_port = getattr(config, "webchat_port", None) or getattr(config, "port", None) or 8080
+    if _daemon_health_responding(int(probe_port)):
+        safe_print(
+            f"A Cato daemon is already serving http://127.0.0.1:{probe_port}/health "
+            f"(the pid file is missing or stale). Refusing to start a second daemon "
+            f"against the same ledger — run 'cato doctor' to identify it."
+        )
+        raise SystemExit(1)
+
+    # Prefer vault.enc for operator secrets; .env only fills keys still missing.
+    # Required only when we are about to actually launch.
     from cato.vault_bootstrap import bootstrap_launch_credentials
 
     try:
@@ -606,30 +634,6 @@ def cmd_start(agent: str, channel: str, browser: str) -> None:
     except VaultError as exc:
         safe_print(f"Vault bootstrap failed: {exc}")
         raise SystemExit(1) from exc
-
-    config = CatoConfig.load()
-
-    if browser == "conduit":
-        config.conduit_enabled = True
-        safe_print("Conduit browser engine enabled (per-action billing).")
-
-    live_pid = _read_live_pid()
-    if live_pid is not None:
-        pid = str(live_pid)
-        safe_print(f"Cato already running (PID {pid}). Use 'cato stop' first.")
-        raise SystemExit(1)
-
-    # Second gate: the pid file can be missing while a daemon is still serving
-    # (deleted by hand, or by older advice from 'cato doctor'). Starting anyway
-    # produced two daemons appending to the same hash-chained ledger.
-    probe_port = getattr(config, "webchat_port", None) or getattr(config, "port", None) or 8080
-    if _daemon_health_responding(int(probe_port)):
-        safe_print(
-            f"A Cato daemon is already serving http://127.0.0.1:{probe_port}/health "
-            f"(the pid file is missing or stale). Refusing to start a second daemon "
-            f"against the same ledger — run 'cato doctor' to identify it."
-        )
-        raise SystemExit(1)
 
     safe_print(f"Starting Cato — agent=[{agent}] channel=[{channel}] browser=[{browser}]")
     safe_print(f"  Model:     {config.default_model}")
