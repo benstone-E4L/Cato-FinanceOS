@@ -36,4 +36,4 @@ jobs:
         run: python -m pytest tests/ -x -q --tb=short
 
       - name: Verify Python source and built wheel
-        run: python scripts/verify_python_build.py
+        run: python scripts/verify_python_build.py --skip-pytest
