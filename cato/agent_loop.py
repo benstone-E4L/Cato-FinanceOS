@@ -72,6 +72,57 @@ def _budget_bypass_requested(message: str, config: Optional[Any] = None) -> bool
     text = message.lower()
     return any(phrase in text for phrase in _BUDGET_BYPASS_PHRASES)
 
+
+# ---------------------------------------------------------------------------
+# Task-type classification for model routing (CHUNK_2_VAULT fix)
+#
+# Every planning-turn call used to hardcode TaskType.GENERAL_TOOL_USE
+# regardless of what the turn actually was, which meant model_policy.py's
+# per-task-type tier table never had a chance to route anything except the
+# GENERAL_TOOL_USE -> SONNET row. This is a small, deterministic, rule-based
+# classifier over declared/knowable-before-the-call signals only (the raw
+# message text and whether tools are being offered this turn) — never a
+# model's own self-assessment, per CLAUDE.md's routing doctrine ("Model
+# selection is policy, not prompt"). Unmatched turns keep the original
+# GENERAL_TOOL_USE default, so this is additive, not a behavior change for
+# the common case.
+# ---------------------------------------------------------------------------
+
+_CLASSIFICATION_PHRASES: tuple[tuple[TaskType, tuple[str, ...]], ...] = (
+    (
+        TaskType.DRAFT_CORRESPONDENCE,
+        (
+            "draft an email", "draft a reply", "draft a message",
+            "compose a reply", "compose an email", "write a reply to",
+            "write an email to", "draft a response to",
+        ),
+    ),
+    (
+        TaskType.DOCUMENT_CLASSIFICATION,
+        (
+            "classify this", "classify the", "categorize this", "categorize the",
+            "what type of document", "what category is this", "which category does",
+        ),
+    ),
+)
+
+
+def _classify_task_type(message: str, requires_tools: bool) -> TaskType:
+    """Deterministically classify a planning turn into a :class:`TaskType`.
+
+    Rule-based only: matches literal phrases in the operator/user-supplied
+    message text. Falls back to ``TaskType.GENERAL_TOOL_USE`` — the same
+    value every turn used to be hardcoded to — for anything that doesn't
+    match a more specific, unambiguous pattern.
+    """
+    text = (message or "").strip().lower()
+    if text and not requires_tools:
+        for task_type, phrases in _CLASSIFICATION_PHRASES:
+            if any(phrase in text for phrase in phrases):
+                return task_type
+    return TaskType.GENERAL_TOOL_USE
+
+
 _CATO_DIR       = get_data_dir()
 _CHARS_PER_TOKEN = 4
 _MAX_RETRIES    = 3
@@ -2009,7 +2060,9 @@ class AgentLoop:
                             )
                             _convo = [m for m in api_messages if m.get("role") != "system"]
                             descriptor = TaskDescriptor(
-                                task_type=TaskType.GENERAL_TOOL_USE,
+                                task_type=_classify_task_type(
+                                    message, bool(_tools_for_api)
+                                ),
                                 input_tokens=int(input_tokens) if isinstance(input_tokens, int) else 0,
                                 max_output_tokens=int(getattr(self._cfg, "max_output_tokens", 16384)),
                                 requires_tools=bool(_tools_for_api),

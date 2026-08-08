@@ -151,19 +151,79 @@ class DoctorReport:
             self._fail("Config file is invalid", f"Fix YAML at {config_path}: {exc}")
 
     def _check_vault(self) -> None:
-        """Check 2: vault file is present."""
+        """Check 2: vault file is present and initialized, and .env holds no
+        live secrets that should have been migrated into it (CHUNK_2_VAULT)."""
         console.print("\n[bold]Vault[/bold]")
         vault_path = _cato_dir() / "vault.enc"
         if vault_path.exists():
             size_kb = vault_path.stat().st_size / 1024
             console.print(
-                f"  [green]OK[/green] — {vault_path}  ({size_kb:.1f} KB)"
+                f"  [green]OK[/green] — vault initialized at {vault_path}  ({size_kb:.1f} KB)"
             )
         else:
             console.print(
                 "  [yellow]NOT FOUND[/yellow] — run 'cato init' to create vault"
             )
             self._fail("Vault is missing", "Run: cato init, then store SWARMSYNC_API_KEY in the vault")
+        self._check_env_secrets()
+
+    # Operator secret names that must never remain as plaintext values in
+    # .env once the vault is initialized (AGENTS.md's env-var list / the
+    # CHUNK_2_VAULT migration set). CATO_VAULT_PASSWORD is included here even
+    # though it is never copied *into* the vault payload (it is the unlock
+    # secret, not vault content) — it still must not sit in plaintext .env;
+    # it belongs in the process environment only.
+    _ENV_SECRET_KEYS: tuple[str, ...] = (
+        "CATO_VAULT_PASSWORD",
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "GMAIL_CLIENT_ID",
+        "GMAIL_CLIENT_SECRET",
+        "GMAIL_REFRESH_TOKEN",
+        "CATODESKTOP_BOT_TOKEN",
+        "GITHUB_FOXFIREPOETS_TOKEN",
+        "SWARMSYNC_VERIFYAPI_KEY",
+    )
+
+    def _check_env_secrets(self) -> None:
+        """Fail if any known operator secret still holds a live value in .env.
+
+        Never prints values — key names only. A missing/absent .env file, or
+        an .env with only non-secret config, is the healthy end state.
+        """
+        from cato.vault_bootstrap import resolve_repo_root
+
+        try:
+            env_path = resolve_repo_root() / ".env"
+        except Exception:
+            return
+        if not env_path.is_file():
+            console.print("  [green]OK[/green] — no .env file present (no plaintext secrets)")
+            return
+
+        try:
+            from dotenv import dotenv_values
+            parsed = {
+                k: v for k, v in (dotenv_values(env_path) or {}).items()
+                if v is not None and str(v).strip() != ""
+            }
+        except Exception as exc:
+            console.print(f"  [yellow]WARN[/yellow] — could not parse {env_path}: {exc}")
+            return
+
+        leaked = sorted(k for k in parsed if k in self._ENV_SECRET_KEYS)
+        if leaked:
+            console.print(
+                f"  [red]LIVE SECRETS IN .env[/red] — {len(leaked)} key(s) still plaintext: "
+                f"{', '.join(leaked)}"
+            )
+            self._fail(
+                f"{len(leaked)} operator secret(s) still live in .env: {', '.join(leaked)}",
+                "Run: cato vault migrate-env, then remove those keys from .env "
+                "(non-secret config like GMAIL_ADDRESS/TELEGRAM_CHAT_ID may stay).",
+            )
+        else:
+            console.print("  [green]OK[/green] — no live operator secrets remaining in .env")
 
     def _check_workspaces(self) -> None:
         """Check 3: per-agent workspace file token audit."""
