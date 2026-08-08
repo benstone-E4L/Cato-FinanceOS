@@ -2453,6 +2453,55 @@ def memory_forget(key: Optional[str], forget_all: bool, agent: str) -> None:
         safe_print(f"Fact '{key}' not found.")
 
 
+@memory_cmd.command("vault-index")
+@click.option("--agent", default="default", show_default=True, help="Agent workspace name.")
+@click.option(
+    "--vault-root",
+    type=click.Path(path_type=Path, exists=False),
+    default=None,
+    help="Override the vault root (default: config's vault_knowledge_root).",
+)
+def memory_vault_index(agent: str, vault_root: Optional[Path]) -> None:
+    """Ingest the E4L knowledge vault's markdown tree (CHUNK_3_VAULT_INDEX).
+
+    Read-only against the vault; safe to re-run — unchanged chunks are
+    no-ops, changed/new chunks are upserted.
+    """
+    from cato.core.memory import MemorySystem
+    from cato.core.vault_ingest import ingest_vault, index_is_stale
+
+    configured_root = CatoConfig.load().vault_knowledge_root
+    root = vault_root or (Path(configured_root) if configured_root else None)
+    if not root:
+        safe_print(
+            "No vault root configured. Pass --vault-root or set "
+            "vault_knowledge_root in config.yaml."
+        )
+        raise SystemExit(1)
+    if not Path(root).is_dir():
+        safe_print(f"Vault root not found or not a directory: {root}")
+        raise SystemExit(1)
+
+    mem = MemorySystem(agent_id=agent)
+    report = ingest_vault(mem, Path(root))
+    stale = index_is_stale(mem, Path(root))
+    mem.close()
+
+    safe_print(f"vault_root: {root}")
+    safe_print(f"files_scanned: {report.files_scanned}")
+    safe_print(
+        f"chunks: created={report.chunks_created} updated={report.chunks_updated} "
+        f"unchanged={report.chunks_unchanged} total={report.chunks_total}"
+    )
+    if report.warnings:
+        safe_print(f"warnings ({len(report.warnings)}):")
+        for w in report.warnings[:20]:
+            safe_print(f"  - {w}")
+        if len(report.warnings) > 20:
+            safe_print(f"  ... and {len(report.warnings) - 20} more")
+    safe_print(f"stale: {stale if stale is not None else 'unknown (nothing indexed yet?)'}")
+
+
 # ---------------------------------------------------------------------------
 # cato flow  (Clawflows: Proactive Trigger Registry, Skill 5)
 # ---------------------------------------------------------------------------

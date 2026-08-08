@@ -619,6 +619,208 @@ class MemorySystem:
         return self._conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
 
     # ------------------------------------------------------------------
+    # Vault knowledge ingestion (CHUNK_3_VAULT_INDEX)
+    #
+    # Vault chunks reuse the EXISTING `chunks` table for content + embedding
+    # (source_file = the canonical chunk ID) and the EXISTING `kg_nodes` table
+    # for frontmatter metadata (label = canonical chunk ID, which is already
+    # UNIQUE-constrained; type = "vault:<frontmatter type>" — a namespace no
+    # existing caller uses ("file"/"person"/"concept"), so it cannot collide;
+    # source_session — otherwise a free-text provenance field with no other
+    # structural meaning for this new node class — repurposed to hold a JSON
+    # metadata blob). No new tables, no new columns: see
+    # cato/core/vault_ingest.py for the ingestion pipeline that walks the
+    # vault tree, computes canonical IDs, and calls these methods.
+    # ------------------------------------------------------------------
+
+    _VAULT_NODE_TYPE_PREFIX = "vault:"
+
+    def upsert_vault_chunk(
+        self,
+        *,
+        canonical_id: str,
+        content: str,
+        content_sha256: str,
+        metadata: dict,
+    ) -> str:
+        """Idempotently store one vault knowledge chunk.
+
+        Returns ``"unchanged"``, ``"updated"``, or ``"created"``. Re-running
+        ingestion on unchanged content is a no-op (content_sha256 match) —
+        only genuinely new/changed chunks touch storage, and re-indexing an
+        unchanged file reproduces byte-identical chunk IDs (the id is a pure
+        function of path + heading + index, computed by the caller).
+        """
+        existing = self._conn.execute(
+            "SELECT source_session FROM kg_nodes WHERE label = ?", (canonical_id,)
+        ).fetchone()
+        if existing is not None:
+            try:
+                prev_meta = json.loads(existing["source_session"] or "{}")
+            except (json.JSONDecodeError, TypeError):
+                prev_meta = {}
+            if prev_meta.get("content_sha256") == content_sha256:
+                return "unchanged"
+
+        blob = self._embed([content])[0]
+        now_iso = self._now_iso()
+        now_epoch = time.time()
+        node_type = f"{self._VAULT_NODE_TYPE_PREFIX}{metadata.get('type') or 'unknown'}"
+        payload = dict(metadata)
+        payload["content_sha256"] = content_sha256
+
+        with self._write_lock:
+            # chunks table: content + embedding, keyed 1:1 by canonical id.
+            self._conn.execute(
+                "DELETE FROM chunks WHERE source_file = ?", (canonical_id,)
+            )
+            self._conn.execute(
+                "INSERT INTO chunks (content, embedding, source_file, created_at, updated_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (content, blob, canonical_id, now_iso, now_iso),
+            )
+            # kg_nodes table: frontmatter metadata, keyed by canonical id.
+            self._conn.execute(
+                """
+                INSERT INTO kg_nodes (type, label, embedding, source_session, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(label) DO UPDATE SET
+                    type = excluded.type,
+                    embedding = excluded.embedding,
+                    source_session = excluded.source_session,
+                    created_at = excluded.created_at
+                """,
+                (node_type, canonical_id, blob, json.dumps(payload), now_epoch),
+            )
+            self._conn.commit()
+        self._ann_dirty = True
+        return "updated" if existing is not None else "created"
+
+    def get_vault_chunk_metadata(self, canonical_id: str) -> Optional[dict]:
+        """Return the stored frontmatter metadata dict for a vault chunk, or None."""
+        row = self._conn.execute(
+            "SELECT source_session FROM kg_nodes WHERE label = ? AND type LIKE ?",
+            (canonical_id, f"{self._VAULT_NODE_TYPE_PREFIX}%"),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            return json.loads(row["source_session"] or "{}")
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def list_vault_chunks(self, *, include_superseded: bool = False) -> list[dict]:
+        """Return metadata (+ canonical id) for every indexed vault chunk.
+
+        Excludes ``status: superseded`` chunks unless *include_superseded* is
+        explicitly requested — default retrieval must never surface them.
+        """
+        rows = self._conn.execute(
+            "SELECT label, source_session, created_at FROM kg_nodes WHERE type LIKE ?",
+            (f"{self._VAULT_NODE_TYPE_PREFIX}%",),
+        ).fetchall()
+        out: list[dict] = []
+        for row in rows:
+            try:
+                meta = json.loads(row["source_session"] or "{}")
+            except (json.JSONDecodeError, TypeError):
+                meta = {}
+            if not include_superseded and meta.get("status") == "superseded":
+                continue
+            meta = dict(meta)
+            meta["canonical_id"] = row["label"]
+            meta["indexed_at"] = row["created_at"]
+            out.append(meta)
+        return out
+
+    def delete_vault_chunk(self, canonical_id: str) -> bool:
+        """Remove one vault chunk (content + metadata). Returns True if it existed."""
+        with self._write_lock:
+            cur = self._conn.execute(
+                "DELETE FROM kg_nodes WHERE label = ? AND type LIKE ?",
+                (canonical_id, f"{self._VAULT_NODE_TYPE_PREFIX}%"),
+            )
+            self._conn.execute(
+                "DELETE FROM chunks WHERE source_file = ?", (canonical_id,)
+            )
+            self._conn.commit()
+        return cur.rowcount > 0
+
+    def vault_index_updated_at(self) -> Optional[float]:
+        """Most recent ``kg_nodes.created_at`` among indexed vault chunks
+        (epoch seconds), or None if nothing has been indexed yet."""
+        row = self._conn.execute(
+            "SELECT MAX(created_at) AS ts FROM kg_nodes WHERE type LIKE ?",
+            (f"{self._VAULT_NODE_TYPE_PREFIX}%",),
+        ).fetchone()
+        return float(row["ts"]) if row and row["ts"] is not None else None
+
+    def search_vault_chunks(
+        self, query: str, top_k: int = 5, *, include_superseded: bool = False
+    ) -> list[dict]:
+        """Hybrid BM25 + semantic search restricted to indexed vault chunks.
+
+        Returns a list of dicts: ``canonical_id``, ``content``, ``score``,
+        ``metadata``. Superseded chunks are excluded unless explicitly asked
+        for via *include_superseded* (the Chunk 4 "explicit history" path).
+        """
+        rows = self._conn.execute(
+            """
+            SELECT c.content AS content, c.embedding AS embedding,
+                   c.source_file AS source_file, n.source_session AS source_session
+            FROM chunks c
+            JOIN kg_nodes n ON n.label = c.source_file
+            WHERE n.type LIKE ?
+            """,
+            (f"{self._VAULT_NODE_TYPE_PREFIX}%",),
+        ).fetchall()
+
+        parsed_rows: list[tuple[sqlite3.Row, dict]] = []
+        for r in rows:
+            try:
+                meta = json.loads(r["source_session"] or "{}")
+            except (json.JSONDecodeError, TypeError):
+                meta = {}
+            if not include_superseded and meta.get("status") == "superseded":
+                continue
+            parsed_rows.append((r, meta))
+        if not parsed_rows:
+            return []
+
+        contents = [r["content"] for r, _m in parsed_rows]
+        embeddings = [self._bytes_to_vec(r["embedding"]) for r, _m in parsed_rows]
+
+        tokenized_corpus = [c.lower().split() for c in contents]
+        bm25 = BM25Okapi(tokenized_corpus)
+        query_tokens = query.lower().split()
+        bm25_scores_raw = bm25.get_scores(query_tokens)
+        bm25_max = float(np.max(bm25_scores_raw)) if np.max(bm25_scores_raw) > 0 else 1.0
+        bm25_scores = bm25_scores_raw / bm25_max
+
+        _sem_model = self._get_embed_model()
+        if _sem_model is not None:
+            q_vec = _sem_model.encode(
+                [query], normalize_embeddings=True, show_progress_bar=False
+            )[0].astype(np.float32)
+            sem_scores = np.array([self._cosine(q_vec, e) for e in embeddings])
+        else:
+            sem_scores = np.zeros(len(contents), dtype=np.float32)
+
+        combined = 0.4 * bm25_scores + 0.6 * sem_scores
+        top_indices = np.argsort(combined)[::-1][:top_k]
+
+        results: list[dict] = []
+        for i in top_indices:
+            row, meta = parsed_rows[int(i)]
+            results.append({
+                "canonical_id": row["source_file"],
+                "content": contents[i],
+                "score": float(combined[i]),
+                "metadata": meta,
+            })
+        return results
+
+    # ------------------------------------------------------------------
     # Distillation support
     # ------------------------------------------------------------------
 

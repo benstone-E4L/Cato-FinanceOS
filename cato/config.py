@@ -147,6 +147,11 @@ class CatoConfig:
     selector_healing_enabled: bool = False
     vault: Optional[dict] = None   # API keys / credentials for search, login, etc.
 
+    # CHUNK_3_VAULT_INDEX: filesystem root of the E4L knowledge vault (Obsidian
+    # markdown tree) to ingest into MemorySystem. Empty = feature inactive; this
+    # is a personal-machine path and must never be hardcoded into source.
+    vault_knowledge_root: str = ""
+
     # Active model toggles — which CLIs are included in coding-agent fan-out
     enabled_models: list = field(default_factory=lambda: ["claude", "codex", "gemini"])
 
