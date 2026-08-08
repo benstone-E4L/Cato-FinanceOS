@@ -930,7 +930,7 @@ _INTEGRATION_SCHEMAS: dict[str, dict] = {
                 "properties": {
                     "integration": {
                         "type": "string",
-                        "description": "Optional integration id, such as github, vercel, netlify, render, supabase, stripe, google_workspace, notion, slack, discord, telegram, or whatsapp.",
+                        "description": "Optional integration id, such as github, vercel, netlify, render, supabase, stripe, google_workspace, notion, slack, discord, or telegram.",
                     },
                 },
             },

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class BaseAdapter(ABC):
     """Base class for all channel adapters."""
 
-    channel_name: str = ""  # Set by subclasses, e.g. "telegram", "whatsapp"
+    channel_name: str = ""  # Set by subclasses, e.g. "telegram"
 
     def __init__(self, gateway: "Gateway", vault: "Vault", config: "CatoConfig") -> None:
         self.gateway = gateway   # Gateway instance

@@ -14,7 +14,7 @@ Checks performed:
      (Other .md files: warn if > 600 tokens each)
   4. Budget status (monthly spent vs. cap)
   5. Active sessions (PID file)
-  6. Telegram / WhatsApp configured
+  6. Telegram configured
   7. Patchright / Chromium available
   8. Vault keys listed (count only — no values shown)
 """
@@ -504,7 +504,7 @@ class DoctorReport:
         return keys
 
     def _check_channels(self) -> None:
-        """Check 6: Telegram / WhatsApp configured."""
+        """Check 6: Telegram configured."""
         console.print("\n[bold]Channels[/bold]")
         cfg = self._config
         if cfg is None:
@@ -512,9 +512,7 @@ class DoctorReport:
             return
 
         tg_status = "[green]enabled[/green]" if cfg.telegram_enabled else "[dim]disabled[/dim]"
-        wa_status = "[green]enabled[/green]" if cfg.whatsapp_enabled else "[dim]disabled[/dim]"
         console.print(f"  Telegram: {tg_status}")
-        console.print(f"  WhatsApp: {wa_status}")
         console.print(f"  WebChat:  port {cfg.webchat_port}")
 
     def _check_browser(self) -> None:

@@ -3180,14 +3180,13 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
                     adapters_info.append({"name": name, "status": status, "details": details})
 
                 # Surface known adapters that are not currently loaded
-                for known_name in ("telegram", "whatsapp"):
+                for known_name in ("telegram",):
                     if known_name not in seen_names:
                         adapters_info.append({"name": known_name, "status": "not_configured", "details": {}})
             else:
                 # No gateway — attempt a lightweight import check
                 for adapter_name, module_path in [
                     ("telegram", "cato.adapters.telegram"),
-                    ("whatsapp", "cato.adapters.whatsapp"),
                 ]:
                     try:
                         import importlib

@@ -79,7 +79,6 @@ async def test_fallback_port_keeps_http_and_websocket_surfaces_working(tmp_path:
         workspace_dir=str(tmp_path / "workspace"),
         webchat_port=8080,
         telegram_enabled=False,
-        whatsapp_enabled=False,
     )
     budget = BudgetManager(
         session_cap=config.session_cap,

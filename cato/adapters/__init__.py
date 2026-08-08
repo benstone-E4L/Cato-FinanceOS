@@ -2,6 +2,5 @@
 
 from .base import BaseAdapter
 from .telegram import TelegramAdapter
-from .whatsapp import WhatsAppAdapter
 
-__all__ = ["TelegramAdapter", "WhatsAppAdapter", "BaseAdapter"]
+__all__ = ["TelegramAdapter", "BaseAdapter"]

@@ -91,16 +91,6 @@ _INTEGRATIONS: tuple[IntegrationSpec, ...] = (
         enable_config_key="telegram_enabled",
     ),
     IntegrationSpec(
-        id="whatsapp",
-        name="WhatsApp",
-        category="messaging",
-        description="WhatsApp Cloud API channel metadata.",
-        vault_keys=("WHATSAPP_PHONE_ID", "WHATSAPP_TOKEN", "WHATSAPP_WEBHOOK_VERIFY"),
-        env_keys=("WHATSAPP_PHONE_ID", "WHATSAPP_TOKEN", "WHATSAPP_WEBHOOK_VERIFY"),
-        config_keys=("whatsapp_enabled",),
-        enable_config_key="whatsapp_enabled",
-    ),
-    IntegrationSpec(
         id="github",
         name="GitHub",
         category="developer_tool",

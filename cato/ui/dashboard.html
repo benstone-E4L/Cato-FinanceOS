@@ -2122,7 +2122,7 @@ async function refreshSessionsPage() {
     const s = state.sessions[id] || {};
     const ss = serverMap[id] || {};
     const ts = s.lastActivity ? new Date(s.lastActivity).toLocaleString() : '—';
-    const ch = id.includes('tg') ? 'Telegram' : id.includes('wa') ? 'WhatsApp' : id.includes('cron') ? 'Cron' : 'Web';
+    const ch = id.includes('tg') ? 'Telegram' : id.includes('cron') ? 'Cron' : 'Web';
     const qd = Number(ss.queue_depth != null ? ss.queue_depth : (s.messages ? s.messages.length : 0)) || 0;
     const running = ss.running ? '<span class="badge badge-positive">Running</span>' : '<span class="badge badge-gray">Idle</span>';
     return `<tr>

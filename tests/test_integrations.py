@@ -128,7 +128,6 @@ def test_status_route_uses_shared_builder_catalog() -> None:
         "slack",
         "discord",
         "telegram",
-        "whatsapp",
     }:
         assert integration_id in ids
 
@@ -148,7 +147,6 @@ def test_builder_catalog_has_fuller_action_coverage() -> None:
         "slack": {"post_message", "schedule_message"},
         "discord": {"send_message", "list_channel_messages"},
         "telegram": {"get_me", "send_document"},
-        "whatsapp": {"send_text"},
     }
 
     for integration_id, actions in expected_actions.items():

@@ -20,10 +20,6 @@
           <span class="tab-icon">🧠</span>
           <span class="tab-label">Memory</span>
         </button>
-        <button class="tab-button" onclick="switchSettingsTab('channels')">
-          <span class="tab-icon">📱</span>
-          <span class="tab-label">Channels</span>
-        </button>
         <button class="tab-button" onclick="switchSettingsTab('scheduling')">
           <span class="tab-icon">🕐</span>
           <span class="tab-label">Scheduling</span>
@@ -56,18 +52,6 @@
             <p>Loading...</p>
           </div>
           <button class="button-secondary" onclick="reindexMemory()">Re-index Memory</button>
-        </div>
-
-        <!-- Channels Tab -->
-        <div id="channels-tab" class="tab-pane">
-          <h3>Channel Configuration</h3>
-          <div class="channel-section">
-            <h4>WhatsApp</h4>
-            <div id="whatsapp-status" class="setting-group">
-              <p>Loading...</p>
-            </div>
-            <p class="hint">Configure WhatsApp credentials in the vault to enable messaging.</p>
-          </div>
         </div>
 
         <!-- Scheduling Tab -->
@@ -445,19 +429,6 @@
             `
           })
           .catch(err => showSettingsMessage(`Memory load error: ${err.message}`, 'error'))
-        break
-
-      case 'channels':
-        fetch(`${baseUrl}/api/whatsapp/config`)
-          .then(r => r.json())
-          .then(data => {
-            const el = document.getElementById('whatsapp-status')
-            const status = data.configured
-              ? `<span class="status-active">Configured</span>`
-              : `<span class="status-inactive">Not Configured</span>`
-            el.innerHTML = `<p><strong>Status:</strong> ${status}</p>`
-          })
-          .catch(err => showSettingsMessage(`Channels load error: ${err.message}`, 'error'))
         break
     }
   }

@@ -283,11 +283,7 @@ def cmd_init() -> None:
         vault.set("TELEGRAM_BOT_TOKEN", bot_token)
         safe_print("Telegram token stored in vault.")
 
-    # 6. WhatsApp
-    whatsapp = click.confirm("Enable WhatsApp?", default=False)
-    config.whatsapp_enabled = whatsapp
-
-    # 7. Create directory structure
+    # 6. Create directory structure
     dirs = [
         _CATO_DIR / "workspace",
         _CATO_DIR / "memory",
@@ -577,7 +573,7 @@ def genesis_health() -> None:
 @main.command("start")
 @click.option("--agent", default="default", show_default=True, help="Agent workspace name.")
 @click.option("--channel", default="webchat", show_default=True,
-              type=click.Choice(["webchat", "telegram", "whatsapp", "all"]),
+              type=click.Choice(["webchat", "telegram", "all"]),
               help="Which messaging channels to enable. Web UI (HTTP/WS) is always started on webchat_port.")
 @click.option("--browser", default="default", show_default=True,
               type=click.Choice(["default", "conduit"]),
@@ -693,7 +689,6 @@ def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
     async def _main(cfg: CatoConfig, vlt: "Vault", bdg: BudgetManager) -> None:
         from .gateway import Gateway
         from .adapters.telegram import TelegramAdapter
-        from .adapters.whatsapp import WhatsAppAdapter
         from .ui.server import create_ui_app
         from aiohttp import web
 
@@ -749,14 +744,6 @@ def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
                 log.info("GmailAdapter started")
             except Exception as e:
                 log.warning(f"GmailAdapter failed to start: {e}")
-
-        if cfg.whatsapp_enabled:
-            try:
-                wa = WhatsAppAdapter(gateway, vlt, cfg)
-                gateway.register_adapter(wa)
-                log.info("WhatsApp adapter registered")
-            except Exception as e:
-                log.warning(f"WhatsApp adapter failed to register: {e}")
 
         app = await create_ui_app(gateway)
         runner = web.AppRunner(app)
@@ -1043,7 +1030,6 @@ def cmd_status() -> None:
     else:
         safe_print(f"  WebChat:  port {config.webchat_port} (config)")
     safe_print(f"  Telegram: {'enabled' if config.telegram_enabled else 'disabled'}")
-    safe_print(f"  WhatsApp: {'enabled' if config.whatsapp_enabled else 'disabled'}")
 
     safe_print("\nBudget")
     try:

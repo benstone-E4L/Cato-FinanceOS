@@ -335,24 +335,6 @@ _INTEGRATIONS: dict[str, IntegrationDefinition] = {
             "send_document": _action("send_document", "Send a Telegram document by URL or file id.", "POST", "/bot{token}/sendDocument", write=True, required_params=("chat_id", "document"), optional_params=("caption",), auth="telegram_bot", approval_note="Sends a file/message to Telegram."),
         },
     ),
-    "whatsapp": IntegrationDefinition(
-        integration_id="whatsapp",
-        display_name="WhatsApp",
-        category="communication",
-        credential_groups=(("WHATSAPP_ACCESS_TOKEN", "WHATSAPP_TOKEN", "whatsapp_access_token"), ("WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_PHONE_ID", "whatsapp_phone_number_id")),
-        base_url="https://graph.facebook.com",
-        docs_url="https://developers.facebook.com/docs/whatsapp/cloud-api",
-        setup_steps=(
-            "Create/configure a Meta WhatsApp Cloud API app.",
-            "Store the access token as WHATSAPP_ACCESS_TOKEN or WHATSAPP_TOKEN.",
-            "Store the phone number id as WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_PHONE_ID.",
-            "Keep outbound messages approval-gated.",
-        ),
-        actions={
-            "send_text": _action("send_text", "Send a WhatsApp Cloud API text message.", "POST", "/v20.0/{phone_number_id}/messages", write=True, required_params=("phone_number_id", "to", "text"), optional_params=("messaging_product", "type"), approval_note="Sends a WhatsApp message."),
-        },
-        notes="WhatsApp Cloud API requires a phone number id and approved recipient/session rules.",
-    ),
 }
 
 

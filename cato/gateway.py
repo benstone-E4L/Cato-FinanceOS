@@ -1,7 +1,7 @@
 """
 cato/gateway.py — Central message bus for CATO.
 
-- Receives messages from channel adapters (Telegram, WhatsApp) via asyncio queues
+- Receives messages from channel adapters (Telegram) via asyncio queues
 - Routes messages to per-session FIFO LaneQueues (never interleave sessions)
 - Drives the AgentLoop for each task
 - Sends responses back to the originating channel adapter
@@ -352,7 +352,7 @@ class Gateway:
         """Called by adapters when a user message arrives. Routes to lane queue."""
         self._append_history("user", message, channel, session_id)
         # Broadcast incoming message to WebSocket clients (desktop app)
-        if channel in ("telegram", "whatsapp"):
+        if channel == "telegram":
             await self._ws_broadcast({
                 "type": "message", "session_id": session_id,
                 "text": message,
@@ -803,7 +803,7 @@ class Gateway:
                 "This is usually transient — please try again."
             )
         self._append_history("assistant", clean_text, channel, session_id)
-        if channel in ("web", "cron", "heartbeat", "telegram", "whatsapp"):
+        if channel in ("web", "cron", "heartbeat", "telegram"):
             await self._ws_broadcast({
                 "type": "response", "session_id": session_id,
                 "text": clean_text,
@@ -817,7 +817,7 @@ class Gateway:
                         try:
                             # Always deliver the cleaned text to adapters so
                             # users do not see internal tool-call XML or cost
-                            # footers in Telegram/WhatsApp chats.
+                            # footers in Telegram chats.
                             await adapter.send(session_id, clean_text)
                         except Exception as exc:
                             logger.error("Adapter send error (%s): %s", channel, exc)

@@ -118,7 +118,6 @@ class CatoConfig:
     # Messaging channels
     telegram_enabled: bool = False
     telegram_bot_token: str = ""
-    whatsapp_enabled: bool = False
     webchat_port: int = 8080
     mcp_enabled: bool = False
     mcp_host: str = "127.0.0.1"

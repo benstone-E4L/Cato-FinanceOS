@@ -1,7 +1,7 @@
 """
 tests/test_start_channel.py — Startup tests for cato start --channel.
 
-Verifies that each --channel value (webchat, telegram, whatsapp, all) is accepted
+Verifies that each --channel value (webchat, telegram, all) is accepted
 and passed to the daemon; and that cato status prints bound listeners when running.
 """
 
@@ -47,15 +47,6 @@ def test_start_channel_telegram_passed_to_daemon(cli_runner: CliRunner, mock_pid
             cli_runner.invoke(main, ["start", "--channel", "telegram"])
     if m_run.called:
         assert m_run.call_args[0][2] == "telegram"
-
-
-def test_start_channel_whatsapp_passed_to_daemon(cli_runner: CliRunner, mock_pid_file):
-    """Starting with --channel whatsapp passes channel to _run_daemon."""
-    with patch("cato.cli._run_daemon", new_callable=MagicMock) as m_run:
-        with patch("cato.cli.setup_signal_handlers"):
-            cli_runner.invoke(main, ["start", "--channel", "whatsapp"])
-    if m_run.called:
-        assert m_run.call_args[0][2] == "whatsapp"
 
 
 def test_start_channel_all_passed_to_daemon(cli_runner: CliRunner, mock_pid_file):

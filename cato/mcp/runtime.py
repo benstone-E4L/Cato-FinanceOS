@@ -61,7 +61,7 @@ def _adapter_status(gateway: Any) -> list[dict[str, Any]]:
             }
         )
 
-    for known_name in ("telegram", "whatsapp"):
+    for known_name in ("telegram",):
         if known_name not in seen:
             adapters.append({"name": known_name, "status": "not_configured"})
 

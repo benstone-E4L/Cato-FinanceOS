@@ -4,9 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - e4l-runtime-hardening
   pull_request:
     branches:
+      - main
       - e4l-runtime-hardening
 
 jobs:
