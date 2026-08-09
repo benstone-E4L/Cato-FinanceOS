@@ -3,36 +3,32 @@
  *
  * Sidebar layout: left nav + main content area.
  * Polls the daemon health endpoint until ready.
+ *
+ * CHUNK_6_WORK_INBOX: Work Inbox is the default landing page and the
+ * sidebar exposes exactly the master spec's §10 9-item nav. The legacy
+ * 23-view surface still exists (nothing was deleted) but is only reachable
+ * as a tab inside the nav item that absorbed it — see LEGACY_VIEW_REDIRECT
+ * below, which maps every old `View` id to {newView, subTab} so any code
+ * path (e.g. `cato-navigate` events fired by an older component) that still
+ * asks for a legacy id lands on the correct new surface instead of 404ing.
  */
 
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar, type View } from "./components/Sidebar";
-import { ChatView } from "./views/ChatView";
 import { InboxView } from "./views/InboxView";
 import type { ChatConnectionStatus } from "./hooks/useChatStream";
-import { CodingAgentView } from "./views/CodingAgentView";
-import { InteractiveCLIView } from "./views/InteractiveCLIView";
-import { DashboardView } from "./views/DashboardView";
+import { WorkInboxView } from "./views/WorkInboxView";
+import { ApprovalsView } from "./views/ApprovalsView";
+import { WaitingFollowupsView } from "./views/WaitingFollowupsView";
+import { CalendarView } from "./views/CalendarView";
+import { CompanyTasksView } from "./views/CompanyTasksView";
 import { FinanceView } from "./views/FinanceView";
-import { SessionsView } from "./views/SessionsView";
-import { SkillsView } from "./views/SkillsView";
-import { CronView } from "./views/CronView";
-import { UsageView } from "./views/UsageView";
-import { LogsView } from "./views/LogsView";
-import { AuditLogView } from "./views/AuditLogView";
-import { ConfigView } from "./views/ConfigView";
-import { SettingsView } from "./views/SettingsView";
-import { BudgetView } from "./views/BudgetView";
+import { AskE4LView } from "./views/AskE4LView";
+import { ActivityAutomationsView } from "./views/ActivityAutomationsView";
+import { SettingsDiagnosticsView } from "./views/SettingsDiagnosticsView";
 import { AlertsView } from "./views/AlertsView";
-import { AuthKeysView } from "./views/AuthKeysView";
-import { IdentityView } from "./views/IdentityView";
-import { FlowsView } from "./views/FlowsView";
-import { NodesView } from "./views/NodesView";
-import { SystemView } from "./views/SystemView";
-import { MemoryView } from "./views/MemoryView";
-import { DiagnosticsView } from "./views/DiagnosticsView";
 import "./styles/app.css";
 import "./styles/finance-shell.css";
 
@@ -46,6 +42,41 @@ interface DaemonInfo {
 }
 
 const DAEMON_DEFAULT_PORT = 8080;
+
+// Legacy view id -> which of the 9 new nav items absorbed it, and (for the
+// tab-hub nav items) which sub-tab to preselect. `null` subTab means the
+// legacy id maps directly onto a non-hub view (e.g. "inbox" -> Work Inbox).
+const LEGACY_VIEW_REDIRECT: Record<string, { newView: View; subTab: string | null }> = {
+  dashboard: { newView: "work-inbox", subTab: null },
+  inbox: { newView: "work-inbox", subTab: null },
+  alerts: { newView: "work-inbox", subTab: null },
+  chat: { newView: "ask-e4l", subTab: "chat" },
+  memory: { newView: "ask-e4l", subTab: "memory" },
+  audit: { newView: "activity-automations", subTab: "audit" },
+  cron: { newView: "activity-automations", subTab: "cron" },
+  sessions: { newView: "activity-automations", subTab: "sessions" },
+  usage: { newView: "activity-automations", subTab: "usage" },
+  logs: { newView: "activity-automations", subTab: "logs" },
+  budget: { newView: "activity-automations", subTab: "budget" },
+  settings: { newView: "settings-diagnostics", subTab: "settings" },
+  config: { newView: "settings-diagnostics", subTab: "config" },
+  identity: { newView: "settings-diagnostics", subTab: "identity" },
+  "auth-keys": { newView: "settings-diagnostics", subTab: "auth-keys" },
+  skills: { newView: "settings-diagnostics", subTab: "skills" },
+  system: { newView: "settings-diagnostics", subTab: "system" },
+  diagnostics: { newView: "settings-diagnostics", subTab: "diagnostics" },
+  nodes: { newView: "settings-diagnostics", subTab: "nodes" },
+  flows: { newView: "settings-diagnostics", subTab: "flows" },
+  "coding-agent": { newView: "settings-diagnostics", subTab: "coding-agent" },
+  "interactive-cli": { newView: "settings-diagnostics", subTab: "interactive-cli" },
+};
+
+/** Resolve any legacy or current view id to {view, subTab} for rendering. */
+function resolveView(view: View): { view: View; subTab: string | null } {
+  const redirect = LEGACY_VIEW_REDIRECT[view as string];
+  if (redirect) return { view: redirect.newView, subTab: redirect.subTab };
+  return { view, subTab: null };
+}
 
 function useDaemonInfo(): DaemonInfo {
   const [info, setInfo] = useState<DaemonInfo>({
@@ -133,72 +164,68 @@ function installCatoFetchAuth(token?: string): void {
   };
 }
 
-function renderView(view: View, daemon: DaemonInfo, onNavigate: (v: View) => void): React.ReactNode {
+function renderView(
+  resolvedView: View,
+  subTab: string | null,
+  daemon: DaemonInfo,
+  onNavigate: (v: View) => void,
+  onChatConnectionStatusChange: (status: ChatConnectionStatus) => void,
+): React.ReactNode {
   const { httpPort, wsPort } = daemon;
-  switch (view) {
-    case "dashboard":
-      return <DashboardView httpPort={httpPort} onNavigate={onNavigate} />;
-    case "chat":
-      return <ChatView wsBase={`127.0.0.1:${wsPort}`} httpPort={httpPort} daemonToken={daemon.daemonToken} />;
-    case "inbox":
-      return <InboxView httpPort={httpPort} />;
+  switch (resolvedView) {
+    case "work-inbox":
+      return <WorkInboxView httpPort={httpPort} onNavigate={onNavigate} />;
+    case "waiting-followups":
+      return <WaitingFollowupsView />;
+    case "approvals":
+      return <ApprovalsView httpPort={httpPort} />;
+    case "calendar":
+      return <CalendarView />;
+    case "company-tasks":
+      return <CompanyTasksView />;
     case "finance":
       return <FinanceView httpPort={httpPort} />;
-    case "coding-agent":
+    case "ask-e4l":
       return (
-        <CodingAgentView
-          wsBase={`127.0.0.1:${httpPort}`}
-          apiBase={`http://127.0.0.1:${httpPort}`}
+        <AskE4LView
+          wsBase={`127.0.0.1:${wsPort}`}
+          httpPort={httpPort}
           daemonToken={daemon.daemonToken}
+          onConnectionStatusChange={onChatConnectionStatusChange}
+          initialTab={subTab === "memory" ? "memory" : "chat"}
         />
       );
-    case "interactive-cli":
-      return <InteractiveCLIView httpPort={httpPort} />;
-    case "skills":
-      return <SkillsView httpPort={httpPort} />;
-    case "cron":
-      return <CronView httpPort={httpPort} />;
-    case "sessions":
-      return <SessionsView httpPort={httpPort} />;
-    case "usage":
-      return <UsageView httpPort={httpPort} />;
-    case "logs":
-      return <LogsView httpPort={httpPort} />;
-    case "audit":
-      return <AuditLogView httpPort={httpPort} />;
-    case "config":
-      return <ConfigView httpPort={httpPort} />;
-    case "settings":
-      return <SettingsView httpPort={httpPort} />;
-    case "budget":
-      return <BudgetView httpPort={httpPort} />;
+    case "activity-automations":
+      return <ActivityAutomationsView httpPort={httpPort} initialTabId={subTab ?? undefined} />;
+    case "settings-diagnostics":
+      return (
+        <SettingsDiagnosticsView
+          httpPort={httpPort}
+          wsPort={wsPort}
+          daemonToken={daemon.daemonToken}
+          initialTabId={subTab ?? undefined}
+        />
+      );
+    // Legacy ids that resolveView() didn't remap (defensive fallback —
+    // should not normally be reached since LEGACY_VIEW_REDIRECT covers all
+    // of them, but never 404/dead-end silently if one is missed).
+    case "inbox":
+      return <InboxView httpPort={httpPort} />;
     case "alerts":
       return <AlertsView httpPort={httpPort} />;
-    case "auth-keys":
-      return <AuthKeysView httpPort={httpPort} />;
-    case "identity":
-      return <IdentityView httpPort={httpPort} />;
-    case "flows":
-      return <FlowsView httpPort={httpPort} />;
-    case "nodes":
-      return <NodesView httpPort={httpPort} />;
-    case "memory":
-      return <MemoryView httpPort={httpPort} />;
-    case "system":
-      return <SystemView httpPort={httpPort} />;
-    case "diagnostics":
-      return <DiagnosticsView httpPort={httpPort} wsPort={wsPort} daemonToken={daemon.daemonToken} />;
     default:
-      return null;
+      return <WorkInboxView httpPort={httpPort} onNavigate={onNavigate} />;
   }
 }
 
 function App() {
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>("work-inbox");
   const daemon = useDaemonInfo();
   const [chatStatus, setChatStatus] = useState<ChatConnectionStatus | "idle">("idle");
 
-  // Allow child views to trigger navigation (e.g. quick-launch buttons)
+  // Allow child views to trigger navigation (e.g. quick-launch buttons).
+  // Legacy event payloads (old view ids) are resolved the same way direct
+  // sidebar navigation is, so nothing that used to work silently breaks.
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string>).detail as View;
@@ -219,10 +246,12 @@ function App() {
     }
   }
 
+  const { view: resolvedView, subTab } = resolveView(view);
+
   return (
     <div className="app-root app-root-sidebar">
       <Sidebar
-        activeView={view}
+        activeView={resolvedView}
         onNavigate={setView}
         daemonStatus={sidebarStatus}
       />
@@ -238,16 +267,7 @@ function App() {
         {daemon.status === "ready" && (
           <main className="app-main">
             <ErrorBoundary>
-              {view === "chat"
-                ? (
-                  <ChatView
-                    wsBase={`127.0.0.1:${daemon.wsPort}`}
-                    httpPort={daemon.httpPort}
-                    daemonToken={daemon.daemonToken}
-                    onConnectionStatusChange={setChatStatus}
-                  />
-                  )
-                : renderView(view, daemon, setView)}
+              {renderView(resolvedView, subTab, daemon, setView, setChatStatus)}
             </ErrorBoundary>
           </main>
         )}

@@ -1955,3 +1955,122 @@ select:focus-visible {
   outline: none;
   overflow-y: auto;
 }
+
+/* ── Tab Hub (CHUNK_6_WORK_INBOX: Ask E4L / Activity / Settings absorb the
+   legacy per-feature views as tabs rather than separate sidebar slots) ── */
+.tab-hub-subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.tab-hub-strip {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.tab-hub-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tab-hub-tab:hover { background: var(--bg-panel); color: var(--text-primary); }
+
+.tab-hub-tab.active {
+  background: var(--bg-panel);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tab-hub-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-hub-panel > * { flex: 1 1 0; min-height: 0; }
+
+/* ── Work Inbox (CHUNK_6_WORK_INBOX: default landing page) ──────────── */
+.work-inbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.work-inbox-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.work-inbox-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.work-inbox-group-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.work-inbox-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.work-inbox-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.work-inbox-card-title { font-weight: 600; font-size: 13px; }
+
+.work-inbox-card-meta { color: var(--text-muted); font-size: 11px; }
+
+.work-inbox-card-stale {
+  color: #fca5a5;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.work-inbox-empty-group {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 4px 0 12px;
+}
+
+.coming-soon-panel {
+  background: var(--bg-panel);
+  border: 1px dashed var(--border-color);
+  border-radius: 10px;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
