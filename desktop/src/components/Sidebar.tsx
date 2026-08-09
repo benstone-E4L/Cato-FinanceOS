@@ -4,7 +4,7 @@ import logoSrc from "../../../New Logos/CATO-E4Life-Structure-Transparent.png";
 export type View =
   | "dashboard" | "chat" | "inbox" | "coding-agent" | "interactive-cli"
   | "skills" | "cron" | "sessions" | "usage" | "logs" | "audit"
-  | "memory" | "settings" | "config" | "budget" | "alerts"
+  | "memory" | "settings" | "config" | "budget" | "alerts" | "finance"
   | "auth-keys" | "identity" | "flows" | "nodes" | "system" | "diagnostics";
 
 interface SidebarProps {
@@ -17,6 +17,7 @@ const PRIMARY_NAV: Array<{ id: View; label: string; hint: string; icon: React.Re
   { id: "dashboard", label: "Control room", hint: "FinanceOS overview", icon: <path d="M4 13h6V4H4v9Zm10 7h6V11h-6v9ZM4 20h6v-3H4v3Zm10-13h6V4h-6v3Z" /> },
   { id: "chat", label: "Ask Cato", hint: "Direct the agent", icon: <path d="M5 5h14v10H9l-4 4V5Zm3 4h8M8 12h5" /> },
   { id: "inbox", label: "Inbox", hint: "Drafts & approvals", icon: <path d="M4 5h16v14H4V5Zm0 9h5l2 2h2l2-2h5" /> },
+  { id: "finance", label: "Finance", hint: "FinanceOS control room (read-only)", icon: <path d="M4 19h16M6 19V9m4 10V5m4 14v-7m4 7V3" /> },
   { id: "flows", label: "Automations", hint: "Recurring workflows", icon: <path d="M7 7h10M7 17h10M5 7a2 2 0 1 0 0 .01M19 17a2 2 0 1 0 0 .01M12 7v5a5 5 0 0 0 5 5" /> },
   { id: "audit", label: "Activity", hint: "Proof & history", icon: <path d="M12 3 5 6v5c0 4.6 2.9 8 7 10 4.1-2 7-5.4 7-10V6l-7-3Zm-3 9 2 2 4-5" /> },
 ];

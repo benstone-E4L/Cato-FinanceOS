@@ -821,6 +821,52 @@ class MemorySystem:
         return results
 
     # ------------------------------------------------------------------
+    # Generic namespaced state cache (last-known-value fallback for
+    # external, unreliable services — e.g. Chunk 5's FinanceOS control-room
+    # proxy). Reuses kg_nodes with no embedding, same no-DDL pattern as the
+    # vault-chunk methods above (see guardrails.md's CHUNK_3 decision note).
+    # ------------------------------------------------------------------
+
+    _CACHE_NODE_TYPE_PREFIX = "cache:"
+
+    def set_cache_value(self, namespace: str, key: str, value: dict) -> None:
+        """Idempotently store the last-known value for *namespace*/*key*.
+
+        Used for stale-fallback state (e.g. the last successful FinanceOS
+        control-room response) — not for anything Cato treats as an
+        authority. No embedding is computed; this is a plain KV write.
+        """
+        label = f"{self._CACHE_NODE_TYPE_PREFIX}{namespace}:{key}"
+        now_iso = self._now_iso()
+        now_epoch = time.time()
+        payload = json.dumps({"value": value, "cached_at": now_iso})
+        with self._write_lock:
+            self._conn.execute(
+                """
+                INSERT INTO kg_nodes (type, label, embedding, source_session, created_at)
+                VALUES (?, ?, NULL, ?, ?)
+                ON CONFLICT(label) DO UPDATE SET
+                    source_session = excluded.source_session,
+                    created_at = excluded.created_at
+                """,
+                (f"{self._CACHE_NODE_TYPE_PREFIX}{namespace}", label, payload, now_epoch),
+            )
+            self._conn.commit()
+
+    def get_cache_value(self, namespace: str, key: str) -> Optional[dict]:
+        """Return ``{"value": ..., "cached_at": iso_str}`` for *namespace*/*key*, or None."""
+        label = f"{self._CACHE_NODE_TYPE_PREFIX}{namespace}:{key}"
+        row = self._conn.execute(
+            "SELECT source_session FROM kg_nodes WHERE label = ?", (label,)
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            return json.loads(row["source_session"] or "{}")
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+    # ------------------------------------------------------------------
     # Distillation support
     # ------------------------------------------------------------------
 

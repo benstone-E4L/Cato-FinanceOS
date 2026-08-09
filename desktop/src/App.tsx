@@ -15,6 +15,7 @@ import type { ChatConnectionStatus } from "./hooks/useChatStream";
 import { CodingAgentView } from "./views/CodingAgentView";
 import { InteractiveCLIView } from "./views/InteractiveCLIView";
 import { DashboardView } from "./views/DashboardView";
+import { FinanceView } from "./views/FinanceView";
 import { SessionsView } from "./views/SessionsView";
 import { SkillsView } from "./views/SkillsView";
 import { CronView } from "./views/CronView";
@@ -141,6 +142,8 @@ function renderView(view: View, daemon: DaemonInfo, onNavigate: (v: View) => voi
       return <ChatView wsBase={`127.0.0.1:${wsPort}`} httpPort={httpPort} daemonToken={daemon.daemonToken} />;
     case "inbox":
       return <InboxView httpPort={httpPort} />;
+    case "finance":
+      return <FinanceView httpPort={httpPort} />;
     case "coding-agent":
       return (
         <CodingAgentView

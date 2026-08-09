@@ -36,6 +36,7 @@ Mounts:
   GET /api/sessions/{session_id}/checkpoints           → List session checkpoints
   GET /api/sessions/{session_id}/checkpoints/{cid}     → Single checkpoint summary
   GET /api/sessions/{session_id}/receipt               → Signed session receipt
+  GET /api/finance-os/control-room                     → Read-only Finance view data (live-or-stale)
 """
 
 from __future__ import annotations
@@ -112,6 +113,117 @@ async def _fetch_finance_os_health() -> dict[str, Any]:
     if any(type(payload.get(key)) is not expected for key, expected in required_types.items()):
         raise ValueError("FinanceOS health payload is missing required fields")
     return {key: payload.get(key) for key in _FINANCE_OS_HEALTH_FIELDS}
+
+
+_FINANCE_CONTROL_ROOM_CACHE_NAMESPACE = "financeos"
+_FINANCE_CONTROL_ROOM_CACHE_KEY = "control_room"
+
+
+def _finance_control_room_base_url() -> str:
+    return (
+        os.environ.get("FINANCEOS_CONTROL_ROOM_URL")
+        or os.environ.get("E4L_FINANCE_OS_URL")
+        or "http://127.0.0.1:3001"
+    ).rstrip("/")
+
+
+async def _fetch_finance_control_room() -> dict[str, Any]:
+    """GET FinanceOS's control-room + integrations-health endpoints, read-only.
+
+    Uses ``cato/integrations/financeos_client.py`` as-is (CHUNK_5 spec: "used
+    as-is or extended — not rewritten"). Both calls are non-mutating GETs, so
+    no capability token is required to succeed; when FinanceOS does gate reads
+    behind auth (O2O-FOS-1: capability-token mint endpoint doesn't exist yet),
+    the resulting non-2xx response is treated as unreachable here — the caller
+    falls back to the last cached value rather than rendering "no data" as if
+    that were a real empty state (CHUNK_5 edge-case requirement).
+
+    Restricted to loopback targets, same as ``_fetch_finance_os_health`` above
+    — this handler is reachable from the desktop webview and must never become
+    an SSRF proxy.
+    """
+    from cato.integrations.financeos_client import FinanceOSClient
+
+    base_url = _finance_control_room_base_url()
+    parsed = urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in _LOCAL_REMOTES:
+        raise ValueError("FINANCEOS_CONTROL_ROOM_URL must target localhost")
+
+    token = (os.environ.get("FINANCEOS_CAPABILITY_TOKEN") or "").strip() or None
+    client = FinanceOSClient(base_url, capability_token=token, timeout=4.0)
+
+    def _fetch_sync() -> tuple[Any, Any]:
+        control = client.request("GET", "/api/v1/control-room", mutating=False)
+        health = client.request(
+            "GET", "/api/v1/control-room/integrations-health", mutating=False
+        )
+        return control, health
+
+    loop = asyncio.get_running_loop()
+    control_result, health_result = await loop.run_in_executor(None, _fetch_sync)
+
+    if not control_result.ok:
+        raise RuntimeError(f"FinanceOS control-room returned HTTP {control_result.status}")
+    if not health_result.ok:
+        raise RuntimeError(
+            f"FinanceOS integrations-health returned HTTP {health_result.status}"
+        )
+
+    control_data = control_result.parsed if isinstance(control_result.parsed, dict) else {}
+    health_data = health_result.parsed if isinstance(health_result.parsed, dict) else {}
+    return {"control_room": control_data, "integrations_health": health_data}
+
+
+def _finance_control_room_memory():
+    from cato.core.memory import MemorySystem
+    from cato.platform import get_data_dir
+
+    return MemorySystem(agent_id="default", memory_dir=get_data_dir() / "default")
+
+
+async def _finance_control_room_payload() -> dict[str, Any]:
+    """Live-or-stale payload for the Finance view. Never raises.
+
+    Returns ``{"connected": bool, "stale": bool, "data": dict|None,
+    "cached_at": str|None}``. On a live success the fresh value is cached for
+    the next failure; on any failure the last cached value (if any) is served
+    marked stale rather than crashing or rendering a blank/silent failure.
+    """
+    try:
+        data = await _fetch_finance_control_room()
+    except Exception as exc:
+        logger.info("FinanceOS control-room unavailable: %s", type(exc).__name__)
+        loop = asyncio.get_running_loop()
+        try:
+            cached = await loop.run_in_executor(
+                None,
+                lambda: _finance_control_room_memory().get_cache_value(
+                    _FINANCE_CONTROL_ROOM_CACHE_NAMESPACE, _FINANCE_CONTROL_ROOM_CACHE_KEY
+                ),
+            )
+        except Exception:
+            cached = None
+        if cached is None:
+            return {"connected": False, "stale": True, "data": None, "cached_at": None}
+        return {
+            "connected": False,
+            "stale": True,
+            "data": cached.get("value"),
+            "cached_at": cached.get("cached_at"),
+        }
+
+    loop = asyncio.get_running_loop()
+    try:
+        await loop.run_in_executor(
+            None,
+            lambda: _finance_control_room_memory().set_cache_value(
+                _FINANCE_CONTROL_ROOM_CACHE_NAMESPACE, _FINANCE_CONTROL_ROOM_CACHE_KEY, data
+            ),
+        )
+    except Exception:
+        logger.warning("Failed to cache FinanceOS control-room response", exc_info=True)
+    return {"connected": True, "stale": False, "data": data, "cached_at": None}
+
 
 # Workspace identity files live here
 def _workspace_dir() -> Path:
@@ -2008,6 +2120,15 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
             logger.info("FinanceOS health unavailable: %s", type(exc).__name__)
             return web.json_response({"connected": False, "status": "unavailable"})
 
+    async def finance_os_control_room(request: web.Request) -> web.Response:
+        """GET /api/finance-os/control-room — read-only Finance view data.
+
+        Always 200; never crashes on a FinanceOS outage. See
+        ``_finance_control_room_payload`` for the live/stale contract.
+        """
+        payload = await _finance_control_room_payload()
+        return web.json_response(payload)
+
     # ------------------------------------------------------------------ #
     # Cron job history                                                     #
     # ------------------------------------------------------------------ #
@@ -3503,6 +3624,7 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
     app.router.add_post("/api/dashboard/handoff",        dashboard_handoff)
     app.router.add_get("/health",                        health)
     app.router.add_get("/api/finance-os/health",         finance_os_health)
+    app.router.add_get("/api/finance-os/control-room",   finance_os_control_room)
     app.router.add_get("/mcp/health",                    mcp_health)
     app.router.add_route("*", "/mcp",                    mcp_proxy)
     app.router.add_route("*", "/mcp/{tail:.*}",          mcp_proxy)
