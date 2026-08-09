@@ -782,6 +782,76 @@ def _register_clawflow_tools(agent_loop: Any = None) -> None:
     register_tool("flow.run", _flow_run)
 
 
+def _format_ask_e4l_result(result: Any) -> str:
+    if result.refused:
+        return result.text
+    lines = [result.text, ""]
+    if result.citations:
+        lines.append("Sources: " + ", ".join(c.formatted() for c in result.citations))
+    if result.contradiction:
+        lines.append(
+            "CONTRADICTION FLAGGED between: "
+            + ", ".join(c.formatted() for c in result.contradiction_citations)
+        )
+    if result.stale:
+        lines.append(
+            "[stale: the vault index predates the vault tree's latest known change — "
+            "run 'cato memory vault-index' to refresh]"
+        )
+    if result.superseded_available:
+        lines.append(
+            "[note: superseded history exists on this topic — ask again with "
+            "include_history to see it]"
+        )
+    return "\n".join(lines)
+
+
+def _register_ask_e4l_tools(memory: Any, router: Any, config: Any = None) -> None:
+    """Register the ask.e4l tool action (CHUNK_4_ASK_E4L / Retrieval Contract)."""
+    try:
+        from .core.ask_e4l import answer_question
+    except ImportError:
+        return
+
+    vault_root_str = getattr(config, "vault_knowledge_root", "") if config is not None else ""
+    vault_root = Path(vault_root_str) if vault_root_str else None
+
+    async def _llm_complete(prompt: str) -> str:
+        descriptor = TaskDescriptor(
+            task_type=TaskType.RECONCILIATION_ANALYSIS,
+            input_tokens=len(prompt) // 4,
+            max_output_tokens=4096,
+            requires_tools=False,
+            cost_ceiling_usd=1.0,
+            task_key="ask-e4l",
+        )
+        _model, message, _decision = await router.complete_message(
+            [{"role": "user", "content": prompt}],
+            descriptor,
+            system=(
+                "You are Ask-E4L, answering strictly from the provided vault "
+                "excerpts. Never use outside knowledge. Cite every claim."
+            ),
+        )
+        return message.get("content", "") or ""
+
+    async def _ask_e4l(args: dict) -> str:
+        question = str(args.get("question", "")).strip()
+        include_history = bool(args.get("include_history", False))
+        if not question:
+            return "[ask.e4l: question required]"
+        result = await answer_question(
+            memory,
+            vault_root,
+            question,
+            llm_complete=_llm_complete,
+            include_history=include_history,
+        )
+        return _format_ask_e4l_result(result)
+
+    register_tool("ask.e4l", _ask_e4l)
+
+
 def _register_graph_tools(memory: Any) -> None:
     """Register graph.query and graph.related tool actions (Skill 9)."""
 
@@ -1816,6 +1886,9 @@ class AgentLoop:
 
         # Register memory fact tool actions (Skill 2)
         _register_memory_tools(memory=memory)
+
+        # Register Ask-E4L (CHUNK_4_ASK_E4L / Retrieval Contract)
+        _register_ask_e4l_tools(memory=memory, router=self._router, config=config)
 
         # Register Clawflow tool action (Skill 5). `self` is the gate chain the
         # flow's steps must run through.

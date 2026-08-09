@@ -2502,6 +2502,83 @@ def memory_vault_index(agent: str, vault_root: Optional[Path]) -> None:
     safe_print(f"stale: {stale if stale is not None else 'unknown (nothing indexed yet?)'}")
 
 
+@memory_cmd.command("ask-e4l-eval")
+@click.option("--agent", default="default", show_default=True, help="Agent workspace name.")
+@click.option(
+    "--vault-root",
+    type=click.Path(path_type=Path, exists=False),
+    default=None,
+    help="Override the vault root (default: config's vault_knowledge_root).",
+)
+@click.option(
+    "--log-path",
+    type=click.Path(path_type=Path, exists=False),
+    default=None,
+    help="Where to log eval results (default: .ralph/context-log.md).",
+)
+def memory_ask_e4l_eval(agent: str, vault_root: Optional[Path], log_path: Optional[Path]) -> None:
+    """Run the 10-question Phoenix eval bar for Ask-E4L (CHUNK_4_ASK_E4L).
+
+    Uses the real ModelRouter (a live, correctly-routed Anthropic call per
+    question) against whatever is currently indexed. Run `cato memory
+    vault-index` first.
+    """
+    import asyncio
+
+    from cato.core.memory import MemorySystem
+    from cato.core.phoenix_eval import run_phoenix_eval
+    from cato.model_policy import TaskDescriptor, TaskType
+    from cato.router import ModelRouter
+    from cato.vault import get_vault
+
+    configured_root = CatoConfig.load().vault_knowledge_root
+    root = vault_root or (Path(configured_root) if configured_root else None)
+    if not root:
+        safe_print(
+            "No vault root configured. Pass --vault-root or set "
+            "vault_knowledge_root in config.yaml."
+        )
+        raise SystemExit(1)
+
+    mem = MemorySystem(agent_id=agent)
+    router = ModelRouter(vault=get_vault())
+
+    async def _llm_complete(prompt: str) -> str:
+        descriptor = TaskDescriptor(
+            task_type=TaskType.RECONCILIATION_ANALYSIS,
+            input_tokens=len(prompt) // 4,
+            max_output_tokens=4096,
+            requires_tools=False,
+            cost_ceiling_usd=1.0,
+            task_key="ask-e4l-eval",
+        )
+        _model, message, _decision = await router.complete_message(
+            [{"role": "user", "content": prompt}],
+            descriptor,
+            system=(
+                "You are Ask-E4L, answering strictly from the provided vault "
+                "excerpts. Never use outside knowledge. Cite every claim."
+            ),
+        )
+        return message.get("content", "") or ""
+
+    report = asyncio.run(
+        run_phoenix_eval(mem, Path(root), llm_complete=_llm_complete, log_path=log_path)
+    )
+    mem.close()
+
+    safe_print(
+        f"score: {report.correct_count}/{report.total} correct+cited, "
+        f"{report.confidently_wrong_count} confidently-wrong"
+    )
+    safe_print(f"passes_bar (>=8/10 correct, 0 confidently-wrong): {report.passes_bar}")
+    for r in report.results:
+        status = "PASS" if r.correct else "FAIL"
+        safe_print(f"  [{status}] {r.question}")
+    if not report.passes_bar:
+        raise SystemExit(1)
+
+
 # ---------------------------------------------------------------------------
 # cato flow  (Clawflows: Proactive Trigger Registry, Skill 5)
 # ---------------------------------------------------------------------------
