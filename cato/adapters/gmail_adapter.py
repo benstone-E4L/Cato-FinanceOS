@@ -16,8 +16,9 @@ import email as _email_lib
 import logging
 import os
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
+
+from cato.platform import get_data_dir
 
 if TYPE_CHECKING:
     from cato.vault import Vault
@@ -27,8 +28,6 @@ logger = logging.getLogger(__name__)
 
 # Operators can place a voice profile at ~/.cato/voice-profile.txt; no default
 # machine-specific path is shipped in source.
-_DEFAULT_VOICE_PATH = Path.home() / ".cato" / "voice-profile.txt"
-
 _POLL_INTERVAL = 15 * 60  # seconds
 _RATE_LIMIT_SLEEP = 1.1   # seconds between Telegram notifications
 
@@ -141,7 +140,7 @@ def _should_skip_deterministically(from_email: str, subject: str) -> tuple[bool,
 
 
 def _load_voice_profile() -> str:
-    candidates = [_DEFAULT_VOICE_PATH]
+    candidates = [get_data_dir() / "voice-profile.txt"]
     for path in candidates:
         if path and path.exists():
             try:
@@ -227,6 +226,24 @@ class GmailAdapter:
         self._router: Optional["ModelRouter"] = None
         self._telegram_app: Any = None   # telegram.ext.Application
         self._telegram_chat_id: Optional[str] = None
+
+    @staticmethod
+    def _expected_address() -> str:
+        """Return the required mailbox identity without exposing credentials."""
+        return os.environ.get("GMAIL_ADDRESS", "").strip().lower()
+
+    def _verify_mailbox_identity_sync(self, service: Any) -> bool:
+        """Fail closed unless Gmail's authenticated profile matches config."""
+        expected = self._expected_address()
+        if not expected:
+            logger.error("GMAIL_ADDRESS is not configured; Gmail integration is disabled")
+            return False
+        profile = service.users().getProfile(userId="me").execute()
+        actual = str(profile.get("emailAddress") or "").strip().lower()
+        if actual != expected:
+            logger.error("Authenticated Gmail mailbox does not match GMAIL_ADDRESS")
+            return False
+        return True
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -354,9 +371,9 @@ class GmailAdapter:
         return res["id"]
 
     def _send_draft_sync(self, draft_id: str) -> None:
-        service = self._get_gmail_service()
-        service.users().drafts().send(userId="me", body={"id": draft_id}).execute()
-        logger.info("Gmail draft %s sent", draft_id)
+        raise PermissionError(
+            "Cato is draft-only; the operator must send Gmail drafts manually"
+        )
 
     # ------------------------------------------------------------------
     # LLM helpers
@@ -479,6 +496,17 @@ class GmailAdapter:
             return
 
         try:
+            identity_ok = await loop.run_in_executor(
+                None, self._verify_mailbox_identity_sync, service
+            )
+        except Exception as exc:
+            logger.error("Could not verify authenticated Gmail mailbox: %s", exc)
+            identity_ok = False
+        if not identity_ok:
+            self._enabled = False
+            return
+
+        try:
             emails = await loop.run_in_executor(None, self._fetch_unread_emails_sync, service)
         except Exception as exc:
             logger.error("Failed to fetch emails: %s", exc)
@@ -566,8 +594,18 @@ class GmailAdapter:
             logger.error("Failed to create Gmail draft for email %s: %s", gmail_id, exc)
             gmail_draft_id = None
 
-        # Send Telegram notification with approve/dismiss buttons
-        await self._notify_telegram(email_data, draft_text, row_id)
+        # Send Telegram notification with approve/dismiss buttons.
+        #
+        # `draft_created` must be told the truth. When drafts().create() fails —
+        # which it does on EVERY call when the stored OAuth grant carries only
+        # `gmail.readonly`, the scope actually issued for this credential — the
+        # old code still sent the operator a "Draft reply:" card with Approve /
+        # Dismiss buttons for a draft that does not exist in Gmail. The operator
+        # would open Gmail expecting to send it and find nothing.
+        await self._notify_telegram(
+            email_data, draft_text, row_id,
+            draft_created=gmail_draft_id is not None,
+        )
 
         # Mark as read
         try:
@@ -584,6 +622,7 @@ class GmailAdapter:
         email_data: dict[str, Any],
         draft_text: str,
         row_id: int,
+        draft_created: bool = True,
     ) -> None:
         if self._telegram_app is None or self._telegram_chat_id is None:
             logger.debug("No Telegram app/chat_id wired — skipping notification")
@@ -598,21 +637,30 @@ class GmailAdapter:
         # Truncate draft preview for the notification
         preview = draft_text[:300] + ("..." if len(draft_text) > 300 else "")
 
+        if draft_created:
+            status_line = "<b>Draft reply</b> (saved in Gmail Drafts):"
+            buttons = [
+                InlineKeyboardButton("Approve Draft", callback_data=f"approve_{row_id}"),
+                InlineKeyboardButton("Dismiss", callback_data=f"dismiss_{row_id}"),
+            ]
+        else:
+            status_line = (
+                "<b>NOT SAVED TO GMAIL</b> — draft creation failed. "
+                "The text below exists only in Cato; there is nothing in your "
+                "Gmail Drafts folder to send. Suggested reply:"
+            )
+            buttons = [
+                InlineKeyboardButton("Dismiss", callback_data=f"dismiss_{row_id}"),
+            ]
+
         text = (
             f"<b>New email from:</b> {from_email}\n"
             f"<b>Subject:</b> {subject}\n"
             f"<b>Snippet:</b> {snippet[:200]}\n\n"
-            f"<b>Draft reply:</b>\n{preview}"
+            f"{status_line}\n{preview}"
         )
 
-        keyboard = InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Approve & Send", callback_data=f"approve_{row_id}"),
-                    InlineKeyboardButton("Dismiss", callback_data=f"dismiss_{row_id}"),
-                ]
-            ]
-        )
+        keyboard = InlineKeyboardMarkup([buttons])
 
         try:
             await self._telegram_app.bot.send_message(
@@ -639,6 +687,7 @@ class GmailAdapter:
     # ------------------------------------------------------------------
 
     async def send_draft(self, draft_id: str) -> None:
-        """Send a Gmail draft identified by *draft_id*."""
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, self._send_draft_sync, draft_id)
+        """Refuse transmission; Cato may create drafts but never send them."""
+        raise PermissionError(
+            "Cato is draft-only; the operator must send Gmail drafts manually"
+        )

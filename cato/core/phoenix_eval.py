@@ -13,10 +13,11 @@ out-of-scope question, to exercise the refusal path) through
     none of the expected keywords appear — i.e. it stated something as fact
     that isn't the expected answer, rather than declining to guess
 
-Attempts to log to Phoenix first (``PHOENIX_ENDPOINT``/``PHOENIX_API_KEY``,
-both optional); on any failure — including "not configured at all", the
-common case — falls back to a local log file, per the chunk's own explicit
-permission to degrade rather than fail.
+Emits the run to Phoenix as OpenInference/OTLP spans when
+``PHOENIX_COLLECTOR_ENDPOINT`` (alias ``PHOENIX_ENDPOINT``) is configured, and
+*always* writes the local log file regardless. On any failure — including "not
+configured at all", the common case — it degrades to the local file rather than
+failing, per the chunk's own explicit permission to degrade.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from . import phoenix_tracing
 from .ask_e4l import AskE4LAnswer, LLMComplete, answer_question
 
 
@@ -209,28 +211,54 @@ def _log_results(report: EvalReport, *, log_path: Optional[Path]) -> None:
 
 
 def _try_log_to_phoenix(report: EvalReport) -> bool:
-    """Best-effort POST to a configured Phoenix endpoint. Never raises."""
-    endpoint = os.environ.get("PHOENIX_ENDPOINT", "").strip()
-    api_key = os.environ.get("PHOENIX_API_KEY", "").strip()
-    if not endpoint:
+    """Emit the eval run to Phoenix as OpenInference spans. Never raises.
+
+    Previously this POSTed a bespoke JSON body to ``PHOENIX_ENDPOINT``. Phoenix
+    has no such endpoint — it ingests OTLP — so that call could only ever 404
+    and the "phoenix_reachable" line in the log file was reporting on an API
+    that does not exist. This emits a real trace instead: one CHAIN span for the
+    run, one child span per question carrying its grade, which is what makes the
+    eval queryable in Phoenix alongside the agent's own traces.
+
+    Returns True only when spans were actually handed to a configured exporter.
+    """
+    if not phoenix_tracing.tracing_enabled():
         return False
     try:
-        import urllib.request
-
-        payload = json.dumps({
-            "eval": "ask_e4l_10q",
-            "total": report.total,
-            "correct": report.correct_count,
-            "confidently_wrong": report.confidently_wrong_count,
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            endpoint, data=payload, method="POST",
-            headers={
-                "Content-Type": "application/json",
-                **({"Authorization": f"Bearer {api_key}"} if api_key else {}),
+        with phoenix_tracing.span(
+            "eval.ask_e4l_10q",
+            kind="CHAIN",
+            attributes={
+                "eval.name": "ask_e4l_10q",
+                "eval.total": report.total,
+                "eval.correct": report.correct_count,
+                "eval.confidently_wrong": report.confidently_wrong_count,
+                "eval.passes_bar": report.passes_bar,
             },
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310
-            return 200 <= resp.status < 300
+        ) as run_span:
+            if run_span is None:
+                return False
+            for result in report.results:
+                with phoenix_tracing.span(
+                    "eval.question",
+                    kind="EVALUATOR",
+                    attributes={
+                        "eval.expects_refusal": result.expects_refusal,
+                        "eval.refused": result.refused,
+                        "eval.correct": result.correct,
+                        "eval.confidently_wrong": result.confidently_wrong,
+                        "eval.citation_count": len(result.citations),
+                        # Question text is the fixed, non-secret eval set; the
+                        # model's answer can quote the vault, so it is gated.
+                        phoenix_tracing.INPUT_VALUE: result.question,
+                        phoenix_tracing.OUTPUT_VALUE: phoenix_tracing.safe_content(
+                            result.answer_text
+                        ),
+                    },
+                ):
+                    pass
+        # Bounded flush so a caller that exits immediately still ships the run.
+        phoenix_tracing.flush(5000)
+        return True
     except Exception:
         return False

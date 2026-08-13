@@ -63,6 +63,96 @@ def get_data_dir() -> Path:
     return base
 
 
+def get_legacy_data_dirs() -> tuple[Path, ...]:
+    """Return existing non-canonical Cato roots for read-only discovery.
+
+    This deliberately performs no copying, moving, merging, or deletion.  It
+    gives doctor/migration tooling a safe way to report a legacy Windows
+    ``~/.cato`` tree without letting runtime components silently write there.
+    """
+    canonical = get_data_dir().resolve()
+    candidates = (Path.home() / ".cato",)
+    return tuple(
+        path for path in candidates
+        if path.exists() and path.resolve() != canonical
+    )
+
+
+def _readonly_table_count(db_path: Path, table: str) -> int:
+    """Row count for *table*, or 0. Opens read-only; never creates or alters.
+
+    Discovery must not be able to damage the thing it discovered — the legacy
+    root may hold the only copy of some records.
+    """
+    import sqlite3
+
+    try:
+        conn = sqlite3.connect(f"{db_path.as_uri()}?mode=ro", uri=True)
+    except Exception:
+        return 0
+    try:
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,),
+        ).fetchone()
+        if not exists:
+            return 0
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+    except Exception:
+        return 0
+    finally:
+        conn.close()
+
+
+def get_legacy_data_inventory() -> tuple[dict[str, object], ...]:
+    """Inventory meaningful legacy state without reading content or mutating it."""
+    inventories: list[dict[str, object]] = []
+    for root in get_legacy_data_dirs():
+        present: list[str] = []
+        counts: dict[str, int] = {}
+        # store.key / conduit_identity.key are key material. A stranded copy in
+        # a non-canonical root is the split-brain the audit flagged: keys and
+        # the records they protect sitting in different trust domains. Names
+        # only — never read or move key bytes from here.
+        for filename in (
+            "config.yaml", "cato.db", "vault.enc",
+            "store.key", "conduit_identity.key",
+        ):
+            if (root / filename).is_file():
+                present.append(filename)
+        # A stranded cato.db is the one entry whose MERE PRESENCE understates
+        # the problem. On the audited machine `~/.cato/cato.db` holds 11
+        # audit_log rows on a NEWER schema (inputs_digest / outputs_digest /
+        # schema_version) than the canonical %APPDATA% audit_log, which has
+        # none of those columns and 0 rows. Every verification surface —
+        # `cato verify-ledger`, `cato audit`, `cato receipt`, `cato replay`,
+        # GET /api/audit/* — reads get_data_dir()/cato.db only, so those rows
+        # are invisible to all of them and nothing raised an alarm.
+        # Reporting "cato.db exists" is not enough; report what is inside it.
+        # Strictly read-only (mode=ro), counts only, never content.
+        legacy_db = root / "cato.db"
+        if legacy_db.is_file():
+            for table in ("ledger_records", "audit_log"):
+                count = _readonly_table_count(legacy_db, table)
+                if count:
+                    label = f"cato.db:{table}"
+                    present.append(label)
+                    counts[label] = count
+        for dirname in ("skills", "agents", "workspace"):
+            path = root / dirname
+            try:
+                count = sum(1 for _ in path.iterdir()) if path.is_dir() else 0
+            except OSError:
+                count = -1
+            if count != 0:
+                present.append(dirname)
+                counts[dirname] = count
+        if present:
+            inventories.append(
+                {"root": str(root), "present": tuple(present), "counts": counts}
+            )
+    return tuple(inventories)
+
+
 # ---------------------------------------------------------------------------
 # Path normalisation
 # ---------------------------------------------------------------------------

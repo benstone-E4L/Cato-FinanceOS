@@ -1,24 +1,21 @@
-//! Sidecar management for the Cato Python daemon.
+//! Sidecar management for the bundled Cato daemon executable.
 //!
-//! Spawns `python -m cato start --channel webchat` as a child process and monitors its health.
-//! Override the interpreter with `CATO_PYTHON` (defaults to `python` on Windows, `python3` elsewhere).
+//! Spawns the Tauri-bundled `cato` executable and monitors its health. Release
+//! startup never searches PATH for Python or another interpreter.
 //! Gracefully shuts down on app exit.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
-use tokio::process::{Child, Command};
+use tauri::AppHandle;
+use tauri_plugin_shell::{
+    process::{Command, CommandChild, CommandEvent},
+    ShellExt,
+};
 use tokio::time::{sleep, Duration};
-
-#[cfg(windows)]
-const DEFAULT_PYTHON: &str = "python";
-#[cfg(not(windows))]
-const DEFAULT_PYTHON: &str = "python3";
 
 /// Manages the Cato daemon sidecar process.
 pub struct SidecarManager {
-    child: Option<Child>,
+    child: Option<CommandChild>,
     http_port: u16,
     ws_port: u16,
 }
@@ -57,24 +54,9 @@ impl SidecarManager {
     pub async fn is_running(&mut self) -> bool {
         self.refresh_ports_from_disk();
 
-        // 1. If we spawned a child, check it first
-        if let Some(ref mut child) = self.child {
-            match child.try_wait() {
-                Ok(Some(_status)) => {
-                    // Process has exited — clean up and fall through to HTTP check
-                    self.child = None;
-                }
-                Ok(None) => return self.check_http_health().await,
-                Err(_) => {
-                    self.child = None;
-                }
-            }
-        }
-
-        self.refresh_ports_from_disk();
-
-        // 2. No child (never started, or it exited) — check if daemon is
-        //    reachable on the HTTP port (external process or race condition).
+        // The shell plugin owns process observation. Health is the runtime
+        // contract whether this manager spawned the process or it was already
+        // running externally.
         self.check_http_health().await
     }
 
@@ -88,55 +70,42 @@ impl SidecarManager {
         )
     }
 
-    /// Start the Cato daemon as a child process (`python -m cato start --channel webchat`).
-    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    /// Start the Cato daemon as a bundled child process.
+    pub async fn start(
+        &mut self,
+        app: &AppHandle,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // Check if already running (handle crashed state)
         if self.is_running().await {
             return Ok(());
         }
 
-        let python_exe = Self::python_executable();
+        // A previous child may have exited without a healthy daemon. Drop its
+        // handle before replacing it; `kill` is safe to call after exit.
+        if let Some(child) = self.child.take() {
+            let _ = child.kill();
+        }
         let sidecar_env = Self::load_env_file();
 
-        // Clear any stale PID file by running `python -m cato stop` first (ignores errors)
+        // Clear any stale PID file through the same bundled executable.
         log::info!("Clearing any stale Cato daemon state...");
-        let _ = Command::new(&python_exe)
-            .args(["-m", "cato", "stop"])
-            .output()
-            .await;
+        let _ = Self::sidecar_command(app)?.arg("stop").output().await;
         sleep(Duration::from_millis(500)).await;
 
-        log::info!(
-            "Starting Cato daemon: {} -m cato start --channel webchat",
-            python_exe.display()
-        );
+        log::info!("Starting Tauri-bundled Cato daemon: start --channel webchat");
 
-        let mut cmd = Command::new(&python_exe);
-        cmd.args(["-m", "cato", "start", "--channel", "webchat"])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
+        let mut cmd = Self::sidecar_command(app)?.args(["start", "--channel", "webchat"]);
 
         for (key, value) in &sidecar_env {
             if std::env::var_os(key).is_none() {
-                cmd.env(key, value);
+                cmd = cmd.env(key, value);
             }
         }
 
-        let mut child = cmd.spawn().map_err(|e| {
-            format!(
-                "Failed to spawn Cato daemon ({} -m cato …): {}",
-                python_exe.display(),
-                e
-            )
-        })?;
-
-        if let Some(stdout) = child.stdout.take() {
-            Self::spawn_log_drain(stdout, false);
-        }
-        if let Some(stderr) = child.stderr.take() {
-            Self::spawn_log_drain(stderr, true);
-        }
+        let (receiver, child) = cmd
+            .spawn()
+            .map_err(|e| format!("Failed to spawn Tauri-bundled Cato daemon: {e}"))?;
+        Self::spawn_log_drain(receiver);
 
         self.child = Some(child);
 
@@ -149,30 +118,22 @@ impl SidecarManager {
     }
 
     /// Stop the Cato daemon gracefully.
-    pub async fn stop(&mut self) {
-        if let Some(mut child) = self.child.take() {
+    pub async fn stop(&mut self, app: &AppHandle) {
+        if let Some(child) = self.child.take() {
             log::info!("Stopping Cato daemon...");
 
-            // Try graceful shutdown via `python -m cato stop`
-            let python_exe = Self::python_executable();
-            let _ = Command::new(&python_exe)
-                .args(["-m", "cato", "stop"])
-                .output()
-                .await;
-
-            // Wait up to 5 seconds for the process to exit
-            let timeout = sleep(Duration::from_secs(5));
-            tokio::pin!(timeout);
-
-            tokio::select! {
-                _ = child.wait() => {
-                    log::info!("Cato daemon stopped gracefully");
+            // Try graceful shutdown via the bundled daemon executable.
+            match Self::sidecar_command(app) {
+                Ok(command) => {
+                    let _ = command.arg("stop").output().await;
                 }
-                _ = &mut timeout => {
-                    log::warn!("Cato daemon did not stop in time, killing...");
-                    let _ = child.kill().await;
-                }
+                Err(message) => log::error!("{}", message),
             }
+
+            sleep(Duration::from_millis(500)).await;
+            // CommandChild::kill consumes the opaque Tauri child handle and
+            // is harmless if the graceful `stop` command already exited it.
+            let _ = child.kill();
         }
     }
 
@@ -219,21 +180,27 @@ impl SidecarManager {
         self.ws_port = http_port;
     }
 
-    fn spawn_log_drain<R>(reader: R, is_stderr: bool)
-    where
-        R: AsyncRead + Unpin + Send + 'static,
-    {
+    fn spawn_log_drain(mut receiver: tauri::async_runtime::Receiver<CommandEvent>) {
         tauri::async_runtime::spawn(async move {
-            let mut lines = BufReader::new(reader).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                let line = line.trim();
-                if line.is_empty() {
-                    continue;
-                }
-                if is_stderr {
-                    log::warn!("[cato] {}", line);
-                } else {
-                    log::info!("[cato] {}", line);
+            while let Some(event) = receiver.recv().await {
+                match event {
+                    CommandEvent::Stdout(bytes) => {
+                        let line = String::from_utf8_lossy(&bytes);
+                        if !line.trim().is_empty() {
+                            log::info!("[cato] {}", line.trim());
+                        }
+                    }
+                    CommandEvent::Stderr(bytes) => {
+                        let line = String::from_utf8_lossy(&bytes);
+                        if !line.trim().is_empty() {
+                            log::warn!("[cato] {}", line.trim());
+                        }
+                    }
+                    CommandEvent::Error(message) => log::error!("[cato] {}", message),
+                    CommandEvent::Terminated(payload) => {
+                        log::info!("Cato daemon process terminated: {:?}", payload.code);
+                    }
+                    _ => {}
                 }
             }
         });
@@ -338,33 +305,22 @@ impl SidecarManager {
         Self::cato_data_dir().map(|dir| dir.join("cato.port"))
     }
 
-    fn current_exe_base_dir() -> Option<PathBuf> {
-        let exe = std::env::current_exe().ok()?;
-        let exe_dir = exe.parent()?;
-        if exe_dir.ends_with("deps") {
-            Some(exe_dir.parent().unwrap_or(exe_dir).to_path_buf())
-        } else {
-            Some(exe_dir.to_path_buf())
-        }
-    }
-
-    /// Python interpreter for `python -m cato …`. Set `CATO_PYTHON` to an absolute path if needed.
-    fn python_executable() -> PathBuf {
-        if let Ok(path) = std::env::var("CATO_PYTHON") {
-            let p = PathBuf::from(path.trim());
-            if !p.as_os_str().is_empty() {
-                log::info!("Using Python from CATO_PYTHON: {}", p.display());
-                return p;
-            }
-        }
-        PathBuf::from(DEFAULT_PYTHON)
+    /// Resolve the configured external binary through Tauri's canonical
+    /// sidecar API. The name is the configured filename, never an installed
+    /// path guess or a PATH lookup.
+    fn sidecar_command(app: &AppHandle) -> Result<Command, String> {
+        app.shell().sidecar("cato").map_err(|error| {
+            format!(
+                "Bundled Cato executable is unavailable: {error}. Reinstall the desktop app."
+            )
+        })
     }
 }
 
 impl Drop for SidecarManager {
     fn drop(&mut self) {
         if let Some(mut child) = self.child.take() {
-            let _: Result<(), std::io::Error> = child.start_kill();
+            let _ = child.kill();
         }
     }
 }

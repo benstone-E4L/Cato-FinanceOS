@@ -120,6 +120,11 @@ _GENESIS_PREV_HASH = "0" * 64  # Fixed genesis sentinel
 # Records written after carry schema_version=2 and hash the full field set.
 _HASH_SCHEMA_VERSION = 2
 
+# How long a ledger writer waits for another process holding SQLite's write
+# lock before giving up. A blocked audit write must eventually FAIL LOUDLY
+# (LedgerWriteError -> dispatch aborts), never silently proceed unrecorded.
+_BUSY_TIMEOUT_S = 15.0
+
 _MAX_REDACTED_INPUT_CHARS = 4000
 _MAX_OUTCOME_CHARS = 500
 _MAX_REDACT_DEPTH = 12
@@ -379,6 +384,15 @@ def _compute_record_hash(row: Mapping[str, Any]) -> str:
     fields, so mutating any of them — or downgrading schema_version to dodge
     the v2 formula — breaks the chain.
     """
+    def _col(name: str) -> Any:
+        # sqlite3.Row raises IndexError for a column the table does not have.
+        # A pre-v2 ledger opened read-only genuinely lacks the v2 columns, and
+        # "absent" must mean "v1", not "unverifiable".
+        try:
+            return row[name]
+        except (IndexError, KeyError):
+            return None
+
     base = [
         str(row["record_id"]), str(row["prev_hash"]), str(row["timestamp"]),
         str(row["agent_session_id"]), str(row["tool_name"]),
@@ -387,16 +401,16 @@ def _compute_record_hash(row: Mapping[str, Any]) -> str:
         str(row["model_source"]), str(row["reversibility"]),
         str(row["delegation_token_id"] or ""),
     ]
-    version = int(row["schema_version"] or 1)
+    version = int(_col("schema_version") or 1)
     if version < 2:
         return _sha256("|".join(base))
     base.extend([
         f"v{version}",
-        str(row["entry_kind"]), str(row["action_id"]),
-        str(row["idempotency_key"]), str(row["policy_decision"]),
-        str(row["policy_gate"]), str(row["approval_ref"]),
-        str(row["actor"]), str(row["outcome"]),
-        str(row["tool_input_redacted"]),
+        str(_col("entry_kind")), str(_col("action_id")),
+        str(_col("idempotency_key")), str(_col("policy_decision")),
+        str(_col("policy_gate")), str(_col("approval_ref")),
+        str(_col("actor")), str(_col("outcome")),
+        str(_col("tool_input_redacted")),
     ])
     return _sha256("|".join(base))
 
@@ -610,14 +624,27 @@ class LedgerMiddleware:
 
     def _open_db(self) -> sqlite3.Connection:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
+        conn = sqlite3.connect(
+            str(self._db_path), check_same_thread=False, timeout=_BUSY_TIMEOUT_S,
+        )
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         # FULL, not NORMAL: an INTENT must survive a crash that happens
         # microseconds after it is written, because the action runs next.
         conn.execute("PRAGMA synchronous=FULL")
+        conn.execute(f"PRAGMA busy_timeout={int(_BUSY_TIMEOUT_S * 1000)}")
+        # Explicit transaction control. `prev_hash` is READ and then WRITTEN,
+        # so the two must sit inside one write transaction — see _write_entry.
+        conn.isolation_level = None
         _ensure_schema(conn)
         return conn
+
+    def _rollback_quiet(self) -> None:
+        """Abandon the open write transaction; never mask the original fault."""
+        try:
+            self._conn.execute("ROLLBACK")
+        except Exception:  # pragma: no cover — nothing to roll back
+            pass
 
     def _last_record_hash(self) -> str:
         row = self._conn.execute(
@@ -696,8 +723,22 @@ class LedgerMiddleware:
             "schema_version": _HASH_SCHEMA_VERSION,
         }
 
+        # The RLock only serialises writers inside THIS process. Reading the
+        # tail hash and appending the successor is a read-then-write, so two
+        # processes (daemon + a `cato` CLI command, or the startup recovery
+        # scan racing a live daemon) could both read the same `prev_hash` and
+        # both commit — forking the chain and making `verify_chain` report
+        # TAMPERED against records that were never tampered with. BEGIN
+        # IMMEDIATE takes SQLite's write lock BEFORE the SELECT, so the read
+        # and the append are one atomic unit across processes as well as
+        # threads.
         with self._write_lock:
-            row["prev_hash"] = self._last_record_hash()
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                row["prev_hash"] = self._last_record_hash()
+            except BaseException:
+                self._conn.execute("ROLLBACK")
+                raise
             record_hash = _compute_record_hash(row)
             row["record_hash"] = record_hash
             row["record_signature"] = self._sign(record_hash)
@@ -719,8 +760,9 @@ class LedgerMiddleware:
             )
             try:
                 self._conn.execute(sql, tuple(row[c] for c in columns))
-                self._conn.commit()
+                self._conn.execute("COMMIT")
             except sqlite3.IntegrityError as exc:
+                self._rollback_quiet()
                 if idempotency_key and "idempotency_key" in str(exc):
                     raise DuplicateActionError(
                         f"idempotency key already present in ledger: {idempotency_key}"
@@ -729,6 +771,7 @@ class LedgerMiddleware:
                     f"ledger append rejected ({kind_value} / {tool_name}): {exc}"
                 ) from exc
             except Exception as exc:
+                self._rollback_quiet()
                 raise LedgerWriteError(
                     f"ledger append failed ({kind_value} / {tool_name}): {exc}"
                 ) from exc
@@ -1187,17 +1230,27 @@ def verify_chain(db_path: Optional[Path] = None) -> tuple[bool, str]:
         from ..platform import get_data_dir
         db_path = get_data_dir() / "cato.db"
 
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    # READ-ONLY. Verification must never mutate the artifact it verifies: the
+    # previous implementation opened the ledger read-write and ran
+    # `_ensure_schema`, i.e. ALTER TABLE + CREATE UNIQUE INDEX, against a
+    # tamper-evident audit trail every time someone asked whether it was
+    # intact. It also made `cato verify-ledger` fail outright on a ledger
+    # copied to read-only media for review — exactly when you most want it.
+    if not Path(db_path).exists():
+        return True, "VALID (0 records, ledger not initialized)"
+    try:
+        conn = sqlite3.connect(
+            f"{Path(db_path).as_uri()}?mode=ro", uri=True, check_same_thread=False,
+        )
+    except sqlite3.Error as exc:
+        return False, f"UNVERIFIABLE — could not open ledger read-only: {exc}"
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
     table = conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='ledger_records'"
     ).fetchone()
     if table is None:
         conn.close()
         return True, "VALID (0 records, ledger not initialized)"
-    _ensure_schema(conn)
     rows = conn.execute(
         "SELECT * FROM ledger_records ORDER BY seq ASC"
     ).fetchall()

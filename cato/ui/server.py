@@ -240,7 +240,8 @@ def _workspace_dir() -> Path:
         pass
     # Fallback: ~/.cato/workspace (mirrors config default)
     from cato.platform import get_data_dir
-    fallback = Path.home() / ".cato" / "workspace"
+    from cato.platform import get_data_dir
+    fallback = get_data_dir() / "workspace"
     fallback.mkdir(parents=True, exist_ok=True)
     return fallback
 
@@ -1349,7 +1350,8 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
             if hasattr(gateway, "_skills_dir") and callable(gateway._skills_dir):
                 skills_dir = gateway._skills_dir()
             else:
-                skills_dir = Path.home() / ".cato" / "skills"
+                from cato.platform import get_data_dir
+                skills_dir = get_data_dir() / "skills"
             # Find the skill directory
             target = None
             for child in skills_dir.iterdir() if skills_dir.exists() else []:
@@ -1387,7 +1389,8 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
             if hasattr(gateway, "_skills_dir") and callable(gateway._skills_dir):
                 skills_dir = gateway._skills_dir()
             else:
-                skills_dir = Path.home() / ".cato" / "skills"
+                from cato.platform import get_data_dir
+                skills_dir = get_data_dir() / "skills"
             skill_path = skills_dir / name
             if skill_path.exists():
                 marker = skill_path / ".disabled"
@@ -2007,7 +2010,6 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
     async def patch_config(request: web.Request) -> web.Response:
         """PATCH /api/config — patch individual config fields and persist to YAML."""
         try:
-            import yaml as _yaml
             from cato.config import CatoConfig
             from cato.platform import get_data_dir as _get_data_dir
             body = await request.json()
@@ -2023,34 +2025,27 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
                         status=400,
                     )
             logger.info("Config patch requested: %s", list(body.keys()))
-            # Load current config from YAML file
             config_path = _get_data_dir() / "config.yaml"
-            current: dict = CatoConfig.load(config_path=config_path).to_dict()
-            current.pop("vault", None)
-            if config_path.exists():
-                try:
-                    file_values = _yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
-                    if isinstance(file_values, dict):
-                        # Strip legacy nested 'config' block and API-injected 'status' key
-                        # before merging — these are junk that cause the config.py warning
-                        # and would be re-persisted on every PATCH call.
-                        file_values.pop("config", None)
-                        file_values.pop("status", None)
-                        current.update(file_values)
-                except Exception:
-                    pass
-            # Apply patches
-            current.update(body)
-            # Persist
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            config_path.write_text(
-                _yaml.dump(current, default_flow_style=False, allow_unicode=True, sort_keys=True),
-                encoding="utf-8",
-            )
+            cfg_obj = CatoConfig.load(config_path=config_path)
+            from dataclasses import fields as _dc_fields
+            valid_names = {
+                f.name for f in _dc_fields(CatoConfig)
+                if not f.name.startswith("_") and f.name not in CatoConfig._RUNTIME_ONLY
+            }
+            forbidden = sorted(set(body) & CatoConfig._RUNTIME_ONLY)
+            if forbidden:
+                return web.json_response(
+                    {"status": "error", "message": "Secret fields must be stored in vault.enc"},
+                    status=400,
+                )
+            for key, value in body.items():
+                if key in valid_names:
+                    setattr(cfg_obj, key, value)
+            cfg_obj.save(config_path=config_path)
+            current = cfg_obj.to_dict()
             # Also update in-memory gateway config if available
             if gateway is not None and hasattr(gateway, "_cfg"):
                 cfg_obj = gateway._cfg
-                from dataclasses import fields as _dc_fields
                 valid_names = {f.name for f in _dc_fields(type(cfg_obj)) if not f.name.startswith("_")}
                 for k, v in body.items():
                     if k in valid_names:
@@ -2167,7 +2162,8 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
     async def memory_files(request: web.Request) -> web.Response:
         """GET /api/memory/files — list memory JSON files in ~/.cato/memory/."""
         try:
-            mem_dir = Path.home() / ".cato" / "memory"
+            from cato.platform import get_data_dir
+            mem_dir = get_data_dir() / "memory"
             if not mem_dir.exists():
                 return web.json_response([])
             files = [f.name for f in sorted(mem_dir.iterdir()) if f.suffix in (".json", ".md")]
@@ -2186,7 +2182,9 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
             return web.json_response({"status": "error", "message": "invalid file"}, status=400)
         try:
             # Try ~/.cato/memory/ first, then ~/.cato/
-            for base in (Path.home() / ".cato" / "memory", Path.home() / ".cato"):
+            from cato.platform import get_data_dir
+            data_dir = get_data_dir()
+            for base in (data_dir / "memory", data_dir):
                 p = base / filename
                 if p.exists():
                     return web.json_response({"content": p.read_text(encoding="utf-8", errors="replace"), "file": filename})
@@ -2204,7 +2202,8 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
             if not filename or ".." in filename or "/" in filename or "\\" in filename:
                 return web.json_response({"status": "error", "message": "invalid file"}, status=400)
             # Write to ~/.cato/ (workspace root)
-            target = Path.home() / ".cato" / filename
+            from cato.platform import get_data_dir
+            target = get_data_dir() / filename
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
             return web.json_response({"status": "ok"})
@@ -2268,7 +2267,8 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
                 facts = 0
                 kg_nodes = 0
                 kg_edges = 0
-                mem_dir = Path.home() / ".cato" / "memory"
+                from cato.platform import get_data_dir
+                mem_dir = get_data_dir() / "memory"
                 if mem_dir.exists():
                     for db_path in mem_dir.glob("*.db"):
                         try:
@@ -3457,6 +3457,9 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
         """Return a live GmailAdapter if one is reachable from the gateway."""
         if gateway is None:
             return None
+        direct = getattr(gateway, "_gmail_adapter", None)
+        if direct is not None and hasattr(direct, "send_draft"):
+            return direct
         for adapter in getattr(gateway, "_adapters", []):
             if hasattr(adapter, "send_draft"):
                 return adapter
@@ -3509,9 +3512,8 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
     async def inbox_email_approve(request: web.Request) -> web.Response:
         """POST /api/inbox/email/{row_id}/approve — approve a Gmail draft.
 
-        When a live GmailAdapter is reachable we send the draft immediately.
-        Otherwise the row remains durably ``approved`` so the Gmail flow can
-        pick it up later without losing the user's desktop approval.
+        This records review approval only. Cato never transmits email; the
+        operator sends the existing Gmail draft manually.
         """
         try:
             from cato.core import personal_store  # noqa: PLC0415
@@ -3537,42 +3539,13 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
             if row is None:
                 return web.json_response({"error": "email_not_found"}, status=404)
 
-            gmail_draft_id = row.get("gmail_draft_id")
-            gmail_adapter = _find_gmail_adapter()
-            if gmail_draft_id and gmail_adapter is not None:
-                # LEDGERED: this is a real outbound email leaving the machine.
-                # It is not routed through guarded_action because THIS request
-                # *is* the human approval that gate exists to obtain — but an
-                # approved send that leaves no record is invisible to an audit.
-                from cato.core.operator_ledger import record_operator_action
-
-                await record_operator_action(
-                    tool_name="gmail.send_draft",
-                    tool_input={"row_id": row_id, "gmail_draft_id": gmail_draft_id,
-                                "to": row.get("to_addr") or row.get("to"),
-                                "subject": row.get("subject")},
-                    session_id="ui-inbox-approve",
-                    run=lambda: gmail_adapter.send_draft(gmail_draft_id),
-                    reversibility=0.0,
-                )
-                personal_store.update_email_status(row_id, "sent")
-                row = personal_store.get_email_by_id(row_id)
-                return web.json_response(
-                    {
-                        "status": "sent",
-                        "sent": True,
-                        "message": "Gmail draft sent.",
-                        "email": row,
-                    }
-                )
-
             return web.json_response(
                 {
                     "status": "approved",
                     "sent": False,
                     "message": (
-                        "Draft approval saved. No live Gmail adapter was available, "
-                        "so sending is deferred to the Gmail flow."
+                        "Draft approved for review. Cato did not send it; "
+                        "Ben sends Gmail drafts manually."
                     ),
                     "email": row,
                 }

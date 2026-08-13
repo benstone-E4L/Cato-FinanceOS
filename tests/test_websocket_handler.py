@@ -30,6 +30,7 @@ from cato.api.websocket_handler import (
     _task_store,
     invoke_coding_agent,
     get_task_info,
+    patch_config,
     register_routes,
 )
 
@@ -542,6 +543,10 @@ class TestGetConfig(AioHTTPTestCase):
         register_routes(app)
         return app
 
+    async def test_coding_agent_router_does_not_own_global_config_route(self):
+        paths = [resource.canonical for resource in self.app.router.resources()]
+        assert "/api/config" not in paths
+
     async def test_returns_enabled_models(self):
         from unittest.mock import MagicMock
         mock_cfg = MagicMock()
@@ -552,23 +557,14 @@ class TestGetConfig(AioHTTPTestCase):
             MockCfg.load.return_value = mock_cfg
             # Re-import to get the patched version
             resp = await self.client.get("/api/config")
-        assert resp.status == 200
-        data = await resp.json()
-        assert "enabled_models" in data
-        assert "subagent_enabled" in data
-        assert "subagent_coding_backend" in data
+        assert resp.status == 404
 
     async def test_returns_200_with_defaults_on_config_error(self):
         """If CatoConfig.load() raises, fallback defaults are returned."""
         with patch("cato.api.websocket_handler.CatoConfig") as MockCfg:
             MockCfg.load.side_effect = Exception("config broken")
             resp = await self.client.get("/api/config")
-        # Should still return 200 with safe defaults (enabled_models + subagent fields)
-        assert resp.status == 200
-        data = await resp.json()
-        assert "enabled_models" in data
-        assert isinstance(data["enabled_models"], list)
-        assert len(data["enabled_models"]) > 0
+        assert resp.status == 404
 
 
 # ── PATCH /api/config tests ─────────────────────────────────────────────── #
@@ -577,7 +573,7 @@ class TestPatchConfig(AioHTTPTestCase):
     async def get_application(self):
         app = web.Application()
         app["daemon_token"] = TEST_DAEMON_TOKEN
-        register_routes(app)
+        app.router.add_patch("/api/config", patch_config)
         return app
 
     def _make_mock_cfg(self):

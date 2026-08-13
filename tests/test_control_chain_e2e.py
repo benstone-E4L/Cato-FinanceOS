@@ -83,6 +83,7 @@ paper over a regression.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 import sys
@@ -1079,3 +1080,77 @@ def test_no_secret_printed_by_this_module() -> None:
     and this module never prints one."""
     assert FAKE_SECRET.startswith("sk-live-NEVERPERSIST")
     assert FAKE_ANTHROPIC_KEY.startswith("sk-ant-test-FAKE")
+
+
+@pytest.mark.asyncio
+async def test_queued_genesis_call_is_not_ledger_confirmed_before_terminal(
+    tmp_path, monkeypatch,
+) -> None:
+    """A QUEUED acknowledgement is not completion evidence."""
+    env = build_chain_env(tmp_path, monkeypatch, genesis_allowlist=["genesis-research"])
+    env.vault.set("GATEWAY_API_KEY", "test-gateway-key")
+    poll_started = asyncio.Event()
+    release_terminal = asyncio.Event()
+
+    class _BlockingStatusResponse(_FakeHTTPResponse):
+        async def text(self) -> str:
+            poll_started.set()
+            await release_terminal.wait()
+            return json.dumps({
+                "status": "DELIVERED",
+                "resultSummary": json.dumps({
+                    "response": "research complete",
+                    "trace": {"tool_calls": [{"tool_name": "web_search", "ok": True}]},
+                }),
+            })
+
+    class _QueuedSession(FakeGenesisSession):
+        def __init__(self) -> None:
+            super().__init__(status=202, body={
+                "status": "QUEUED",
+                "job_id": "job-ledger-1",
+                "poll_url": "/agents/jobs/job-ledger-1",
+                "principal_token": "principal-ledger-job",
+            })
+
+        def get(
+            self, url: str, headers: Any = None, timeout: Any = None,
+            allow_redirects: bool = True,
+        ):
+            assert allow_redirects is False
+            return _BlockingStatusResponse(200, {})
+
+    tool = GenesisTool(vault=env.vault, config=env.config, budget=None)
+    tool._session = _QueuedSession()
+    tool._warmed_up = True
+    monkeypatch.setitem(agent_loop_mod._TOOL_REGISTRY, "genesis", tool.execute)
+    tc = ToolCall(
+        name="genesis",
+        args={"agent": "genesis-research", "task": "research with tools"},
+        call_id="queued-model-call",
+    )
+
+    task = asyncio.create_task(env.loop._dispatch_recorded(
+        tc, "queued-ledger-session", policy_gate="test",
+    ))
+    await asyncio.wait_for(poll_started.wait(), timeout=2)
+
+    query = LedgerQuery(db_path=env.ledger_path)
+    try:
+        interim = [record.entry_kind for record in query.last_n(20)]
+    finally:
+        query.close()
+    assert "INTENT" in interim
+    assert "ATTEMPTED" in interim
+    assert "CONFIRMED" not in interim
+
+    release_terminal.set()
+    result = json.loads(await asyncio.wait_for(task, timeout=2))
+    assert result["ok"] is True
+
+    query = LedgerQuery(db_path=env.ledger_path)
+    try:
+        final = [record.entry_kind for record in query.last_n(20)]
+    finally:
+        query.close()
+    assert "CONFIRMED" in final

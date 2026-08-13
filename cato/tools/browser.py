@@ -333,7 +333,7 @@ class BrowserTool:
     async def _output_to_file(self, filename: str, content: str, fmt: str = "md") -> dict:
         """Write content to workspace file. Sanitizes filename to prevent path traversal."""
         from pathlib import Path as _Path
-        out_dir = _Path.home() / ".cato" / "workspace" / ".conduit"
+        out_dir = get_data_dir() / "workspace" / ".conduit"
         out_dir.mkdir(parents=True, exist_ok=True)
         safe_name = _Path(filename).name  # strip any path traversal
         # Guard against empty or dot-only names (e.g. filename='' or filename='.')

@@ -90,7 +90,8 @@ class ContradictionDetector:
 
     def __init__(self, db_path: Optional[Path] = None) -> None:
         if db_path is None:
-            db_path = Path.home() / ".cato" / "contradictions.db"
+            from cato.platform import get_data_dir
+            db_path = get_data_dir() / "contradictions.db"
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)

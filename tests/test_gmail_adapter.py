@@ -45,6 +45,48 @@ def _make_adapter(**vault_kwargs) -> GmailAdapter:
     return adapter
 
 
+def test_mailbox_identity_accepts_configured_controller(monkeypatch):
+    monkeypatch.setenv("GMAIL_ADDRESS", "controller@e4l.com")
+    service = MagicMock()
+    users = service.users.return_value
+    users.getProfile.return_value.execute.return_value = {
+        "emailAddress": "controller@e4l.com"
+    }
+    adapter = _make_adapter()
+
+    assert adapter._verify_mailbox_identity_sync(service) is True
+    users.getProfile.assert_called_once_with(userId="me")
+
+
+def test_mailbox_identity_rejects_another_authenticated_account(monkeypatch):
+    monkeypatch.setenv("GMAIL_ADDRESS", "controller@e4l.com")
+    service = MagicMock()
+    service.users().getProfile().execute.return_value = {
+        "emailAddress": "someone-else@e4l.com"
+    }
+
+    assert GmailAdapter(_make_vault())._verify_mailbox_identity_sync(service) is False
+
+
+@pytest.mark.asyncio
+async def test_send_draft_is_permanently_refused_without_gmail_api_call():
+    adapter = _make_adapter()
+    adapter._get_gmail_service = MagicMock()
+
+    with pytest.raises(PermissionError, match="draft-only"):
+        await adapter.send_draft("draft-123")
+
+    adapter._get_gmail_service.assert_not_called()
+
+
+def test_mailbox_identity_rejects_missing_expected_address(monkeypatch):
+    monkeypatch.delenv("GMAIL_ADDRESS", raising=False)
+    service = MagicMock()
+
+    assert GmailAdapter(_make_vault())._verify_mailbox_identity_sync(service) is False
+    service.users.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # _extract_plain_text tests (pure, no I/O)
 # ---------------------------------------------------------------------------

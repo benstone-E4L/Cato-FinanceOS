@@ -35,7 +35,7 @@ from rich.table import Table
 
 from cato.budget import BudgetManager
 from cato.config import CatoConfig
-from cato.platform import get_data_dir
+from cato.platform import get_data_dir, get_legacy_data_inventory
 from cato.swarmsync import swarmsync_key_status
 
 console = Console()
@@ -111,6 +111,7 @@ class DoctorReport:
         console.print("=" * 54)
 
         self._check_config()
+        self._check_legacy_data()
         self._check_vault()
         self._check_workspaces()
         self._check_budget()
@@ -132,10 +133,6 @@ class DoctorReport:
         console.print("\n[bold]Config[/bold]")
         data_dir = _cato_dir()
         config_path = data_dir / "config.yaml"
-        # Warn if legacy path exists (e.g. ~/.cato on Windows when we use %APPDATA%\cato)
-        legacy = Path.home() / ".cato"
-        if legacy.exists() and data_dir != legacy and (legacy / "config.yaml").exists():
-            console.print(f"  [yellow]LEGACY PATH[/yellow] — config also at {legacy}; current data dir: {data_dir}")
         if not config_path.exists():
             console.print("  [yellow]NOT FOUND[/yellow] — run 'cato init' to create config")
             self._fail("Config file is missing", "Run: cato init")
@@ -149,6 +146,27 @@ class DoctorReport:
         except Exception as exc:
             console.print(f"  [red]INVALID[/red] — {exc}")
             self._fail("Config file is invalid", f"Fix YAML at {config_path}: {exc}")
+
+    def _check_legacy_data(self) -> None:
+        """Expose stranded legacy state without copying or changing it."""
+        inventories = get_legacy_data_inventory()
+        if not inventories:
+            return
+        console.print("\n[bold]Legacy data discovery[/bold]")
+        for item in inventories:
+            labels = []
+            counts = item["counts"]
+            for name in item["present"]:
+                count = counts.get(name) if isinstance(counts, dict) else None
+                labels.append(f"{name} ({count} entries)" if count is not None else name)
+            console.print(
+                f"  [yellow]LEGACY DATA[/yellow] — {item['root']}: {', '.join(labels)}"
+            )
+        self._fail(
+            "Legacy Cato data requires operator review",
+            "Run 'cato doctor', compare the listed roots, and migrate explicitly; "
+            "Cato will not copy, overwrite, move, or delete legacy state automatically.",
+        )
 
     def _check_vault(self) -> None:
         """Check 2: vault file is present and initialized, and .env holds no

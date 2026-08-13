@@ -12,7 +12,8 @@ Public symbols:
     GENESIS_AGENTS         -- 20-agent registry dict
     GENESIS_TOOL_SCHEMA    -- tool registry schema for task-03 wiring
     AP2_ENVELOPE_VERSION   -- wire protocol version (1)
-    MONEY_DOMAIN_AGENTS    -- hardcoded, non-configurable denylist of money-domain slugs
+    MONEY_DOMAIN_AGENTS    -- hardcoded money-domain slugs
+    IMMUTABLE_DENIED_AGENTS -- money-domain slugs plus deployment
     build_envelope         -- pure function, builds + signs envelope
     list_agents            -- returns the registry as a flat list
     GenesisTool            -- the tool class (instance method ``execute``)
@@ -20,7 +21,7 @@ Public symbols:
 Containment model (see cato/tools/genesis.py execute() branches):
     - genesis_agent_allowlist fails CLOSED: empty or missing denies every
       agent; only an explicitly populated list grants anything.
-    - MONEY_DOMAIN_AGENTS (finance/billing/commerce/pricing) is denied
+    - IMMUTABLE_DENIED_AGENTS (deployment plus finance/billing/commerce/pricing) is denied
       independently of, and takes priority over, the allowlist -- it cannot
       be reinstated via config.
     - Allow/deny is derived only from the agent slug + Cato-side config,
@@ -81,13 +82,14 @@ _UPSTREAM_BODY_TRUNCATE = 500
 _logger = logging.getLogger("cato.tools.genesis")
 
 # ---------------------------------------------------------------------------
-# Money-domain denylist -- hardcoded, NOT configurable away.
+# Immutable high-impact denylist -- hardcoded, NOT configurable away.
 #
-# These agent slugs front Genesis's finance/billing/commerce/pricing tool
+# The money slugs front Genesis's finance/billing/commerce/pricing tool
 # modules. Per the verified Genesis audit, those modules are stubs that
 # return {"ok": true, "stub": true} for write actions and (in the pricing
 # case) fabricate hardcoded revenue figures. Cato must never be able to
-# invoke them, no matter what an operator puts in genesis_agent_allowlist.
+# invoke them, and deployment is equally prohibited, no matter what an
+# operator puts in genesis_agent_allowlist.
 #
 # This set is independent of config: config.genesis_agent_denylist can only
 # ADD slugs to the denylist, never remove one of these.
@@ -98,6 +100,14 @@ MONEY_DOMAIN_AGENTS: frozenset[str] = frozenset({
     "genesis-commerce",
     "genesis-pricing",
 })
+IMMUTABLE_DENIED_AGENTS: frozenset[str] = MONEY_DOMAIN_AGENTS | {"genesis-deploy"}
+
+_QUEUED_JOB_STATES = frozenset({"QUEUED", "RUNNING", "PENDING", "PROCESSING"})
+_SUCCESS_JOB_STATES = frozenset({"DELIVERED", "DELIVERED_WITH_ARTIFACT_WARNING", "COMPLETED"})
+_FAILED_JOB_STATES = frozenset({"FAILED", "CANCELLED", "CANCELED", "REJECTED", "EXPIRED"})
+_POLL_INTERVAL_S = 0.25
+_POLL_INTERVAL_MAX_S = 4.0
+_PRINCIPAL_TOKEN_MAX_LENGTH = 4096
 
 # Suffix used by the live SwarmSync gateway on some wire-form agent slugs
 # (e.g. "genesis_finance_x402"). Stripped during canonicalization so a
@@ -226,6 +236,54 @@ def _detect_inband_failure(parsed_body: Any) -> str | None:
     return None
 
 
+def _parse_json_object(value: Any) -> dict[str, Any] | None:
+    """Return a JSON object, unwrapping Genesis's string ``response`` once.
+
+    ``/agents/{slug}/run`` uses a Pydantic ``RunResponse`` whose ``response``
+    field is itself JSON text.  The explicit async ``/jobs`` route returns the
+    job object directly.  Cato accepts both shapes without guessing at prose.
+    """
+    parsed = value
+    if isinstance(parsed, str):
+        try:
+            parsed = json.loads(parsed)
+        except (json.JSONDecodeError, ValueError):
+            return None
+    if not isinstance(parsed, dict):
+        return None
+    nested = parsed.get("response")
+    if isinstance(nested, str):
+        try:
+            decoded = json.loads(nested)
+        except (json.JSONDecodeError, ValueError):
+            decoded = None
+        if isinstance(decoded, dict):
+            return decoded
+    return parsed
+
+
+def _successful_tool_call_count(payload: dict[str, Any]) -> int | None:
+    """Count explicit successful Genesis tool calls, or None if no trace exists."""
+    trace = payload.get("trace")
+    if not isinstance(trace, dict):
+        return None
+    calls = trace.get("tool_calls")
+    if not isinstance(calls, list):
+        return 0
+    return sum(1 for call in calls if isinstance(call, dict) and call.get("ok") is True)
+
+
+def _valid_principal_token(value: Any) -> str | None:
+    """Return a bounded opaque server token safe for an HTTP header."""
+    if not isinstance(value, str):
+        return None
+    if not value or len(value) > _PRINCIPAL_TOKEN_MAX_LENGTH:
+        return None
+    if value != value.strip() or any(ord(char) < 0x21 or ord(char) > 0x7E for char in value):
+        return None
+    return value
+
+
 # ---------------------------------------------------------------------------
 # Envelope construction (pure, testable, no I/O)
 # ---------------------------------------------------------------------------
@@ -235,11 +293,21 @@ def _canonical_signed_bytes(payload: dict[str, Any], nonce: str, timestamp: str)
 
     Must NEVER include the signature or pubkey; if the wire format ever
     grows new signed fields, they MUST be added here in sorted-key form.
+
+    ``ensure_ascii=False`` is load-bearing, not style. Genesis verifies against
+    ``json.dumps(..., ensure_ascii=False).encode("utf-8")`` (Genesis Agents
+    runtime/request_auth.py::_canonical_json), which is the RFC 8785 (JCS)
+    canonical form. Signing with the json.dumps default escaped every
+    non-ASCII character to ``\\uXXXX``, so the two sides hashed different byte
+    strings and any task containing a smart quote, accent, arrow or emoji was
+    rejected with 401 ap2_signature_invalid. ASCII-only payloads encode
+    identically under both settings, so existing traffic is unaffected.
     """
     return json.dumps(
         {"payload": payload, "nonce": nonce, "timestamp": timestamp},
         sort_keys=True,
         separators=(",", ":"),
+        ensure_ascii=False,
     ).encode("utf-8")
 
 
@@ -368,6 +436,169 @@ class GenesisTool:
                 self._log.warning("Error closing Genesis session: %s", exc)
         self._session = None
 
+    @staticmethod
+    def _wire_request(
+        envelope: dict[str, Any], task: str, params: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Build the Genesis RunRequest without changing signed AP2 fields.
+
+        Genesis validates a non-empty top-level ``prompt`` and reads structured
+        runtime parameters from ``task``.  AP2 fields remain top-level for the
+        signature middleware; the signed ``payload`` is not rewritten.
+        """
+        runtime_task = dict(params)
+        runtime_task.setdefault("description", task)
+        return {**envelope, "prompt": task, "task": runtime_task}
+
+    @staticmethod
+    def _terminal_result(
+        payload: dict[str, Any], *, agent: str, elapsed: float,
+    ) -> str:
+        """Map one terminal Genesis payload to a truthful Cato tool result."""
+        stub_reason = _detect_stub_response(payload)
+        if stub_reason is not None:
+            return json.dumps({
+                "ok": False, "error": "stub_response", "reason": stub_reason,
+                "agent": agent, "response": json.dumps(payload), "elapsed_s": elapsed,
+            })
+
+        inband_reason = _detect_inband_failure(payload)
+        if inband_reason is not None:
+            return json.dumps({
+                "ok": False, "error": "remote_reported_failure", "reason": inband_reason,
+                "agent": agent, "response": json.dumps(payload), "elapsed_s": elapsed,
+            })
+
+        successful_calls = _successful_tool_call_count(payload)
+        if successful_calls == 0:
+            return json.dumps({
+                "ok": False,
+                "error": "zero_successful_tool_calls",
+                "reason": "Genesis returned an explicit trace with no successful tool execution",
+                "agent": agent,
+                "response": json.dumps(payload),
+                "elapsed_s": elapsed,
+            })
+
+        return json.dumps({
+            "ok": True,
+            "agent": agent,
+            "response": json.dumps(payload),
+            "elapsed_s": elapsed,
+            "successful_tool_calls": successful_calls,
+        })
+
+    async def _poll_job(
+        self,
+        *,
+        endpoint: str,
+        poll_url: str,
+        principal_token: str,
+        agent: str,
+        deadline: float,
+        started: float,
+    ) -> str:
+        """Poll a queued Genesis job until a terminal state or an unknown timeout."""
+        # Poll locations are untrusted response data.  Accept only one leading
+        # slash so the gateway credential can never be redirected to another
+        # origin via an absolute, scheme-relative, or userinfo URL.
+        if not poll_url.startswith("/") or poll_url.startswith("//") or "\\" in poll_url:
+            return json.dumps({
+                "ok": False,
+                "error": "unsafe_job_poll_url",
+                "outcome_unknown": True,
+                "agent": agent,
+                "reason": "Genesis returned a non-relative polling location",
+            })
+        url = f"{endpoint.rstrip('/')}{poll_url}"
+        # LEAST PRIVILEGE, DELIBERATE: the poll carries ONLY the owner-scoped
+        # principal token. The shared GATEWAY_API_KEY is an omni-privilege
+        # credential — any holder can read any job — and `poll_url` arrives in
+        # an untrusted response body, so it must never travel here.
+        #
+        # KNOWN OPEN CONTRACT GAP (Cato cannot close this alone): if Genesis's
+        # `GET /agents/jobs/{id}` requires the gateway key and does not honour
+        # `X-Genesis-Principal-Token`, every 202/QUEUED dispatch ends in
+        # `job_poll_upstream_error` (401) -> outcome_unknown -> a ledger
+        # INDETERMINATE a human must reconcile, for a job that ran fine. The
+        # fix belongs on the Genesis side: accept the principal token. Do NOT
+        # "fix" it here by sending the shared secret.
+        # Pinned by tests/test_genesis_tool.py::
+        #   test_expired_principal_token_fails_without_shared_gateway_header
+        #   test_poll_redirect_is_not_followed_with_gateway_credential
+        poll_headers = {
+            "Content-Type": "application/json",
+            "X-Genesis-Principal-Token": principal_token,
+        }
+        session = await self._ensure_session()
+        # Bounded exponential backoff. A flat 0.25s interval issued up to
+        # ~240 requests per queued job against a cold Render instance, which
+        # is a retry storm dressed up as polling.
+        interval = _POLL_INTERVAL_S
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return json.dumps({
+                    "ok": False,
+                    "error": "job_poll_timeout",
+                    "outcome_unknown": True,
+                    "agent": agent,
+                    "reason": "Genesis job remained non-terminal through the polling deadline",
+                })
+            timeout = aiohttp.ClientTimeout(total=max(0.1, remaining))
+            async with session.get(
+                url, headers=poll_headers, timeout=timeout, allow_redirects=False,
+            ) as resp:
+                body = await resp.text()
+                if resp.status != 200:
+                    truncated = body[:_UPSTREAM_BODY_TRUNCATE]
+                    return json.dumps({
+                        "ok": False,
+                        "error": "job_poll_upstream_error",
+                        "outcome_unknown": True,
+                        "agent": agent,
+                        "status": resp.status,
+                        "body": truncated,
+                    })
+                payload = _parse_json_object(body)
+                if payload is None:
+                    return json.dumps({
+                        "ok": False,
+                        "error": "invalid_job_status",
+                        "outcome_unknown": True,
+                        "agent": agent,
+                    })
+                status = str(payload.get("status") or "").upper()
+                if status in _QUEUED_JOB_STATES:
+                    await asyncio.sleep(min(interval, max(0.0, remaining)))
+                    interval = min(interval * 2, _POLL_INTERVAL_MAX_S)
+                    continue
+                if status in _FAILED_JOB_STATES:
+                    return json.dumps({
+                        "ok": False,
+                        "error": "genesis_job_failed",
+                        "agent": agent,
+                        "status": status,
+                        "response": json.dumps(payload),
+                    })
+                if status not in _SUCCESS_JOB_STATES:
+                    return json.dumps({
+                        "ok": False,
+                        "error": "unknown_job_status",
+                        "outcome_unknown": True,
+                        "agent": agent,
+                        "status": status or "MISSING",
+                    })
+
+                summary = payload.get("resultSummary", payload.get("result_summary"))
+                terminal_payload = _parse_json_object(summary) or payload
+                terminal_payload.setdefault("status", status)
+                return self._terminal_result(
+                    terminal_payload,
+                    agent=agent,
+                    elapsed=round(time.monotonic() - started, 3),
+                )
+
     # ---- main entry point ----------------------------------------------
 
     async def execute(self, args: dict[str, Any]) -> str:
@@ -436,7 +667,7 @@ class GenesisTool:
             _canonicalize_agent_slug(slug)
             for slug in (getattr(config, "genesis_agent_denylist", None) or [])
         }
-        if canonical_agent in MONEY_DOMAIN_AGENTS or canonical_agent in configured_denylist:
+        if canonical_agent in IMMUTABLE_DENIED_AGENTS or canonical_agent in configured_denylist:
             return json.dumps({
                 "ok": False,
                 "error": "denylisted",
@@ -475,7 +706,14 @@ class GenesisTool:
                 "agent": agent,
             })
 
-        # --- branch 4: pending deployment
+        # --- branch 4: not cleared for dispatch from Cato
+        #
+        # These five slugs DO exist as real Genesis bundles and would answer a
+        # request. The old message ("not yet deployed on SwarmSync ... try again
+        # later") was verified false and sent the operator to wait on a
+        # deployment that had already happened. The blocker is on Cato's side:
+        # the slug has not been reviewed and cleared for dispatch. The error
+        # code is retained for callers; the explanation must be true.
         if meta.get("status") == "pending":
             return json.dumps({
                 "ok": False,
@@ -483,8 +721,9 @@ class GenesisTool:
                 "agent": agent,
                 "name": meta.get("name", agent),
                 "message": (
-                    "This Genesis agent is registered but not yet deployed on "
-                    "SwarmSync. Try again later."
+                    "This Genesis agent exists on Genesis but is not cleared for "
+                    "dispatch from Cato. Waiting will not change this — clearing "
+                    "it requires a reviewed capability grant, not a deployment."
                 ),
             })
 
@@ -568,54 +807,85 @@ class GenesisTool:
         effective_timeout = 60.0 if is_cold else timeout_s
         client_timeout = aiohttp.ClientTimeout(total=effective_timeout)
 
+        wire_request = self._wire_request(envelope, task, params)
         started = time.monotonic()
+        deadline = started + effective_timeout
         try:
             session = await self._ensure_session()
-            async with session.post(url, json=envelope, headers=headers, timeout=client_timeout) as resp:
+            async with session.post(url, json=wire_request, headers=headers, timeout=client_timeout) as resp:
                 body = await resp.text()
                 elapsed = round(time.monotonic() - started, 3)
 
-                if resp.status == 200:
+                if resp.status in (200, 202):
                     # HTTP 200 alone is not evidence of success. If the body
                     # carries a stub/scaffold marker, surface FAILURE to the
                     # caller -- a stub write action returning {"ok": true,
                     # "stub": true} must never be reported as a real success.
                     try:
-                        parsed_body: Any = json.loads(body)
+                        raw_parsed: Any = json.loads(body)
                     except (json.JSONDecodeError, ValueError):
-                        parsed_body = None
-                    stub_reason = _detect_stub_response(parsed_body)
-
-                    if stub_reason is not None:
+                        raw_parsed = None
+                    raw_stub_reason = (
+                        _detect_stub_response(raw_parsed)
+                        if raw_parsed is not None and not isinstance(raw_parsed, dict)
+                        else None
+                    )
+                    if raw_stub_reason is not None:
                         return json.dumps({
                             "ok": False,
                             "error": "stub_response",
-                            "reason": stub_reason,
+                            "reason": raw_stub_reason,
                             "agent": agent,
                             "response": body,
                             "elapsed_s": elapsed,
                         })
 
-                    # A 200 whose body says the operation failed is a failure.
-                    # Reporting it as ok=true told the model AND the audit
-                    # ledger that a thing happened which did not happen.
-                    inband_reason = _detect_inband_failure(parsed_body)
-                    if inband_reason is not None:
+                    parsed_body = _parse_json_object(raw_parsed)
+                    if parsed_body is None:
                         return json.dumps({
                             "ok": False,
-                            "error": "remote_reported_failure",
-                            "reason": inband_reason,
+                            "error": "invalid_upstream_response",
                             "agent": agent,
-                            "response": body,
                             "elapsed_s": elapsed,
                         })
 
-                    return json.dumps({
-                        "ok": True,
-                        "agent": agent,
-                        "response": body,
-                        "elapsed_s": elapsed,
-                    })
+                    status = str(parsed_body.get("status") or "").upper()
+                    job_id = parsed_body.get("job_id") or parsed_body.get("id")
+                    if resp.status == 202 or status in _QUEUED_JOB_STATES:
+                        poll_url = parsed_body.get("poll_url") or (
+                            f"/agents/jobs/{job_id}" if job_id else ""
+                        )
+                        if not poll_url:
+                            return json.dumps({
+                                "ok": False,
+                                "error": "queued_job_missing_poll_url",
+                                "outcome_unknown": True,
+                                "agent": agent,
+                            })
+                        principal_token = _valid_principal_token(
+                            parsed_body.get("principal_token")
+                        )
+                        if principal_token is None:
+                            return json.dumps({
+                                "ok": False,
+                                "error": "invalid_principal_token",
+                                "outcome_unknown": True,
+                                "agent": agent,
+                                "reason": (
+                                    "Queued Genesis response did not provide a valid "
+                                    "owner-scoped principal token"
+                                ),
+                            })
+                        return await self._poll_job(
+                            endpoint=endpoint,
+                            poll_url=str(poll_url),
+                            principal_token=principal_token,
+                            agent=agent,
+                            deadline=deadline,
+                            started=started,
+                        )
+
+                    return self._terminal_result(parsed_body, agent=agent, elapsed=elapsed)
 
                 # --- branch 6: upstream non-200
                 truncated = body if len(body) <= _UPSTREAM_BODY_TRUNCATE else body[:_UPSTREAM_BODY_TRUNCATE]
@@ -690,7 +960,7 @@ GENESIS_TOOL_SCHEMA: dict[str, Any] = {
             "genesis-security, genesis-seo, genesis-support, genesis-email, genesis-analyst, "
             "genesis-commerce, genesis-billing, genesis-legal, genesis-hr, genesis-data-pipeline, "
             "genesis-workflow-automator, genesis-ai-vision). Returns the agent's response. "
-            "Pending agents return a 'pending_deployment' error."
+            "Agents not cleared for dispatch return a 'pending_deployment' error."
         ),
         "parameters": {
             "type": "object",
@@ -711,6 +981,7 @@ __all__ = [
     "GENESIS_TOOL_SCHEMA",
     "AP2_ENVELOPE_VERSION",
     "MONEY_DOMAIN_AGENTS",
+    "IMMUTABLE_DENIED_AGENTS",
     "GenesisTool",
     "build_envelope",
     "list_agents",

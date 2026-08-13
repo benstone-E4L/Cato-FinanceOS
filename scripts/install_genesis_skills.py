@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Install Genesis Agent SKILL.md files into Cato's skills directory.
 
-Cato's gateway scans ``~/.cato/skills/`` for directories that contain a
+Cato's gateway scans the canonical ``get_data_dir()/skills`` directory for
+directories that contain a
 ``SKILL.md`` file. This script writes one such directory per Genesis Agent
 so each agent becomes a discoverable skill.
 
 Usage:
-    python install_genesis_skills.py            # install to ~/.cato/skills
+    python install_genesis_skills.py            # install to canonical Cato skills
     python install_genesis_skills.py --dry-run  # show what would be written
     python install_genesis_skills.py --root /tmp/skills  # custom root
 
@@ -17,6 +18,8 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
+from cato.platform import get_data_dir
 
 
 AGENT_REGISTRY = [
@@ -376,7 +379,7 @@ def parse_args() -> argparse.Namespace:
         "--root",
         type=Path,
         default=None,
-        help="Override install root (default: ~/.cato/skills).",
+        help="Override install root (default: canonical Cato data_dir/skills).",
     )
     return parser.parse_args()
 
@@ -386,7 +389,7 @@ def main() -> int:
     if args.root is not None:
         root = args.root.expanduser().resolve()
     else:
-        root = Path.home() / ".cato" / "skills"
+        root = get_data_dir() / "skills"
 
     count = install(root, dry_run=args.dry_run)
 

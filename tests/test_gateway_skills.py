@@ -762,11 +762,11 @@ class TestPathHelpers:
     """Minimal tests for the directory-returning helpers."""
 
     def test_skills_dir_creates_and_returns_path(self, tmp_path, monkeypatch):
-        """_skills_dir() returns ~/.cato/skills and creates it if absent."""
-        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        """_skills_dir() returns the canonical platform data directory."""
+        monkeypatch.setattr("cato.gateway.get_data_dir", lambda: tmp_path)
         gw = _make_gateway(tmp_path)
         result = gw._skills_dir()
-        assert result == tmp_path / ".cato" / "skills"
+        assert result == tmp_path / "skills"
         assert result.exists()
 
     def test_workspace_dir_uses_config_workspace_dir(self, tmp_path):
@@ -777,20 +777,20 @@ class TestPathHelpers:
         result = gw._workspace_dir()
         assert result == custom_ws
 
-    def test_workspace_dir_falls_back_to_home_cato(self, tmp_path, monkeypatch):
-        """When config.workspace_dir is empty, returns ~/.cato/workspace."""
-        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    def test_workspace_dir_falls_back_to_data_dir(self, tmp_path, monkeypatch):
+        """When config.workspace_dir is empty, returns data_dir/workspace."""
+        monkeypatch.setattr("cato.gateway.get_data_dir", lambda: tmp_path)
         gw = _make_gateway(tmp_path)
         gw._cfg.workspace_dir = ""
         result = gw._workspace_dir()
-        assert result == tmp_path / ".cato" / "workspace"
+        assert result == tmp_path / "workspace"
 
-    def test_agents_dir_returns_home_cato_agents(self, tmp_path, monkeypatch):
-        """_agents_dir() always returns ~/.cato/agents."""
-        monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    def test_agents_dir_returns_data_dir_agents(self, tmp_path, monkeypatch):
+        """_agents_dir() always returns canonical data_dir/agents."""
+        monkeypatch.setattr("cato.gateway.get_data_dir", lambda: tmp_path)
         gw = _make_gateway(tmp_path)
         result = gw._agents_dir()
-        assert result == tmp_path / ".cato" / "agents"
+        assert result == tmp_path / "agents"
 
 
 # ---------------------------------------------------------------------------

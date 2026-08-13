@@ -614,19 +614,48 @@ def get_tool_definitions() -> list[dict]:
         if name in _TOOL_SCHEMAS:
             defs.append(_openai_tool_definition(name, _TOOL_SCHEMAS[name]))
         else:
-            # Auto-generate a minimal schema for unregistered tools
+            # Auto-generated fallback for a tool with no registered schema.
+            #
+            # LIVE-OBSERVED (2026-08-12, isolated data dir): with
+            # `properties: {}` and nothing else, claude-sonnet-5 called
+            # `memory__search` with `arguments: "{}"`. The tool ran, returned
+            # nothing, and the hash-chained ledger recorded INTENT ->
+            # ATTEMPTED -> CONFIRMED / "success" for a guaranteed no-op. A
+            # tool the model cannot parameterise is not a capability; it is a
+            # false success generator.
+            #
+            # Declaring the object open and saying so is the honest minimum.
+            # The real fix is a registered schema per tool — see
+            # `tools_without_schema()` and its regression test.
             defs.append({
                 "type": "function",
                 "function": {
                     "name": name,
-                    "description": f"Execute the {name} tool.",
+                    "description": (
+                        f"Execute the {name} tool. NOTE: no parameter schema is "
+                        "registered for this tool. Pass arguments as free-form "
+                        "JSON keys; an empty object will almost certainly be a "
+                        "no-op."
+                    ),
                     "parameters": {
                         "type": "object",
                         "properties": {},
+                        "additionalProperties": True,
                     },
                 },
             })
     return defs
+
+
+def tools_without_schema() -> list[str]:
+    """Registered tool names the model can reach but cannot parameterise.
+
+    Every name here is advertised to the model with an empty parameter schema,
+    so the model can only ever call it with ``{}``. Pinned by
+    ``tests/test_kraken_failure_modes.py::TestToolSchemaCoverage`` so the set
+    cannot grow silently.
+    """
+    return sorted(n for n in _TOOL_REGISTRY if n not in _TOOL_SCHEMAS)
 
 
 def register_all_tools(register_tool_fn: Callable[[str, Any], None], config: Optional[Any] = None) -> None:
@@ -803,13 +832,18 @@ def _format_ask_e4l_result(result: Any) -> str:
             "[note: superseded history exists on this topic — ask again with "
             "include_history to see it]"
         )
+    authority_note = getattr(result, "authority_note", "")
+    if authority_note:
+        lines.append(f"[authority: {authority_note}]")
     return "\n".join(lines)
 
 
-def _register_ask_e4l_tools(memory: Any, router: Any, config: Any = None) -> None:
+def _register_ask_e4l_tools(
+    memory: Any, router: Any, config: Any = None, vault: Any = None,
+) -> None:
     """Register the ask.e4l tool action (CHUNK_4_ASK_E4L / Retrieval Contract)."""
     try:
-        from .core.ask_e4l import answer_question
+        from .core.ask_e4l import GenesisRetrievalClient, answer_question_master
     except ImportError:
         return
 
@@ -840,11 +874,12 @@ def _register_ask_e4l_tools(memory: Any, router: Any, config: Any = None) -> Non
         include_history = bool(args.get("include_history", False))
         if not question:
             return "[ask.e4l: question required]"
-        result = await answer_question(
+        result = await answer_question_master(
             memory,
             vault_root,
             question,
             llm_complete=_llm_complete,
+            remote_client=GenesisRetrievalClient(config, vault),
             include_history=include_history,
         )
         return _format_ask_e4l_result(result)
@@ -1843,12 +1878,23 @@ class AgentLoop:
         # `proceed=True` whenever a delegation token authorizes the tool, which
         # would let a token override the reversibility rules. Token
         # authorization is already a separate, earlier gate.
+        #
+        # FAIL-CLOSED CONSTRUCTION. The ledger already refuses to dispatch when
+        # it is required but could not be opened; this gate must behave the
+        # same way. It previously swallowed the construction error and left
+        # `_action_guard = None`, and `_check_action_guard` reads None as
+        # "proceed" — so a broken import or a raising constructor silently
+        # deleted the reversibility gate from every dispatch, leaving only a
+        # log line. A gate whose dependency is unavailable is not a licence to
+        # proceed.
         self._action_guard = None
+        self._action_guard_unavailable: Optional[str] = None
         try:
             from .audit.action_guard import ActionGuard
             self._action_guard = ActionGuard()
         except Exception as exc:  # pragma: no cover — defensive
-            logger.error("ActionGuard unavailable: %s", exc)
+            logger.critical("ActionGuard unavailable — dispatch will refuse: %s", exc)
+            self._action_guard_unavailable = f"{type(exc).__name__}: {exc}"
         self._autonomy_level = float(getattr(config, "autonomy_level", 0.5) or 0.5)
 
         # Token-based authorization checker (T3)
@@ -1888,7 +1934,7 @@ class AgentLoop:
         _register_memory_tools(memory=memory)
 
         # Register Ask-E4L (CHUNK_4_ASK_E4L / Retrieval Contract)
-        _register_ask_e4l_tools(memory=memory, router=self._router, config=config)
+        _register_ask_e4l_tools(memory=memory, router=self._router, config=config, vault=vault)
 
         # Register Clawflow tool action (Skill 5). `self` is the gate chain the
         # flow's steps must run through.
@@ -1960,7 +2006,7 @@ class AgentLoop:
             else _CATO_DIR / safe_agent_id / "workspace"
         )
         daily_log = _CATO_DIR / safe_agent_id / "memory" / f"{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.md"
-        skills_dir = Path.home() / ".cato" / "skills"  # ~/.cato/skills
+        skills_dir = get_data_dir() / "skills"
         # BUG FIX BH-004: Also scan ~/.claude/skills/ for skills installed via
         # the Claude ecosystem.  The context_builder supports skills_dirs (plural)
         # but we were only passing the singular ~/.cato/skills/ path.
@@ -2638,6 +2684,56 @@ class AgentLoop:
         human_approved: bool = False,
         dispatch: Optional[Callable[[], Any]] = None,
     ) -> str:
+        """Traced wrapper over :meth:`_guarded_dispatch_inner`.
+
+        Instrumented here rather than inside the gate sequence because this is
+        the one door every tool call passes through — a span opened here cannot
+        be bypassed by a gate that returns early, so "what did this agent do,
+        with which tools" is answerable from Phoenix alone. Wrapping also keeps
+        the gate ordering in the implementation untouched.
+        """
+        from .core import phoenix_tracing
+
+        with phoenix_tracing.span(
+            f"tool.{tc.name or 'unknown'}",
+            kind="TOOL",
+            attributes={
+                phoenix_tracing.TOOL_NAME: tc.name or "",
+                "cato.session.id": session_id,
+                "cato.tool.human_approved": human_approved,
+                "cato.tool.has_approval_ref": bool(approval_ref),
+                phoenix_tracing.INPUT_VALUE: phoenix_tracing.safe_content(
+                    tc.args if isinstance(tc.args, dict) else {}
+                ),
+            },
+        ) as sp:
+            outcome = await self._guarded_dispatch_inner(
+                tc, session_id, approval_ref=approval_ref,
+                human_approved=human_approved, dispatch=dispatch,
+            )
+            try:
+                text = outcome if isinstance(outcome, str) else str(outcome)
+                # A refusal is a normal, expected outcome of the gates, not an
+                # error — but it is the thing an operator most wants to filter
+                # on, so it gets its own boolean attribute.
+                phoenix_tracing.set_attributes(sp, {
+                    "cato.tool.refused": text.startswith(("Refused", "Blocked", "Denied")),
+                    "cato.tool.result_chars": len(text),
+                    phoenix_tracing.OUTPUT_VALUE: phoenix_tracing.safe_content(text),
+                })
+            except Exception:
+                pass
+            return outcome
+
+    async def _guarded_dispatch_inner(
+        self,
+        tc: ToolCall,
+        session_id: str,
+        *,
+        approval_ref: Optional[str] = None,
+        human_approved: bool = False,
+        dispatch: Optional[Callable[[], Any]] = None,
+    ) -> str:
         """Run every pre-action gate, then dispatch inside a ledger INTENT.
 
         Order (see also the module docstring of cato/safety.py):
@@ -2734,9 +2830,29 @@ class AgentLoop:
 
         This is the gate that used to exist only as a dashboard panel. Its
         verdict binds here: `proceed=False` stops the dispatch.
+
+        A guard that could not be CONSTRUCTED refuses exactly like a guard that
+        raises mid-check. The two are the same fact — no verdict is available —
+        and they must not have opposite outcomes.
         """
         if self._action_guard is None:
-            return None
+            reason = getattr(self, "_action_guard_unavailable", None)
+            if not reason:
+                return None
+            logger.critical(
+                "ActionGuard was never constructed (%s) — refusing %s", reason, tool_name,
+            )
+            self._record_denial(
+                tool_name=tool_name, tool_input=args, session_id=session_id,
+                gate="action_guard", reason=f"guard_unavailable: {reason}",
+            )
+            return json.dumps({
+                "error": (
+                    f"[GUARD] Action '{tool_name}' refused: the pre-action "
+                    "reversibility guard is unavailable."
+                ),
+                "guard_denied": True,
+            })
         registry_name = _reversibility_name(tool_name, args)
         try:
             decision = self._action_guard.check_before_execute(

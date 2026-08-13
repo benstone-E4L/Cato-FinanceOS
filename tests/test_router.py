@@ -92,3 +92,95 @@ def test_missing_anthropic_key_returns_error_message(monkeypatch):
     assert "SWARMSYNC_API_KEY" not in src, (
         "SwarmSync must not appear in the active model-execution path"
     )
+
+
+async def test_legacy_model_id_is_translated_at_native_provider_wire_boundary(monkeypatch) -> None:
+    vault = DummyVault({"OPENAI_API_KEY": "test-openai"})
+    router = ModelRouter(vault=vault, preferred_model="openai/gpt-4o-mini")
+    captured: dict[str, str] = {}
+
+    async def fake_openai(messages, model, tools, api_key, base_url):
+        captured.update(model=model, api_key=api_key, base_url=base_url)
+        yield "ok"
+
+    monkeypatch.setattr(router, "_openai_compat", fake_openai)
+
+    chunks = [chunk async for chunk in router._complete_single(
+        "openai/gpt-4o-mini", [{"role": "user", "content": "hello"}],
+    )]
+
+    assert chunks == ["ok"]
+    assert captured["model"] == "gpt-4o-mini"
+    assert captured["base_url"] == "https://api.openai.com/v1/chat/completions"
+
+
+async def test_openrouter_model_id_is_not_translated_to_native_provider(monkeypatch) -> None:
+    vault = DummyVault({"OPENROUTER_API_KEY": "test-openrouter"})
+    router = ModelRouter(vault=vault, preferred_model="openrouter/openai/gpt-4o-mini")
+    captured: dict[str, str] = {}
+
+    async def fake_openai(messages, model, tools, api_key, base_url):
+        captured.update(model=model, base_url=base_url)
+        yield "ok"
+
+    monkeypatch.setattr(router, "_openai_compat", fake_openai)
+    _ = [chunk async for chunk in router._complete_single(
+        "openrouter/openai/gpt-4o-mini", [{"role": "user", "content": "hello"}],
+    )]
+
+    assert captured["model"] == "openrouter/openai/gpt-4o-mini"
+    assert captured["base_url"] == "https://openrouter.ai/api/v1/chat/completions"
+
+
+async def test_availability_check_and_wire_dispatch_agree_on_translation(monkeypatch) -> None:
+    """_is_available and _complete_single must resolve a model identically.
+
+    The live HTTP 400 came from exactly this disagreement: _is_available
+    translated "openai/gpt-4o-mini" to "gpt-4o-mini" to find a key, declared the
+    model available, and then _complete_single put the UNTRANSLATED id on the
+    wire to api.openai.com, which rejected it. Every legacy id must agree, and
+    openrouter/ ids must stay untranslated on both sides.
+    """
+    from cato.router import MODEL_TRANSLATIONS, _FALLBACK_CHAIN
+
+    vault = DummyVault({
+        "OPENAI_API_KEY": "test-openai",
+        "ANTHROPIC_API_KEY": "test-anthropic",
+        "OPENROUTER_API_KEY": "test-openrouter",
+        "DEEPSEEK_API_KEY": "test-deepseek",
+        "GROQ_API_KEY": "test-groq",
+        "MISTRAL_API_KEY": "test-mistral",
+        "GOOGLE_API_KEY": "test-google",
+    })
+    router = ModelRouter(vault=vault, preferred_model="openai/gpt-4o-mini")
+
+    captured: dict[str, str] = {}
+
+    async def capture(messages, model, *args, **kwargs):
+        captured["model"] = model
+        yield "ok"
+
+    monkeypatch.setattr(router, "_openai_compat", capture)
+    monkeypatch.setattr(router, "_anthropic", capture)
+    monkeypatch.setattr(router, "_google", capture)
+
+    candidates = list(MODEL_TRANSLATIONS) + list(_FALLBACK_CHAIN)
+    checked = 0
+    for model in candidates:
+        if not router._is_available(model):
+            continue
+        captured.clear()
+        _ = [c async for c in router._complete_single(
+            model, [{"role": "user", "content": "hi"}],
+        )]
+        expected = (
+            model if model.startswith("openrouter/")
+            else MODEL_TRANSLATIONS.get(model, model)
+        )
+        assert captured["model"] == expected, (
+            f"{model!r} passed _is_available but went on the wire as "
+            f"{captured['model']!r}; the provider expects {expected!r}"
+        )
+        checked += 1
+
+    assert checked >= 5, f"only {checked} models exercised — the sweep is not meaningful"

@@ -68,3 +68,25 @@ def test_env_secrets_clean_when_env_file_absent(
     report._check_env_secrets()
 
     assert report._failures == []
+
+
+def test_doctor_surfaces_nonempty_legacy_state_without_mutating_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = tmp_path / ".cato"
+    skill = legacy / "skills" / "existing-skill"
+    skill.mkdir(parents=True)
+    marker = skill / "SKILL.md"
+    marker.write_text("legacy", encoding="utf-8")
+    inventory = ({
+        "root": str(legacy),
+        "present": ("skills",),
+        "counts": {"skills": 1},
+    },)
+    monkeypatch.setattr("cato.doctor.get_legacy_data_inventory", lambda: inventory)
+
+    report = _make_report()
+    report._check_legacy_data()
+
+    assert any("Legacy Cato data" in problem for problem, _ in report._failures)
+    assert marker.read_text(encoding="utf-8") == "legacy"

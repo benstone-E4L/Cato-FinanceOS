@@ -9,8 +9,23 @@ Those test files call _make_pkg_stub() only when the key is absent:
     if name in sys.modules: return sys.modules[name]
 So pre-loading the real package prevents all stub pollution.
 """
+import os
+import shutil
 import sys
+import tempfile
+from pathlib import Path
+
 import pytest
+
+
+# Establish a hermetic Cato root before test collection imports any modules
+# that cache data paths at module scope.  Never point tests at the operator's
+# APPDATA ledger or workspace.
+_TEST_ROOT = Path(tempfile.mkdtemp(prefix="cato-pytest-"))
+os.environ.pop("CATO_DATA_DIR", None)
+os.environ["APPDATA"] = str(_TEST_ROOT / "appdata")
+os.environ["HOME"] = str(_TEST_ROOT / "home")
+os.environ["USERPROFILE"] = str(_TEST_ROOT / "home")
 
 
 def pytest_configure(config):
@@ -23,9 +38,9 @@ def pytest_configure(config):
     so they won't overwrite the real package with stubs.
     """
     try:
-        import cato          # noqa: F401
-        import cato.tools    # noqa: F401
-        import cato.platform # noqa: F401
+        import cato  # noqa: F401
+        import cato.platform  # noqa: F401
+        import cato.tools  # noqa: F401
     except Exception:
         pass  # If cato isn't installed yet, don't block collection
 
@@ -46,3 +61,8 @@ def restore_cato_modules():
             sys.modules.pop(k, None)
         else:
             sys.modules[k] = v
+
+
+def pytest_unconfigure(config):
+    """Remove only the private per-run test tree after pytest is finished."""
+    shutil.rmtree(_TEST_ROOT, ignore_errors=True)

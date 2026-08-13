@@ -511,6 +511,23 @@ async def test_config_patch_persists_approval_policy(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_config_patch_rejects_plaintext_messaging_token(tmp_path):
+    """The config API must direct messaging credentials to the encrypted vault."""
+    with patch("cato.platform.get_data_dir", return_value=tmp_path):
+        app = await create_ui_app()
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.patch(
+                "/api/config",
+                json={"telegram_bot_token": "must-not-write"},
+                headers=_auth_headers(),
+            )
+            assert resp.status == 400
+
+    config_path = tmp_path / "config.yaml"
+    assert not config_path.exists() or "must-not-write" not in config_path.read_text(
+        encoding="utf-8"
+    )
+@pytest.mark.asyncio
 async def test_config_patch_response_redacts_sensitive_keys(tmp_path):
     """PATCH /api/config must not echo plaintext legacy secrets."""
     import yaml
@@ -545,6 +562,9 @@ async def test_config_patch_response_redacts_sensitive_keys(tmp_path):
     assert "secret-token" not in serialized
     assert "sk-secret" not in serialized
     assert data["config"]["strict_approval"] is True
+    persisted = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert "telegram_bot_token" not in persisted
+    assert "openrouter_api_key" not in persisted
 
 
 # ------------------------------------------------------------------ #

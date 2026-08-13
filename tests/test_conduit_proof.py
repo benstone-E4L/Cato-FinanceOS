@@ -11,13 +11,14 @@ Verifies:
 """
 import hashlib
 import json
-import sys
 import tarfile
 import tempfile
 import time
 import types
 import unittest
 from pathlib import Path
+
+from cato.audit.audit_log import AuditLog
 
 
 # ---------------------------------------------------------------------------
@@ -33,26 +34,6 @@ exec(compile(_proof_src, str(_PROOF_PATH), "exec"), _proof_mod.__dict__)
 
 ConduitProof = _proof_mod.ConduitProof
 VERIFY_PY = _proof_mod.VERIFY_PY
-
-
-# ---------------------------------------------------------------------------
-# Import audit.py standalone for integration tests
-# ---------------------------------------------------------------------------
-
-_AUDIT_PATH = Path(__file__).parent.parent / "cato" / "audit.py"
-_audit_src = _AUDIT_PATH.read_text(encoding="utf-8")
-
-# Patch the relative import
-_audit_src_patched = _audit_src.replace(
-    "from .platform import get_data_dir",
-    "def get_data_dir(): return Path.home() / '.cato_test'"
-)
-
-_audit_mod = types.ModuleType("audit_standalone")
-_audit_mod.__file__ = str(_AUDIT_PATH)
-exec(compile(_audit_src_patched, str(_AUDIT_PATH), "exec"), _audit_mod.__dict__)
-
-AuditLog = _audit_mod.AuditLog
 
 
 # ---------------------------------------------------------------------------

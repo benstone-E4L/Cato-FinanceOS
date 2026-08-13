@@ -172,10 +172,23 @@ RouterStreamChunk = str | dict[str, Any]
 # ---------------------------------------------------------------------------
 
 MODEL_TRANSLATIONS: dict[str, str] = {
+    # Current models — these MUST stay in step with model_policy.MODEL_REGISTRY.
+    # Before this entry existed, every anthropic/-qualified id the policy engine
+    # actually knows was absent from the table, so `_complete_single` sent the
+    # slug through untranslated and Anthropic answered 400 — the same defect
+    # class already proven live for `openai/gpt-4o-mini`. The retired 4-x keys
+    # below were the only anthropic entries present, and all three map to model
+    # ids MODEL_REGISTRY does not contain.
+    # `test_router_translations_cover_registry` fails if the tables drift again.
+    "anthropic/claude-sonnet-5":     "claude-sonnet-5",
+    "anthropic/claude-opus-5":       "claude-opus-5",
+    "anthropic/claude-fable-5":      "claude-fable-5",
+    "anthropic/claude-haiku-4-5":    "claude-haiku-4-5",
+    # Retired ids, kept so an old pinned config still resolves to a bare id
+    # rather than reaching the wire provider-qualified.
     "anthropic/claude-opus-4-7":     "claude-opus-4-7",
     "anthropic/claude-opus-4-6":     "claude-opus-4-6",
     "anthropic/claude-sonnet-4-6":   "claude-sonnet-4-6",
-    "anthropic/claude-haiku-4-5":    "claude-haiku-4-5-20251001",
     "openai/gpt-4o":                 "gpt-4o",
     "openai/gpt-4o-mini":            "gpt-4o-mini",
     "openai/o3-mini":                "o3-mini",
@@ -580,11 +593,79 @@ class ModelRouter:
         tools: Optional[list[dict]] = None,
         stream: bool = True,
     ) -> AsyncIterator[RouterStreamChunk]:
+        """Traced wrapper over :meth:`_complete_inner`.
+
+        Every Cato model call funnels through here, including the fallback-chain
+        retries, so one span per call answers "which model actually served this,
+        and what did it cost". Usage is read off the stream rather than assumed,
+        because after a failover the serving model differs from the requested one.
+        """
+        from .core import phoenix_tracing
+
+        with phoenix_tracing.span(
+            "llm.completion",
+            kind="LLM",
+            attributes={
+                phoenix_tracing.LLM_MODEL_NAME: model,
+                "llm.invocation_parameters.stream": stream,
+                "llm.tools.count": len(tools or []),
+                "llm.messages.count": len(messages or []),
+                phoenix_tracing.INPUT_VALUE: phoenix_tracing.safe_content(messages),
+            },
+        ) as sp:
+            chunk_count = 0
+            usage: dict[str, Any] = {}
+            routed_model: Optional[str] = None
+            async for chunk in self._complete_inner(
+                messages, model, tools=tools, stream=stream
+            ):
+                chunk_count += 1
+                if isinstance(chunk, dict):
+                    if isinstance(chunk.get("usage"), dict):
+                        usage = chunk["usage"]
+                    routed_model = chunk.get("model") or routed_model
+                yield chunk
+            phoenix_tracing.set_attributes(sp, {
+                "llm.model_name.routed": routed_model,
+                "llm.stream.chunks": chunk_count,
+                phoenix_tracing.LLM_TOKEN_PROMPT: usage.get("prompt_tokens")
+                or usage.get("input_tokens"),
+                phoenix_tracing.LLM_TOKEN_COMPLETION: usage.get("completion_tokens")
+                or usage.get("output_tokens"),
+                phoenix_tracing.LLM_TOKEN_TOTAL: usage.get("total_tokens"),
+            })
+
+    async def _complete_inner(
+        self,
+        messages: list[dict],
+        model: str,
+        tools: Optional[list[dict]] = None,
+        stream: bool = True,
+    ) -> AsyncIterator[RouterStreamChunk]:
         """Stream completions from the provider matched to *model*.
 
         On transient failures, classifies the error and attempts fallback
         models from _FALLBACK_CHAIN before giving up.
+
+        Two invariants:
+
+        * **The breaker binds.** ``_direct_cb_open_until`` was written and never
+          read, so the "circuit breaker" counted failures forever and never
+          opened. While it is open this method refuses immediately instead of
+          hammering a provider that has already failed ``_CB_THRESHOLD`` times.
+        * **No failover after first byte.** Once a chunk has been yielded the
+          caller has committed it to the transcript. Restarting on another
+          model concatenated a truncated answer with a whole new one, and
+          ``_stream_collect`` joins the chunks blind. After first byte the
+          error propagates.
         """
+        if self._direct_cb_open_until and time.monotonic() < self._direct_cb_open_until:
+            raise RuntimeError(
+                "LLM circuit breaker open after "
+                f"{self._direct_cb_failures} consecutive failures; retry in "
+                f"{self._direct_cb_open_until - time.monotonic():.0f}s"
+            )
+
         models_to_try = [model] + [
             m for m in _FALLBACK_CHAIN
             if m != model and self._is_available(m)
@@ -592,11 +673,14 @@ class ModelRouter:
         last_error: Optional[Exception] = None
 
         for attempt_model in models_to_try:
+            emitted = False
             try:
                 async for chunk in self._complete_single(attempt_model, messages, tools):
+                    emitted = True
                     yield chunk
                 # Success — reset direct-LLM circuit breaker
                 self._direct_cb_failures = 0
+                self._direct_cb_open_until = 0.0
                 return
             except Exception as exc:
                 classified = classify_api_error(exc)
@@ -611,6 +695,16 @@ class ModelRouter:
                 self._direct_cb_failures += 1
                 if self._direct_cb_failures >= self._CB_THRESHOLD:
                     self._direct_cb_open_until = time.monotonic() + self._CB_COOLDOWN
+
+                if emitted:
+                    # Partial output is already downstream. A second model would
+                    # append a full answer to a truncated one.
+                    logger.error(
+                        "LLM stream from %s failed after %d bytes were already "
+                        "emitted — refusing to fail over onto a partial answer",
+                        attempt_model, 1,
+                    )
+                    raise
 
                 if not classified.should_fallback:
                     # Non-recoverable errors (format, context overflow) — don't
@@ -631,16 +725,20 @@ class ModelRouter:
         tools: Optional[list[dict]] = None,
     ) -> AsyncIterator[RouterStreamChunk]:
         """Dispatch a single completion to the appropriate provider."""
-        base_url, auth = self._resolve_provider(model)
-        api_key = self._get_api_key(auth, model)
+        # Translate legacy provider-qualified IDs at the final wire boundary.
+        # Selection remains deterministic and OpenRouter IDs remain untouched;
+        # only a native provider's outbound model string is normalized.
+        api_model = model if model.startswith("openrouter/") else MODEL_TRANSLATIONS.get(model, model)
+        base_url, auth = self._resolve_provider(api_model)
+        api_key = self._get_api_key(auth, api_model)
         if auth == "x-api-key":
-            async for c in self._anthropic(messages, model, tools or [], api_key):
+            async for c in self._anthropic(messages, api_model, tools or [], api_key):
                 yield c
         elif auth == "google":
-            async for c in self._google(messages, model, api_key):
+            async for c in self._google(messages, api_model, api_key):
                 yield c
         else:
-            async for c in self._openai_compat(messages, model, tools or [], api_key, base_url):
+            async for c in self._openai_compat(messages, api_model, tools or [], api_key, base_url):
                 yield c
 
     # ------------------------------------------------------------------

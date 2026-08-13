@@ -1,6 +1,6 @@
 //! Cato Desktop — Tauri backend (v0.2.1 — activity indicator)
 //!
-//! Manages the Python daemon sidecar, system tray, global hotkey,
+//! Manages the bundled Cato daemon sidecar, system tray, global hotkey,
 //! and native notifications.
 
 use serde::Serialize;
@@ -42,10 +42,13 @@ async fn get_daemon_status(state: tauri::State<'_, AppState>) -> Result<DaemonSt
 
 /// Tauri command: restart the daemon
 #[tauri::command]
-async fn restart_daemon(state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn restart_daemon(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
     let mut mgr = state.sidecar.lock().await;
-    mgr.stop().await;
-    mgr.start().await.map_err(|e| e.to_string())
+    mgr.stop(&app).await;
+    mgr.start(&app).await.map_err(|e| e.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -84,9 +87,10 @@ pub fn run() {
             // ── Start sidecar with crash monitoring ──
             let sidecar = handle.state::<AppState>().sidecar.clone();
             let emit_handle = handle.clone();
+            let sidecar_handle = handle.clone();
             tauri::async_runtime::spawn(async move {
                 let mut mgr = sidecar.lock().await;
-                if let Err(e) = mgr.start().await {
+                if let Err(e) = mgr.start(&sidecar_handle).await {
                     log::error!("Failed to start Cato daemon: {}", e);
                     let _ = emit_handle.emit("daemon-error", e.to_string());
                 }
@@ -115,9 +119,10 @@ pub fn run() {
                 RunEvent::ExitRequested { .. } => {
                     // Cleanup sidecar on exit — use spawn to avoid deadlock
                     let sidecar = app_handle.state::<AppState>().sidecar.clone();
+                    let stop_handle = app_handle.clone();
                     tauri::async_runtime::spawn(async move {
                         let mut mgr = sidecar.lock().await;
-                        mgr.stop().await;
+                        mgr.stop(&stop_handle).await;
                     });
                 }
                 _ => {}
@@ -147,10 +152,11 @@ fn setup_tray(handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 "restart" => {
                     let sidecar = app.state::<AppState>().sidecar.clone();
+                    let restart_handle = app.clone();
                     tauri::async_runtime::spawn(async move {
                         let mut mgr = sidecar.lock().await;
-                        mgr.stop().await;
-                        if let Err(e) = mgr.start().await {
+                        mgr.stop(&restart_handle).await;
+                        if let Err(e) = mgr.start(&restart_handle).await {
                             log::error!("Failed to restart daemon: {}", e);
                         }
                     });
@@ -159,9 +165,10 @@ fn setup_tray(handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     // Spawn cleanup then exit — avoids block_on deadlock
                     let sidecar = app.state::<AppState>().sidecar.clone();
                     let app_handle = app.clone();
+                    let stop_handle = app.clone();
                     tauri::async_runtime::spawn(async move {
                         let mut mgr = sidecar.lock().await;
-                        mgr.stop().await;
+                        mgr.stop(&stop_handle).await;
                         drop(mgr); // Release lock before exit
                         app_handle.exit(0);
                     });

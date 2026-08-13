@@ -304,7 +304,7 @@ class CatoConfig:
 
     # Fields that must never be written to the plaintext YAML config file.
     # vault is a runtime-only bridge credential store — it belongs in vault.enc, not config.yaml.
-    _RUNTIME_ONLY: frozenset[str] = frozenset({"vault"})
+    _RUNTIME_ONLY: frozenset[str] = frozenset({"vault", "telegram_bot_token"})
 
     def save(self, config_path: Optional[Path] = None) -> None:
         """Write current config to YAML file, creating parent dirs as needed."""

@@ -471,44 +471,11 @@ class TelegramAdapter(BaseAdapter):
             await query.answer("Email record not found.", show_alert=True)
             return
 
-        gmail_draft_id = email_row.get("gmail_draft_id")
-        if not gmail_draft_id:
-            personal_store.update_email_status(row_id, "dismissed")
-            await query.answer("No draft ID — could not send.", show_alert=True)
-            return
-
-        if self._gmail_adapter is None:
-            personal_store.update_email_status(row_id, "dismissed")
-            await query.answer("Gmail adapter not available.", show_alert=True)
-            return
-
-        try:
-            # LEDGERED: a real outbound email. The button tap IS the human
-            # approval, so this is not re-gated — but the send must leave an
-            # audit record naming the recipient and the approving chat.
-            from cato.core.operator_ledger import record_operator_action
-
-            await record_operator_action(
-                tool_name="gmail.send_draft",
-                tool_input={
-                    "row_id": row_id,
-                    "gmail_draft_id": gmail_draft_id,
-                    "to": email_row.get("to_addr") or email_row.get("to"),
-                    "subject": email_row.get("subject"),
-                    "approved_by_chat": str(
-                        update.effective_user.id if update.effective_user else "unknown"
-                    ),
-                },
-                session_id="telegram-inbox-approve",
-                run=lambda: self._gmail_adapter.send_draft(gmail_draft_id),
-                reversibility=0.0,
-            )
-            personal_store.update_email_status(row_id, "sent")
-            await query.edit_message_reply_markup(reply_markup=None)
-            await query.answer("Sent!", show_alert=False)
-        except Exception as exc:
-            logger.error("send_draft failed for row %d: %s", row_id, exc)
-            await query.answer(f"Send failed: {exc}"[:200], show_alert=True)
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.answer(
+            "Draft approved for review. Cato did not send it; Ben sends manually.",
+            show_alert=False,
+        )
 
     # ------------------------------------------------------------------
     # Night-shift approvals + digest

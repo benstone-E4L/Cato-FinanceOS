@@ -12,6 +12,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional
 
+from cato.platform import get_data_dir
+
 if TYPE_CHECKING:
     from .memory import MemorySystem
 
@@ -188,7 +190,7 @@ class ContextGate:
 
         # Try to find skill files in standard locations
         skill_dirs = [
-            Path.home() / ".cato" / "workspace",
+            get_data_dir() / "workspace",
             Path.cwd() / "cato" / "skills",
         ]
 

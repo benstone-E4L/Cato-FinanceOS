@@ -64,3 +64,23 @@ async def test_telegram_send_without_bot_raises_or_logs(caplog):
                for r in caplog.records), (
         "Expected an error log when send() called before start()"
     )
+
+
+@pytest.mark.asyncio
+async def test_email_approve_callback_never_transmits_draft():
+    """Telegram approval records review state and cannot call Gmail send."""
+    adapter = _make_adapter()
+    adapter._gmail_adapter = MagicMock(send_draft=AsyncMock())
+    query = MagicMock(data="approve_42")
+    query.answer = AsyncMock()
+    query.edit_message_reply_markup = AsyncMock()
+    update = MagicMock(callback_query=query)
+
+    with patch("cato.core.personal_store.claim_email_for_send", return_value=42), patch(
+        "cato.core.personal_store.get_email_by_id",
+        return_value={"id": 42, "gmail_draft_id": "draft-42"},
+    ):
+        await adapter._cb_email_action(update, MagicMock())
+
+    adapter._gmail_adapter.send_draft.assert_not_awaited()
+    assert "did not send" in query.answer.await_args_list[-1].args[0]

@@ -43,6 +43,7 @@ from cato.tools.genesis import (
     AP2_ENVELOPE_VERSION,
     GENESIS_AGENTS,
     GENESIS_TOOL_SCHEMA,
+    IMMUTABLE_DENIED_AGENTS,
     MONEY_DOMAIN_AGENTS,
     GenesisTool,
     build_envelope,
@@ -113,10 +114,12 @@ class FakeResp:
 class FakeSession:
     """Drop-in replacement for aiohttp.ClientSession for tests."""
 
-    def __init__(self, post_resp=None, post_exc=None, get_resp=None):
+    def __init__(self, post_resp=None, post_exc=None, get_resp=None, get_responses=None):
         self._post_resp = post_resp
         self._post_exc = post_exc
         self._get_resp = get_resp
+        self._get_responses = list(get_responses or [])
+        self.get_calls: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
         self.closed = False
 
     def post(self, *a, **kw):
@@ -125,6 +128,9 @@ class FakeSession:
         return self._post_resp
 
     def get(self, *a, **kw):
+        self.get_calls.append((a, kw))
+        if self._get_responses:
+            return self._get_responses.pop(0)
         return self._get_resp or FakeResp(200, '"ok"')
 
     async def close(self):
@@ -339,6 +345,29 @@ class TestExecuteBranches:
         assert out["agent"] == "genesis-legal"
         assert "name" in out
 
+    async def test_pending_message_does_not_claim_the_agent_is_undeployed(self):
+        """All five 'pending' slugs are real, deployed Genesis bundles.
+
+        Telling the operator to "try again later" sends them to wait on a
+        deployment that already happened; the actual blocker is that Cato has
+        not cleared the slug for dispatch. A refusal that misstates its own
+        reason is worse than a bare refusal.
+        """
+        tool = _new_tool()
+        for slug in (
+            "genesis-legal",
+            "genesis-hr",
+            "genesis-data-pipeline",
+            "genesis-workflow-automator",
+            "genesis-ai-vision",
+        ):
+            out = json.loads(await tool.execute({"agent": slug, "task": "t"}))
+            assert out["ok"] is False, slug
+            message = out["message"].lower()
+            assert "not yet deployed" not in message, slug
+            assert "try again later" not in message, slug
+            assert "cleared for dispatch" in message, slug
+
     async def test_disabled_returns_genesis_disabled(self):
         tool = _new_tool(config=MockConfig(genesis_enabled=False))
         out = json.loads(await tool.execute({"agent": "genesis-research", "task": "t"}))
@@ -428,10 +457,47 @@ class TestExecuteHTTP:
         assert env["payload"]["agent"] == "genesis-research"
         assert env["payload"]["task"] == "t"
         assert env["payload"]["params"] == {"x": 1}
+        # Genesis's RunRequest receives a non-empty prompt and structured task,
+        # while the signed AP2 payload remains unchanged underneath.
+        assert env["prompt"] == "t"
+        assert env["task"] == {"x": 1, "description": "t"}
+        signed_bytes = json.dumps(
+            {"payload": env["payload"], "nonce": env["nonce"], "timestamp": env["timestamp"]},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        assert vault_crypto.verify(
+            base64.b64decode(env["pubkey"]), signed_bytes, base64.b64decode(env["signature"])
+        ) is True
         # Headers carry the AP2 protocol version + pubkey sidecar.
         headers = kw.get("headers") or {}
         assert headers.get("X-AP2-Version") == str(AP2_ENVELOPE_VERSION)
         assert headers.get("X-AP2-Pubkey") == env["pubkey"]
+
+    async def test_caller_description_param_is_not_overwritten_by_task_text(self):
+        """Genesis binds task-minus-description against the signed params.
+
+        Cato uses setdefault, so a caller's own `description` must survive
+        unchanged into BOTH the signed payload.params and the runtime task —
+        if the two disagree, Genesis rejects a correctly signed request with an
+        opaque 401 (main.assert_envelope_binds_request → ap2_params_mismatch).
+        """
+        session = CapturingSession()
+        tool = _new_tool(session=session)
+        params = {"description": "caller supplied", "x": 1}
+        out = json.loads(
+            await tool.execute(
+                {"agent": "genesis-research", "task": "t", "params": params}
+            )
+        )
+        assert out["ok"] is True
+        _, kw = session.calls[0]
+        env = kw["json"]
+        assert env["payload"]["params"]["description"] == "caller supplied"
+        assert env["task"]["description"] == "caller supplied"
+        # The binding Genesis performs: runtime task equals signed params here,
+        # because description is present on the signed side too.
+        assert env["task"] == env["payload"]["params"]
 
     async def test_includes_api_key_header_when_vault_has_key(self):
         v = MockVault(initial={"GATEWAY_API_KEY": "test-key-abc"})
@@ -443,6 +509,157 @@ class TestExecuteHTTP:
         assert fake.calls, "post not called"
         headers = fake.calls[0][1].get("headers", {})
         assert headers.get("X-Agent-Api-Key") == "test-key-abc", headers
+
+    async def test_auth_header_exactly_matches_genesis_gateway_contract(self):
+        v = MockVault(initial={"GATEWAY_API_KEY": "contract-test-key"})
+        fake = CapturingSession()
+        tool = _new_tool(vault=v, session=fake)
+
+        await tool.execute({"agent": "genesis-research", "task": "research"})
+
+        headers = fake.calls[0][1]["headers"]
+        assert headers["X-Agent-Api-Key"] == "contract-test-key"
+        assert "Authorization" not in headers
+        assert "X-API-Key" not in headers
+
+    async def test_queued_job_is_polled_until_terminal_before_success(self):
+        posted = FakeResp(202, json.dumps({
+            "status": "QUEUED", "job_id": "job-1", "poll_url": "/agents/jobs/job-1",
+            "principal_token": "principal-job-1",
+        }))
+        queued = FakeResp(200, json.dumps({"status": "RUNNING", "id": "job-1"}))
+        delivered = FakeResp(200, json.dumps({
+            "status": "DELIVERED",
+            "resultSummary": json.dumps({
+                "response": "done",
+                "trace": {"tool_calls": [{"tool_name": "web_search", "ok": True}]},
+            }),
+        }))
+        session = FakeSession(post_resp=posted, get_responses=[queued, delivered])
+        tool = _new_tool(session=session)
+
+        out = json.loads(await tool.execute({"agent": "genesis-research", "task": "research"}))
+
+        assert out["ok"] is True
+        assert out["successful_tool_calls"] == 1
+        assert len(session.get_calls) == 2
+        poll_headers = session.get_calls[0][1]["headers"]
+        assert poll_headers == {
+            "Content-Type": "application/json",
+            "X-Genesis-Principal-Token": "principal-job-1",
+        }
+        assert "X-Agent-Api-Key" not in poll_headers
+
+    @pytest.mark.parametrize("poll_url", [
+        "https://attacker.invalid/steal",
+        "//attacker.invalid/steal",
+        "https://test.local@attacker.invalid/steal",
+    ])
+    async def test_untrusted_poll_origins_receive_no_credentialed_request(self, poll_url):
+        posted = FakeResp(202, json.dumps({
+            "status": "QUEUED", "job_id": "job-hostile", "poll_url": poll_url,
+            "principal_token": "principal-hostile",
+        }))
+        session = FakeSession(post_resp=posted)
+        tool = _new_tool(
+            vault=MockVault(initial={"GATEWAY_API_KEY": "test-gateway-secret"}),
+            session=session,
+        )
+
+        out = json.loads(await tool.execute({"agent": "genesis-research", "task": "research"}))
+
+        assert out["ok"] is False
+        assert out["error"] == "unsafe_job_poll_url"
+        assert session.get_calls == []
+
+    async def test_poll_redirect_is_not_followed_with_gateway_credential(self):
+        posted = FakeResp(202, json.dumps({
+            "status": "QUEUED", "job_id": "job-redirect", "poll_url": "/agents/jobs/job-redirect",
+            "principal_token": "principal-redirect",
+        }))
+        redirect = FakeResp(302, "redirect")
+        session = FakeSession(post_resp=posted, get_resp=redirect)
+        tool = _new_tool(
+            vault=MockVault(initial={"GATEWAY_API_KEY": "test-gateway-secret"}),
+            session=session,
+        )
+
+        out = json.loads(await tool.execute({"agent": "genesis-research", "task": "research"}))
+
+        assert out["ok"] is False
+        assert out["error"] == "job_poll_upstream_error"
+        assert len(session.get_calls) == 1
+        args, kwargs = session.get_calls[0]
+        assert args[0] == "http://test.local/agents/jobs/job-redirect"
+        assert kwargs["allow_redirects"] is False
+        assert kwargs["headers"] == {
+            "Content-Type": "application/json",
+            "X-Genesis-Principal-Token": "principal-redirect",
+        }
+
+    @pytest.mark.parametrize("principal_token", [
+        None,
+        "",
+        " leading-space",
+        "line\nbreak",
+        "x" * 4097,
+    ])
+    async def test_missing_or_malformed_principal_token_never_polls(self, principal_token):
+        queued = {
+            "status": "QUEUED",
+            "job_id": "job-invalid-token",
+            "poll_url": "/agents/jobs/job-invalid-token",
+        }
+        if principal_token is not None:
+            queued["principal_token"] = principal_token
+        session = FakeSession(post_resp=FakeResp(202, json.dumps(queued)))
+        tool = _new_tool(
+            vault=MockVault(initial={"GATEWAY_API_KEY": "test-gateway-secret"}),
+            session=session,
+        )
+
+        out = json.loads(await tool.execute({"agent": "genesis-research", "task": "research"}))
+
+        assert out["ok"] is False
+        assert out["error"] == "invalid_principal_token"
+        assert out["outcome_unknown"] is True
+        assert session.get_calls == []
+
+    async def test_expired_principal_token_fails_without_shared_gateway_header(self):
+        posted = FakeResp(202, json.dumps({
+            "status": "QUEUED",
+            "job_id": "job-expired",
+            "poll_url": "/agents/jobs/job-expired",
+            "principal_token": "principal-expired",
+        }))
+        session = FakeSession(post_resp=posted, get_resp=FakeResp(401, "principal_token_expired"))
+        tool = _new_tool(
+            vault=MockVault(initial={"GATEWAY_API_KEY": "test-gateway-secret"}),
+            session=session,
+        )
+
+        out = json.loads(await tool.execute({"agent": "genesis-research", "task": "research"}))
+
+        assert out["ok"] is False
+        assert out["error"] == "job_poll_upstream_error"
+        headers = session.get_calls[0][1]["headers"]
+        assert headers["X-Genesis-Principal-Token"] == "principal-expired"
+        assert "X-Agent-Api-Key" not in headers
+
+    async def test_explicit_zero_successful_tool_calls_is_failure(self):
+        body = {
+            "response": json.dumps({
+                "ok": True,
+                "response": "narrated but did not execute",
+                "trace": {"tool_calls": []},
+            }),
+        }
+        tool = _new_tool(session=FakeSession(post_resp=FakeResp(200, json.dumps(body))))
+
+        out = json.loads(await tool.execute({"agent": "genesis-research", "task": "research"}))
+
+        assert out["ok"] is False
+        assert out["error"] == "zero_successful_tool_calls"
 
     async def test_omits_api_key_header_when_vault_empty(self):
         v = MockVault()
@@ -492,6 +709,23 @@ class TestFailClosedAllowlist:
         out = json.loads(await tool.execute({"agent": "genesis-research", "task": "t"}))
         assert out["ok"] is False
         assert out["error"] == "not_in_allowlist"
+
+    async def test_deploy_is_immutable_deny_even_when_config_allowlists_it(self):
+        assert isinstance(IMMUTABLE_DENIED_AGENTS, frozenset)
+        assert MONEY_DOMAIN_AGENTS < IMMUTABLE_DENIED_AGENTS
+        assert "genesis-deploy" in IMMUTABLE_DENIED_AGENTS
+        cfg = MockConfig(
+            genesis_agent_allowlist=["genesis-deploy"],
+            genesis_agent_denylist=[],
+        )
+        session = CapturingSession()
+        tool = _new_tool(config=cfg, session=session)
+
+        out = json.loads(await tool.execute({"agent": "genesis-deploy", "task": "deploy"}))
+
+        assert out["ok"] is False
+        assert out["error"] == "denylisted"
+        assert session.calls == []
 
     async def test_populated_allowlist_still_permits(self):
         """Sanity: the fail-closed flip doesn't break the legitimate grant path."""
@@ -589,12 +823,13 @@ class TestTruthfulRemoteResults:
         out = json.loads(await tool.execute({"agent": "genesis-research", "task": "t"}))
         assert out["ok"] is True
 
-    async def test_non_json_body_falls_back_to_http_status(self):
-        """No structured signal available -- trust the 200 (nothing to distinguish it)."""
+    async def test_non_json_body_fails_closed_despite_http_200(self):
+        """A 200 without the Genesis response contract is not completion proof."""
         session = FakeSession(post_resp=FakeResp(200, "plain text ack"))
         tool = _new_tool(session=session)
         out = json.loads(await tool.execute({"agent": "genesis-research", "task": "t"}))
-        assert out["ok"] is True
+        assert out["ok"] is False
+        assert out["error"] == "invalid_upstream_response"
 
 
 class TestTimeoutFailureSemantics:
@@ -694,3 +929,62 @@ class TestNoSelfGrantedAuthority:
         out = json.loads(await tool.execute({"agent": "genesis-research", "task": "t"}))
         assert out["ok"] is True
         assert out["agent"] == "genesis-research"  # echoes the REQUEST agent, not the response's
+
+
+class TestAP2CanonicalBytesUnicode:
+    r"""AP2 canonical bytes must be RFC 8785 (JCS) form: raw UTF-8, not \uXXXX escapes.
+
+    Genesis verifies with json.dumps(..., ensure_ascii=False).encode("utf-8")
+    (runtime/request_auth.py::_canonical_json). Cato signed with the json.dumps
+    default (ensure_ascii=True), so the two sides hashed different byte strings
+    the moment a task contained any non-ASCII character — a smart quote, an
+    accent, an arrow, an emoji — and Genesis answered 401 ap2_signature_invalid.
+    Pure-ASCII payloads are byte-identical either way, so this is not a wire
+    break for existing traffic.
+    """
+
+    def test_non_ascii_task_is_not_escaped(self):
+        from cato.tools.genesis import _canonical_signed_bytes
+
+        raw = _canonical_signed_bytes(
+            {"agent": "genesis-security", "task": "café → naïve", "params": {}},
+            "n" * 32,
+            "2026-08-12T00:00:00Z",
+        )
+        assert rb"\u" not in raw, (
+            r"canonical bytes contain \uXXXX escapes; Genesis verifies raw UTF-8 "
+            "so every non-ASCII prompt fails signature verification"
+        )
+        assert "café → naïve".encode("utf-8") in raw
+
+    def test_matches_genesis_verifier_canonicalization(self):
+        """Byte-for-byte agreement with Genesis's _canonical_json implementation."""
+        import json
+
+        from cato.tools.genesis import _canonical_signed_bytes
+
+        payload = {"agent": "genesis-security", "task": "Résumé ☕", "params": {"k": "→"}}
+        nonce, ts = "a" * 32, "2026-08-12T00:00:00Z"
+
+        # Exactly runtime/request_auth.py::_canonical_json in Genesis Agents.
+        genesis_bytes = json.dumps(
+            {"payload": payload, "nonce": nonce, "timestamp": ts},
+            sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        ).encode("utf-8")
+
+        assert _canonical_signed_bytes(payload, nonce, ts) == genesis_bytes
+
+    def test_ascii_payload_bytes_unchanged(self):
+        """Regression guard: the fix must not alter the wire form of ASCII traffic."""
+        import json
+
+        from cato.tools.genesis import _canonical_signed_bytes
+
+        payload = {"agent": "genesis-security", "task": "plain ascii", "params": {}}
+        nonce, ts = "b" * 32, "2026-08-12T00:00:00Z"
+        legacy = json.dumps(
+            {"payload": payload, "nonce": nonce, "timestamp": ts},
+            sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")
+
+        assert _canonical_signed_bytes(payload, nonce, ts) == legacy

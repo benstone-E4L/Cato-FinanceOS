@@ -138,9 +138,9 @@ def build_system_prompt(base_prompt: str = "", workspace_dir: "Path | None" = No
             from cato.config import CatoConfig
             cfg = CatoConfig.load()
             ws = getattr(cfg, "workspace_dir", "") or ""
-            workspace_dir = _Path(ws).expanduser().resolve() if ws else (_Path.home() / ".cato" / "workspace")
+            workspace_dir = _Path(ws).expanduser().resolve() if ws else (get_data_dir() / "workspace")
         except Exception:
-            workspace_dir = _Path.home() / ".cato" / "workspace"
+            workspace_dir = get_data_dir() / "workspace"
     identity_files = ["SOUL.md", "IDENTITY.md"]
     identity_content = []
     for fname in identity_files:
@@ -1245,8 +1245,7 @@ class Gateway:
     # ------------------------------------------------------------------
 
     def _skills_dir(self) -> "Path":
-        from pathlib import Path
-        d = Path.home() / ".cato" / "skills"
+        d = get_data_dir() / "skills"
         d.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -1419,8 +1418,7 @@ class Gateway:
     # ------------------------------------------------------------------
 
     def _agents_dir(self) -> "Path":
-        from pathlib import Path
-        return Path.home() / ".cato" / "agents"
+        return get_data_dir() / "agents"
 
     def _list_agents(self) -> list:
         agents = []
@@ -1459,7 +1457,7 @@ class Gateway:
         ws = getattr(self._cfg, "workspace_dir", None)
         if ws:
             return Path(ws)
-        return Path.home() / ".cato" / "workspace"
+        return get_data_dir() / "workspace"
 
     def _list_workspace_files(self) -> dict:
         ws = self._workspace_dir()

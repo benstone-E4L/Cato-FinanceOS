@@ -620,10 +620,13 @@ async def patch_config(request: web.Request) -> web.Response:
 
 
 def register_routes(app: web.Application) -> None:
-    """Register coding agent routes onto an aiohttp Application."""
+    """Register coding-agent routes onto an aiohttp Application.
+
+    The main UI server is the sole owner of ``/api/config``.  Registering a
+    second pair here made application startup depend on aiohttp collision
+    behaviour and left two incompatible config schemas behind one URL.
+    """
     app.router.add_post("/api/coding-agent/invoke",        invoke_coding_agent)
     app.router.add_get("/api/coding-agent/{task_id}",      get_task_info)
     app.router.add_get("/ws/coding-agent/{task_id}",       coding_agent_ws_handler)
-    app.router.add_get("/api/config",                      get_config)
-    app.router.add_patch("/api/config",                    patch_config)
     logger.info("Coding agent routes registered")

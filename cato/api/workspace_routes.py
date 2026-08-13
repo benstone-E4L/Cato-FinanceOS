@@ -24,7 +24,8 @@ def _workspace_dir() -> Path:
     config = CatoConfig.load()
     if config.workspace_dir:
         return Path(config.workspace_dir).expanduser()
-    return Path.home() / ".cato" / "workspace"
+    from cato.platform import get_data_dir
+    return get_data_dir() / "workspace"
 
 
 async def get_templates(request: web.Request) -> web.Response:

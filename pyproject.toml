@@ -39,6 +39,12 @@ dependencies = [
     "google-api-python-client>=2.100.0",
     "google-auth>=2.20.0",
     "google-auth-oauthlib>=1.0.0",
+    # Phoenix/OpenInference tracing. Vendor-neutral OTLP rather than a
+    # Phoenix-specific SDK, so a second exporter (e.g. Azure Monitor) is a
+    # config change, not a rewrite. Both are pure-Python and dependency-light;
+    # cato.core.phoenix_tracing degrades to no-op if they are ever absent.
+    "opentelemetry-sdk>=1.44.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44.0",
 ]
 
 [project.optional-dependencies]

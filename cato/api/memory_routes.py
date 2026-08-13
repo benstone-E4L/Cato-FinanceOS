@@ -53,7 +53,8 @@ async def search_memory(request: web.Request) -> web.Response:
         # Load memory file if not yet indexed
         from cato.config import CatoConfig
         config = CatoConfig.load()
-        workspace_dir = Path(config.workspace_dir or Path.home() / ".cato" / "workspace").expanduser()
+        from cato.platform import get_data_dir
+        workspace_dir = Path(config.workspace_dir or get_data_dir() / "workspace").expanduser()
         memory_path = workspace_dir / "MEMORY.md"
 
         if memory_path.exists() and not engine.chunks:
@@ -86,7 +87,8 @@ async def index_memory(request: web.Request) -> web.Response:
 
         from cato.config import CatoConfig
         config = CatoConfig.load()
-        workspace_dir = Path(config.workspace_dir or Path.home() / ".cato" / "workspace").expanduser()
+        from cato.platform import get_data_dir
+        workspace_dir = Path(config.workspace_dir or get_data_dir() / "workspace").expanduser()
         memory_path = workspace_dir / "MEMORY.md"
 
         if not memory_path.exists():
@@ -120,7 +122,8 @@ async def memory_stats(request: web.Request) -> web.Response:
             facts = 0
             kg_nodes = 0
             kg_edges = 0
-            mem_dir = Path.home() / ".cato" / "memory"
+            from cato.platform import get_data_dir
+            mem_dir = get_data_dir() / "memory"
             if mem_dir.exists():
                 for db_path in mem_dir.glob("*.db"):
                     try:

@@ -93,7 +93,11 @@ class ConduitProof:
         Export a self-verifiable session proof bundle as a .tar.gz archive.
         Returns {"success": True, "path": str, "action_count": int, "chain_hash": str}
         """
-        out_dir = Path(output_dir) if output_dir else Path.home() / ".cato" / "proofs"
+        if output_dir:
+            out_dir = Path(output_dir).expanduser()
+        else:
+            from cato.platform import get_data_dir
+            out_dir = get_data_dir() / "proofs"
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # Fetch session rows

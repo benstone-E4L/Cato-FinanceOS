@@ -162,7 +162,10 @@ class OpenClawMigrator:
         dry_run: bool = False,
     ) -> None:
         self.source = source_dir or Path.home() / ".openclaw"
-        self.dest = dest_dir or Path.home() / ".cato"
+        if dest_dir is None:
+            from cato.platform import get_data_dir
+            dest_dir = get_data_dir()
+        self.dest = dest_dir
         self.dry_run = dry_run
         self.stats: dict = {
             "agents": 0,

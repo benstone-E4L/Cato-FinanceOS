@@ -39,6 +39,7 @@ not as "today's price".
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
@@ -934,6 +935,88 @@ def route(
     return decision
 
 
+def to_anthropic_messages(messages: list[dict]) -> list[dict]:
+    """Translate OpenAI-shaped conversation turns to the Anthropic Messages shape.
+
+    The agent loop keeps history in the OpenAI wire shape: assistant turns carry
+    ``tool_calls``, and each tool result is its own ``{"role": "tool"}`` message.
+    The Anthropic Messages API has no ``tool`` role — it takes ``tool_use`` content
+    blocks on the assistant turn and ``tool_result`` blocks inside the *next user*
+    turn. Sending the OpenAI shape verbatim returns
+    ``400 invalid_request_error: messages: Unexpected role "tool"``, which killed
+    every tool-using conversation on its second turn.
+
+    This is the wire boundary, deliberately mirroring the model-id translation in
+    ``cato/router.py``: selection and history stay in one canonical shape and only
+    the outbound provider payload is normalised.
+
+    Properties this must keep:
+      * **Idempotent.** Messages already in Anthropic shape (list content, no
+        ``tool_calls``) pass through untouched.
+      * **Grouped.** All ``tool_result`` blocks answering one assistant turn are
+        merged into a single user message. Anthropic rejects a ``tool_use`` block
+        that is not answered in the immediately following user turn, so a
+        multi-tool turn must not become several user messages.
+      * **Order preserving.** ``tool_result`` blocks stay in call order.
+    """
+    out: list[dict[str, Any]] = []
+    pending_results: list[dict[str, Any]] = []
+
+    def _flush() -> None:
+        if pending_results:
+            out.append({"role": "user", "content": list(pending_results)})
+            pending_results.clear()
+
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role")
+
+        if role == "tool":
+            content = msg.get("content")
+            pending_results.append({
+                "type": "tool_result",
+                "tool_use_id": str(msg.get("tool_call_id") or "unknown"),
+                "content": content if isinstance(content, str) else json.dumps(content),
+            })
+            continue
+
+        _flush()
+
+        if role == "assistant" and msg.get("tool_calls"):
+            blocks: list[dict[str, Any]] = []
+            text = msg.get("content")
+            if isinstance(text, str) and text.strip():
+                blocks.append({"type": "text", "text": text})
+            elif isinstance(text, list):
+                blocks.extend(b for b in text if isinstance(b, dict))
+            for tc in msg.get("tool_calls") or []:
+                if not isinstance(tc, dict):
+                    continue
+                fn = tc.get("function") if isinstance(tc.get("function"), dict) else tc
+                raw_args = fn.get("arguments", {})
+                if isinstance(raw_args, str):
+                    try:
+                        parsed_args = json.loads(raw_args or "{}")
+                    except (json.JSONDecodeError, ValueError):
+                        parsed_args = {}
+                else:
+                    parsed_args = raw_args
+                blocks.append({
+                    "type": "tool_use",
+                    "id": str(tc.get("id") or "unknown"),
+                    "name": str(fn.get("name") or ""),
+                    "input": parsed_args if isinstance(parsed_args, dict) else {},
+                })
+            out.append({"role": "assistant", "content": blocks})
+            continue
+
+        out.append(msg)
+
+    _flush()
+    return out
+
+
 def build_request_payload(
     decision: RoutingDecision,
     messages: list[dict],
@@ -947,11 +1030,14 @@ def build_request_payload(
     Encodes the structural difference between tiers: Haiku 4.5 gets the older
     ``thinking:{type:"enabled",budget_tokens:N}`` shape and NO ``output_config``;
     Sonnet/Opus/Fable get adaptive thinking plus ``output_config.effort``.
+
+    Messages are normalised to the Anthropic shape here — this is the last point
+    before the wire, so no caller can bypass it.
     """
     payload: dict[str, Any] = {
         "model": decision.model_id,
         "max_tokens": decision.max_output_tokens,   # the only HARD cost cap
-        "messages": messages,
+        "messages": to_anthropic_messages(messages),
         "stream": stream,
     }
     if system:

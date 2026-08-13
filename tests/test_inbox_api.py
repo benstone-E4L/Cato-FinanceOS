@@ -93,7 +93,7 @@ async def test_inbox_approve_without_gmail_adapter_durably_marks_approved_for_la
 
 
 @pytest.mark.asyncio
-async def test_inbox_approve_with_nested_gmail_adapter_sends_and_marks_sent():
+async def test_inbox_approve_with_nested_gmail_adapter_never_sends():
     row_id = store.save_email(
         gmail_message_id="msg-send",
         subject="Please send",
@@ -115,10 +115,11 @@ async def test_inbox_approve_with_nested_gmail_adapter_sends_and_marks_sent():
         assert resp.status == 200
         data = await resp.json()
 
-    gmail_adapter.send_draft.assert_awaited_once_with("draft-send")
-    assert data["status"] == "sent"
-    assert data["sent"] is True
-    assert store.get_email_by_id(row_id)["status"] == "sent"
+    gmail_adapter.send_draft.assert_not_awaited()
+    assert data["status"] == "approved"
+    assert data["sent"] is False
+    assert "did not send" in data["message"]
+    assert store.get_email_by_id(row_id)["status"] == "approved"
 
 
 @pytest.mark.asyncio

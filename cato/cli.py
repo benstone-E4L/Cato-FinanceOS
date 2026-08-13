@@ -48,6 +48,15 @@ _PID_FILE = _CATO_DIR / "cato.pid"
 _PORT_FILE = _CATO_DIR / "cato.port"
 
 
+def _ensure_data_dirs(data_dir: Path | None = None) -> tuple[Path, ...]:
+    """Create the canonical runtime directories, including discoverable skills."""
+    root = data_dir or _CATO_DIR
+    dirs = tuple(root / name for name in ("workspace", "memory", "logs", "agents", "skills"))
+    for directory in dirs:
+        directory.mkdir(parents=True, exist_ok=True)
+    return dirs
+
+
 def _pid_alive(pid: int) -> bool:
     """Return True when *pid* currently refers to a live process.
 
@@ -284,14 +293,7 @@ def cmd_init() -> None:
         safe_print("Telegram token stored in vault.")
 
     # 6. Create directory structure
-    dirs = [
-        _CATO_DIR / "workspace",
-        _CATO_DIR / "memory",
-        _CATO_DIR / "logs",
-        _CATO_DIR / "agents",
-    ]
-    for d in dirs:
-        d.mkdir(parents=True, exist_ok=True)
+    _ensure_data_dirs()
 
     # 8. Save config
     config.save()
@@ -653,6 +655,46 @@ def cmd_start(agent: str, channel: str, browser: str) -> None:
             _PID_FILE.unlink()
 
 
+async def _start_messaging_adapters(gateway, vault, config, log):
+    """Start Telegram and Gmail independently; return the Gmail adapter.
+
+    Gmail polling is useful without Telegram because drafts and inbox state are
+    exposed through the authenticated desktop API.  Telegram remains an
+    optional notification/approval surface, not a startup prerequisite.
+    """
+    import asyncio
+
+    tg = None
+    if config.telegram_enabled:
+        try:
+            from .adapters.telegram import TelegramAdapter
+
+            tg = TelegramAdapter(gateway, vault, config)
+            gateway.register_adapter(tg)
+            log.info("Telegram adapter registered")
+        except Exception as exc:
+            log.warning("Telegram adapter failed to register: %s", exc)
+
+    gmail = None
+    if vault is not None:
+        try:
+            from .adapters.gmail_adapter import GmailAdapter
+            from .router import ModelRouter
+
+            gmail = GmailAdapter(vault=vault)
+            router = ModelRouter(vault=vault, preferred_model="claude-sonnet-4-6")
+            gmail._router = router
+            gmail._task = asyncio.create_task(gmail.start(), name="gmail-poller")
+            gateway._gmail_adapter = gmail
+            if tg is not None:
+                tg._gmail_adapter = gmail
+                tg._router = router
+            log.info("Gmail adapter started")
+        except Exception as exc:
+            log.warning("Gmail adapter failed to start: %s", exc)
+    return gmail
+
+
 def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
     """Import and launch the Gateway with configured adapters."""
     import asyncio
@@ -688,7 +730,6 @@ def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
 
     async def _main(cfg: CatoConfig, vlt: "Vault", bdg: BudgetManager) -> None:
         from .gateway import Gateway
-        from .adapters.telegram import TelegramAdapter
         from .ui.server import create_ui_app
         from aiohttp import web
 
@@ -717,33 +758,7 @@ def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
 
         gateway = Gateway(cfg, bdg, vlt)
 
-        tg: "TelegramAdapter | None" = None
-        if cfg.telegram_enabled:
-            try:
-                tg = TelegramAdapter(gateway, vlt, cfg)
-                gateway.register_adapter(tg)
-                log.info("Telegram adapter registered")
-            except Exception as e:
-                log.warning(f"Telegram adapter failed to register: {e}")
-
-        # Wire Gmail adapter alongside Telegram (best-effort — no vault key = skipped)
-        if tg is not None and vlt is not None:
-            try:
-                from .adapters.gmail_adapter import GmailAdapter  # noqa: PLC0415
-                from .router import ModelRouter  # noqa: PLC0415
-
-                gmail = GmailAdapter(vault=vlt)
-                router = ModelRouter(vault=vlt, preferred_model="claude-sonnet-4-6")
-                tg._gmail_adapter = gmail
-                tg._router = router
-                # GmailAdapter needs app/chat_id at runtime; we set the app now
-                # and the chat_id is wired per-request in _cmd_check.
-                # For the scheduled poller we use None until first /check sets it.
-                gmail._router = router
-                asyncio.create_task(gmail.start())
-                log.info("GmailAdapter started")
-            except Exception as e:
-                log.warning(f"GmailAdapter failed to start: {e}")
+        gmail = await _start_messaging_adapters(gateway, vlt, cfg, log)
 
         app = await create_ui_app(gateway)
         runner = web.AppRunner(app)
@@ -776,6 +791,8 @@ def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
         except asyncio.CancelledError:
             pass
         finally:
+            if gmail is not None:
+                await gmail.stop()
             await runner.cleanup()
             await gateway.stop()
             # Remove port file on clean shutdown
@@ -1030,6 +1047,13 @@ def cmd_status() -> None:
     else:
         safe_print(f"  WebChat:  port {config.webchat_port} (config)")
     safe_print(f"  Telegram: {'enabled' if config.telegram_enabled else 'disabled'}")
+
+    from cato.platform import get_legacy_data_inventory
+    legacy_inventory = get_legacy_data_inventory()
+    if legacy_inventory:
+        safe_print("\nLegacy data requires review (no automatic migration):")
+        for item in legacy_inventory:
+            safe_print(f"  {item['root']}: {', '.join(item['present'])}")
 
     safe_print("\nBudget")
     try:
