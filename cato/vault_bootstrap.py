@@ -51,6 +51,21 @@ _MIGRATE_SKIP_KEYS: frozenset[str] = frozenset(
     }
 )
 
+# Real credentials already present in the vault under a differently-named key
+# than the one the rest of the codebase reads. Discovered 2026-08-13: the
+# recovered vault holds SWARMSYNC_VERIFYAPI_KEY and GITHUB_FOXFIREPOETS_TOKEN,
+# neither of which OPERATOR_VAULT_KEYS or any consumer looks for by that exact
+# name, so both credentials were silently unused. This maps canonical name ->
+# the alias(es) that may hold the same value, resolved at bootstrap time only
+# (an environ assignment, never a second vault entry) so nothing is duplicated
+# or exposed — see apply_vault_to_environ().
+CANONICAL_KEY_ALIASES: dict[str, tuple[str, ...]] = {
+    "SWARMSYNC_API_KEY": ("SWARMSYNC_VERIFYAPI_KEY",),
+    "SWARM_SYNC_API_KEY": ("SWARMSYNC_VERIFYAPI_KEY",),
+    "GITHUB_TOKEN": ("GITHUB_FOXFIREPOETS_TOKEN",),
+    "GH_TOKEN": ("GITHUB_FOXFIREPOETS_TOKEN",),
+}
+
 
 @dataclass(frozen=True)
 class BootstrapReport:
@@ -198,6 +213,11 @@ def apply_vault_to_environ(
     env values that were set before bootstrap are overwritten when the vault
     has the key (vault is the preferred durable store).
 
+    A canonical key with no value under its own name falls back to
+    CANONICAL_KEY_ALIASES: if the vault holds the same credential under a
+    differently-named key, that value is applied under the CANONICAL name
+    only — the vault itself is never written to, so nothing is duplicated.
+
     Returns key names applied — never values.
     """
     target = environ if environ is not None else os.environ
@@ -213,6 +233,12 @@ def apply_vault_to_environ(
         if key in _MIGRATE_SKIP_KEYS or key == CANARY_KEY_NAME:
             continue
         value = stored.get(key)
+        if value is None or not str(value).strip():
+            for alias in CANONICAL_KEY_ALIASES.get(key, ()):
+                alias_value = stored.get(alias)
+                if alias_value is not None and str(alias_value).strip():
+                    value = alias_value
+                    break
         if value is None or not str(value).strip():
             if only_if_present:
                 continue

@@ -12,6 +12,7 @@ import pytest
 
 from cato.vault import Vault, VaultError
 from cato.vault_bootstrap import (
+    CANONICAL_KEY_ALIASES,
     OPERATOR_VAULT_KEYS,
     apply_vault_to_environ,
     bootstrap_launch_credentials,
@@ -189,3 +190,67 @@ def test_operator_vault_keys_include_required_targets():
     assert "TELEGRAM_BOT_TOKEN" in OPERATOR_VAULT_KEYS
     assert "OPENROUTER_API_KEY" in OPERATOR_VAULT_KEYS
     assert "ANTHROPIC_API_KEY" in OPERATOR_VAULT_KEYS
+
+
+def test_swarmsync_verifyapi_key_resolves_via_alias(tmp_path, monkeypatch):
+    """Regression: the recovered vault holds SWARMSYNC_VERIFYAPI_KEY, not
+    SWARMSYNC_API_KEY — bootstrap must still recognize it under the
+    canonical name the rest of the codebase reads, without a second vault
+    entry existing anywhere."""
+    monkeypatch.setenv("CATO_VAULT_PASSWORD", "alias-pw")
+    import cato.vault as vault_mod
+
+    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
+
+    vault_path = tmp_path / "vault.enc"
+    v = Vault(vault_path=vault_path)
+    v.unlock("alias-pw", allow_create=True)
+    v.set("SWARMSYNC_VERIFYAPI_KEY", "swarmsync-real-value")
+    assert "SWARMSYNC_API_KEY" not in v.list_keys()
+
+    environ = {}
+    applied = apply_vault_to_environ(v, environ=environ)
+    assert "SWARMSYNC_API_KEY" in applied
+    assert environ["SWARMSYNC_API_KEY"] == "swarmsync-real-value"
+    # The alias key itself is never promoted directly under its own name
+    # unless something else also wants it — only the canonical name is what
+    # this test asserts on, matching what OPERATOR_VAULT_KEYS actually reads.
+
+
+def test_github_foxfirepoets_token_resolves_via_alias(tmp_path, monkeypatch):
+    monkeypatch.setenv("CATO_VAULT_PASSWORD", "alias-pw-2")
+    import cato.vault as vault_mod
+
+    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
+
+    vault_path = tmp_path / "vault.enc"
+    v = Vault(vault_path=vault_path)
+    v.unlock("alias-pw-2", allow_create=True)
+    v.set("GITHUB_FOXFIREPOETS_TOKEN", "github-real-value")
+
+    environ = {}
+    applied = apply_vault_to_environ(v, environ=environ)
+    assert "GITHUB_TOKEN" in applied
+    assert environ["GITHUB_TOKEN"] == "github-real-value"
+
+
+def test_canonical_value_wins_over_alias_when_both_present(tmp_path, monkeypatch):
+    monkeypatch.setenv("CATO_VAULT_PASSWORD", "alias-pw-3")
+    import cato.vault as vault_mod
+
+    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
+
+    vault_path = tmp_path / "vault.enc"
+    v = Vault(vault_path=vault_path)
+    v.unlock("alias-pw-3", allow_create=True)
+    v.set("GITHUB_TOKEN", "canonical-value")
+    v.set("GITHUB_FOXFIREPOETS_TOKEN", "alias-value")
+
+    environ = {}
+    apply_vault_to_environ(v, environ=environ)
+    assert environ["GITHUB_TOKEN"] == "canonical-value"
+
+
+def test_alias_map_only_covers_the_two_confirmed_mismatches():
+    assert CANONICAL_KEY_ALIASES["SWARMSYNC_API_KEY"] == ("SWARMSYNC_VERIFYAPI_KEY",)
+    assert CANONICAL_KEY_ALIASES["GITHUB_TOKEN"] == ("GITHUB_FOXFIREPOETS_TOKEN",)
