@@ -227,11 +227,16 @@ def unlock_vault(
     vault_path: Path | None = None,
     password: str | None = None,
 ) -> Vault:
-    """Unlock (or create) the vault using CATO_VAULT_PASSWORD."""
+    """Unlock the vault using CATO_VAULT_PASSWORD. Never creates one silently.
+
+    Daemon/CLI launch paths must fail closed if the vault is missing rather
+    than bootstrapping an empty one — see `bootstrap_launch_credentials`,
+    which only calls this after confirming the file already exists.
+    """
     path = vault_path or (get_data_dir() / "vault.enc")
     pw = password or require_vault_password()
     vault = Vault(vault_path=path)
-    vault.unlock(pw)
+    vault.unlock(pw, allow_create=False)
     return vault
 
 
@@ -356,7 +361,9 @@ def migrate_env_to_vault(
 
     try:
         vault = Vault(vault_path=vpath)
-        vault.unlock(pw)
+        # Explicit operator command (`cato vault migrate-env`) — creating a
+        # vault on first run here is the deliberate, documented entry point.
+        vault.unlock(pw, allow_create=True)
     except VaultError as exc:
         report.error = f"vault_unlock_failed: {exc}"
         return report

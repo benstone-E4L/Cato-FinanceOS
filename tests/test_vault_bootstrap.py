@@ -52,7 +52,7 @@ def test_apply_vault_prefers_vault_over_dotenv(tmp_path, monkeypatch):
 
     vault_path = tmp_path / "vault.enc"
     vault = Vault(vault_path=vault_path)
-    vault.unlock("unit-test-vault-pw")
+    vault.unlock("unit-test-vault-pw", allow_create=True)
     vault.set("TELEGRAM_BOT_TOKEN", "vault-telegram")
     vault.set("OPENROUTER_API_KEY", "vault-openrouter")
 
@@ -82,7 +82,7 @@ def test_bootstrap_launch_credentials_prefers_vault(tmp_path, monkeypatch):
     )
     vault_path = tmp_path / "vault.enc"
     v = Vault(vault_path=vault_path)
-    v.unlock("bootstrap-pw")
+    v.unlock("bootstrap-pw", allow_create=True)
     v.set("TELEGRAM_BOT_TOKEN", "vault-tg")
     v.set("OPENROUTER_API_KEY", "vault-or")
 
@@ -129,7 +129,7 @@ def test_migrate_env_to_vault_grows_vault_and_lists_keys(tmp_path, monkeypatch):
     )
     vault_path = tmp_path / "vault.enc"
     # Create empty vault first
-    Vault(vault_path=vault_path).unlock("migrate-pw")
+    Vault(vault_path=vault_path).unlock("migrate-pw", allow_create=True)
     size_before = vault_path.stat().st_size
     assert size_before > 0
 
@@ -152,7 +152,7 @@ def test_migrate_env_to_vault_grows_vault_and_lists_keys(tmp_path, monkeypatch):
 
     # Relock via fresh instance — list keys only (no values in assertions on stdout)
     v2 = Vault(vault_path=vault_path)
-    v2.unlock("migrate-pw")
+    v2.unlock("migrate-pw", allow_create=False)
     keys = v2.list_keys()
     assert "TELEGRAM_BOT_TOKEN" in keys
     assert "OPENROUTER_API_KEY" in keys
@@ -168,7 +168,7 @@ def test_migrate_skips_existing_without_overwrite(tmp_path, monkeypatch):
 
     vault_path = tmp_path / "vault.enc"
     v = Vault(vault_path=vault_path)
-    v.unlock("migrate-pw-2")
+    v.unlock("migrate-pw-2", allow_create=True)
     v.set("TELEGRAM_BOT_TOKEN", "already-in-vault")
 
     env_file = tmp_path / ".env"

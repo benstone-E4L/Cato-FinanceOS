@@ -7,14 +7,14 @@ from cato.vault import Vault, VaultError
 
 def test_round_trip(tmp_path):
     v = Vault(tmp_path / "vault.enc")
-    v.unlock("testpassword")
+    v.unlock("testpassword", allow_create=True)
     v.set("API_KEY", "sk-test-123")
     assert v.get("API_KEY") == "sk-test-123"
 
 
 def test_wrong_password(tmp_path):
     v1 = Vault(tmp_path / "vault.enc")
-    v1.unlock("correct")
+    v1.unlock("correct", allow_create=True)
     v1.set("KEY", "value")
 
     v2 = Vault(tmp_path / "vault.enc")
@@ -24,7 +24,7 @@ def test_wrong_password(tmp_path):
 
 def test_key_case_sensitive(tmp_path):
     v = Vault(tmp_path / "vault.enc")
-    v.unlock("pw")
+    v.unlock("pw", allow_create=True)
     v.set("UPPER_KEY", "value")
     assert v.get("UPPER_KEY") == "value"
     assert v.get("upper_key") is None  # case sensitive
@@ -32,7 +32,7 @@ def test_key_case_sensitive(tmp_path):
 
 def test_list_keys(tmp_path):
     v = Vault(tmp_path / "vault.enc")
-    v.unlock("pw")
+    v.unlock("pw", allow_create=True)
     v.set("KEY1", "a")
     v.set("KEY2", "b")
     keys = v.list_keys()
@@ -42,7 +42,7 @@ def test_list_keys(tmp_path):
 
 def test_delete(tmp_path):
     v = Vault(tmp_path / "vault.enc")
-    v.unlock("pw")
+    v.unlock("pw", allow_create=True)
     v.set("KEY", "val")
     v.delete("KEY")
     assert v.get("KEY") is None

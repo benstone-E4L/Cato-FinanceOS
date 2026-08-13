@@ -62,17 +62,39 @@ class CatoDaemonService(win32serviceutil.ServiceFramework):
         win32event.WaitForSingleObject(self.stop_event, win32event.INFINITE)
 
     def _run_daemon(self):
-        import asyncio
         import logging
+        from logging.handlers import RotatingFileHandler
 
         from cato.platform import get_data_dir
 
         log_path = get_data_dir() / "cato_service.log"
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s %(name)s %(levelname)s %(message)s",
-            filename=str(log_path),
+        handler = RotatingFileHandler(
+            str(log_path), maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
         )
+        handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+        root = logging.getLogger()
+        root.setLevel(logging.INFO)
+        root.addHandler(handler)
+
+        # Same duplicate-instance guard cmd_start() uses — this method calls
+        # cli._run_daemon() directly, bypassing cmd_start()'s CLI-only gate,
+        # so a manually-started daemon would otherwise race the service for
+        # the same ports and the same hash-chained ledger.
+        from cato.cli import _daemon_health_responding, _read_live_pid
+
+        live_pid = _read_live_pid()
+        if live_pid is not None:
+            logging.error(
+                "Refusing to start: a Cato daemon is already running (PID %s). "
+                "Stop it before starting the service.", live_pid,
+            )
+            return
+        if _daemon_health_responding(8080):
+            logging.error(
+                "Refusing to start: something is already answering "
+                "http://127.0.0.1:8080/health (pid file missing or stale)."
+            )
+            return
 
         from cato.vault import VaultError
         from cato.vault_bootstrap import bootstrap_launch_credentials

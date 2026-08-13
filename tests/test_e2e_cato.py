@@ -307,7 +307,7 @@ class TestVaultCanaryE2E:
         from cato.vault import Vault, CANARY_KEY_NAME
 
         vault = Vault(tmp_path / "vault.enc")
-        vault.unlock("testpw")
+        vault.unlock("testpw", allow_create=True)
 
         canary_val = vault.create_canary()
         # Canary value must look like a real key
@@ -327,7 +327,7 @@ class TestVaultCanaryE2E:
         from cato.vault import Vault
 
         vault = Vault(tmp_path / "vault.enc")
-        vault.unlock("testpw")
+        vault.unlock("testpw", allow_create=True)
 
         vault.set("OPENAI_API_KEY", "sk-realkey-abc123")
         keys = vault.list_keys()
@@ -338,7 +338,7 @@ class TestVaultCanaryE2E:
         from cato.vault import Vault
 
         vault = Vault(tmp_path / "vault.enc")
-        vault.unlock("testpw")
+        vault.unlock("testpw", allow_create=True)
 
         test_key = "MY_SECRET_TOKEN"
         test_val = "tok_abc123XYZ987"
@@ -352,7 +352,7 @@ class TestVaultCanaryE2E:
         from cato.vault import Vault
 
         vault = Vault(tmp_path / "vault.enc")
-        vault.unlock("testpw")
+        vault.unlock("testpw", allow_create=True)
 
         canary_val = vault.create_canary()
         # Format: "sk-cato-canary-" + 48 hex chars

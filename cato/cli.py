@@ -265,7 +265,11 @@ def cmd_init() -> None:
         sys.exit(1)
 
     vault_path = _CATO_DIR / "vault.enc"
-    vault = Vault.create(pw, vault_path=vault_path)
+    # force=True is safe here specifically: reaching this line already
+    # required either a true first run (no vault exists — force is a no-op)
+    # or an explicit "Reinitialise?" confirmation above (line ~200). It is
+    # never reached as a fallback from a failed unlock.
+    vault = Vault.create(pw, vault_path=vault_path, force=True)
     safe_print("Vault created.")
 
     # 4. SwarmSync
