@@ -348,19 +348,21 @@ class Vault:
     # ------------------------------------------------------------------
 
     def get(self, key: str) -> Optional[str]:
-        """Return the stored value for *key*, or None if not found.
+        """Return the vault-stored value for *key*, or ``None``.
 
         If the returned value matches the canary key, logs a warning
-        to alert of a potential credential leak.
+        to alert of a potential credential leak.  Credential lookup is
+        deliberately fail-closed: a locked vault or missing key never falls
+        back to the process environment.
         """
         try:
             self._unlock()
         except Exception:
-            return os.environ.get(key)
+            return None
         assert self._data is not None
         value = self._data.get(key)
-        if not value:
-            value = os.environ.get(key) or value
+        if value is None or str(value).strip() == "":
+            return None
         # Canary detection: if the value looks like our canary, warn
         if value is not None and key != CANARY_KEY_NAME:
             canary_val = self._data.get(CANARY_KEY_NAME)
@@ -400,9 +402,8 @@ class Vault:
     def get_stored(self, key: str) -> Optional[str]:
         """Return the vault-stored value for *key* with no environment fallback.
 
-        Use this when the caller must know whether the encrypted vault itself
-        holds a secret (launch bootstrap, migrate checks). ``get()`` still
-        falls back to ``os.environ`` for runtime convenience.
+        This explicit name remains useful for launch and migration checks;
+        ``get()`` now has the same vault-only source policy.
         """
         self._unlock()
         assert self._data is not None

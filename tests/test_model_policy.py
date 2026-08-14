@@ -8,6 +8,7 @@ through an injected fake transport.
 from __future__ import annotations
 
 from datetime import date
+from uuid import uuid4
 
 import pytest
 
@@ -42,6 +43,16 @@ from cato.model_policy import (
 )
 
 TODAY = date(2026, 8, 3)
+
+
+class _TestVault:
+    """Explicit value-only test seam; production still requires encrypted Vault."""
+
+    def __init__(self) -> None:
+        self.value = uuid4().hex
+
+    def get(self, key: str):
+        return self.value if key == "ANTHROPIC_API_KEY" else None
 
 
 # ---------------------------------------------------------------------------
@@ -563,6 +574,26 @@ def test_retry_contract_classification(status, expected):
 
 
 @pytest.mark.asyncio
+async def test_client_ignores_process_environment_and_fails_closed(monkeypatch):
+    process_value = uuid4().hex
+    monkeypatch.setenv("ANTHROPIC_API_KEY", process_value)
+    client = AnthropicDirectClient(vault=None)
+    decision = route(
+        TaskDescriptor(
+            task_type=TaskType.GENERAL_TOOL_USE,
+            input_tokens=1,
+            max_output_tokens=64,
+            cost_ceiling_usd=10.0,
+        ),
+        when=TODAY,
+    )
+
+    assert client.has_credentials() is False
+    with pytest.raises(AnthropicAPIError) as caught:
+        await client.call(decision, [])
+    assert process_value not in str(caught.value)
+
+
 async def test_client_retries_429_then_succeeds_without_live_api_call():
     calls: list[dict] = []
 
@@ -583,7 +614,7 @@ async def test_client_retries_429_then_succeeds_without_live_api_call():
         slept.append(seconds)
 
     client = AnthropicDirectClient(
-        vault=None, transport=fake_transport, sleep=fake_sleep
+        vault=_TestVault(), transport=fake_transport, sleep=fake_sleep
     )
     decision = route(
         TaskDescriptor(task_type=TaskType.GENERAL_TOOL_USE, input_tokens=100,
@@ -620,7 +651,7 @@ async def test_client_does_not_retry_400_and_flags_409_as_conditional(monkeypatc
         attempts["n"] += 1
         return 400, {"error": {"type": "invalid_request_error"}}, {}
 
-    client = AnthropicDirectClient(vault=None, transport=bad_request)
+    client = AnthropicDirectClient(vault=_TestVault(), transport=bad_request)
     with pytest.raises(AnthropicAPIError):
         await client.call(decision, [{"role": "user", "content": "hi"}])
     assert attempts["n"] == 1, "400 invalid_request_error must not be retried"
@@ -628,7 +659,7 @@ async def test_client_does_not_retry_400_and_flags_409_as_conditional(monkeypatc
     async def conflict(url, payload, headers):
         return 409, {"error": {"type": "conflict_error"}}, {}
 
-    client2 = AnthropicDirectClient(vault=None, transport=conflict)
+    client2 = AnthropicDirectClient(vault=_TestVault(), transport=conflict)
     with pytest.raises(ConflictRequiresResolution):
         await client2.call(decision, [{"role": "user", "content": "hi"}])
 
@@ -660,7 +691,7 @@ async def test_stop_reason_refusal_escalates_exactly_once_then_succeeds(monkeypa
 
     router = ModelRouter(
         vault=None,
-        anthropic_client=AnthropicDirectClient(vault=None, transport=fake_transport),
+        anthropic_client=AnthropicDirectClient(vault=_TestVault(), transport=fake_transport),
     )
     model, message, decision = await router.complete_message(
         [{"role": "user", "content": "reconcile"}],
@@ -698,7 +729,7 @@ async def test_persistent_refusal_stops_at_the_escalation_cap(monkeypatch):
 
     router = ModelRouter(
         vault=None,
-        anthropic_client=AnthropicDirectClient(vault=None, transport=always_refuse),
+        anthropic_client=AnthropicDirectClient(vault=_TestVault(), transport=always_refuse),
     )
     with pytest.raises(EscalationExhausted):
         await router.complete_message(

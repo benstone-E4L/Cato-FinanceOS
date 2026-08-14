@@ -982,21 +982,19 @@ class ModelRouter:
         return bool(self._get_api_key(auth, resolved))
 
     def _get_api_key(self, auth: str, model: str) -> str:
-        import os as _os
-
-        def _vault_or_env(vault_key: str) -> str:
+        def _vault_only(vault_key: str) -> str:
             try:
                 v = self._vault.get(vault_key)
             except Exception:
                 v = None
-            return v or _os.environ.get(vault_key, "")
+            return str(v or "").strip()
 
         if auth == "x-api-key":
-            return _vault_or_env("ANTHROPIC_API_KEY")
+            return _vault_only("ANTHROPIC_API_KEY")
         if auth == "google":
-            return _vault_or_env("GOOGLE_API_KEY")
+            return _vault_only("GOOGLE_API_KEY")
         if auth == "openrouter":
-            return _vault_or_env("OPENROUTER_API_KEY")
+            return _vault_only("OPENROUTER_API_KEY")
         mapping = {
             "openrouter/": "OPENROUTER_API_KEY",
             "deepseek-":   "DEEPSEEK_API_KEY",
@@ -1007,5 +1005,5 @@ class ModelRouter:
         }
         for prefix, vault_key in mapping.items():
             if model.startswith(prefix):
-                return _vault_or_env(vault_key)
-        return _vault_or_env("OPENAI_API_KEY")
+                return _vault_only(vault_key)
+        return _vault_only("OPENAI_API_KEY")

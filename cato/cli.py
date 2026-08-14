@@ -615,23 +615,20 @@ def cmd_start(agent: str, channel: str, browser: str) -> None:
         )
         raise SystemExit(1)
 
-    # Prefer vault.enc for operator secrets; .env only fills keys still missing.
-    # Required only when we are about to actually launch.
+    # Operator credentials are resolved from vault.enc only.
     from cato.vault_bootstrap import bootstrap_launch_credentials
 
     try:
         _vault, _boot = bootstrap_launch_credentials(
             repo_root=Path.cwd(),
             require_password=True,
-            load_dotenv=True,
+            load_dotenv=False,
         )
         safe_print(
             "Credentials: "
             f"vault_present={_boot.vault_present} "
             f"unlocked={_boot.vault_unlocked} "
-            f"vault_keys={_boot.vault_keys_total} "
-            f"applied_from_vault={list(_boot.applied_from_vault)} "
-            f"filled_from_dotenv={list(_boot.filled_from_dotenv)}"
+            f"vault_keys={_boot.vault_keys_total}"
         )
     except VaultError as exc:
         safe_print(f"Vault bootstrap failed: {exc}")
@@ -704,25 +701,22 @@ def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
     import asyncio
     import logging
 
-    # Ensure vault is unlocked and preferred secrets are in environ even when
-    # callers (legacy launch scripts) skipped bootstrap_launch_credentials.
-    # Password may already live in the process-level vault cache (env var popped).
+    # Ensure the vault is unlocked even when a legacy caller skipped bootstrap.
+    # Credentials remain in the vault and are never copied to process environ.
     vault_path = _CATO_DIR / "vault.enc"
     vault: Vault | None = None
     if vault_path.exists():
         try:
-            from cato.vault_bootstrap import apply_vault_to_environ, unlock_vault
+            from cato.vault_bootstrap import unlock_vault
 
             vault = unlock_vault(vault_path=vault_path)
-            applied = apply_vault_to_environ(vault)
             logging.getLogger("cato").info(
-                "Daemon vault ready: keys=%d applied=%s",
+                "Daemon vault ready: keys=%d; credentials retained in vault",
                 len(vault.list_keys()),
-                list(applied),
             )
         except VaultError:
-            # Password missing/wrong — keep a locked handle; adapters unlock later
-            # or fall back to environ filled by the outer runner.
+            # Password missing/wrong — keep a locked handle; credential
+            # consumers fail closed until an unlocked vault is available.
             vault = Vault(vault_path=vault_path)
         except Exception:
             vault = Vault(vault_path=vault_path)

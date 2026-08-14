@@ -94,7 +94,7 @@ This command:
 What is NOT copied from OpenClaw / ClawdBot / MoltBot:
 - `config.json` — Cato uses YAML; re-run `cato init` to configure
 - `node_modules/`, Node binaries — not applicable to Cato
-- `.env` files — re-enter API keys via `cato init`, then verify the active installation uses the vault
+- `.env` files — migrate API keys with the explicit `cato vault migrate-env` command, verify the vault, then remove the plaintext file before launch
 
 After migration, run `cato doctor` to audit token budgets and `cato init` to configure API keys.
 

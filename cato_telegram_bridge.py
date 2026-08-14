@@ -29,14 +29,6 @@ from typing import Optional
 # ── Cato path ──────────────────────────────────────────────────────────────
 CATO_ROOT = Path(r"C:\Users\Administrator\Desktop\Cato")
 sys.path.insert(0, str(CATO_ROOT))
-ENV_PATH = CATO_ROOT / ".env"
-
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv(ENV_PATH, override=False)
-except ImportError:
-    pass
 
 # ── Logging ────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -179,16 +171,19 @@ async def _reject_unauthorized(update: Update) -> bool:
 # ── Env + CLI helpers ──────────────────────────────────────────────────────
 
 def _resolve_token() -> str:
-    override = os.environ.get("CLAUDE_BRIDGE_TOKEN", "").strip()
-    if override:
-        return override
-    for key in BRIDGE_BOT_TOKEN_ENV_KEYS:
-        token = os.environ.get(key, "").strip()
-        if token:
-            logger.info("Using Telegram bridge bot token from %s.", key)
-            return token
+    try:
+        from cato.vault import get_vault
+
+        vault = get_vault()
+        for key in ("CLAUDE_BRIDGE_TOKEN", *BRIDGE_BOT_TOKEN_ENV_KEYS):
+            token = str(vault.get(key) or "").strip()
+            if token:
+                logger.info("Using Telegram bridge bot token from vault key %s.", key)
+                return token
+    except Exception as exc:
+        raise RuntimeError("Telegram bridge vault credential is unavailable") from exc
     raise RuntimeError(
-        "No bridge bot token configured. Set CATODESKTOP_BOT_TOKEN or TELEGRAM_BOT_TOKEN in .env."
+        "No bridge bot token is configured in the encrypted vault."
     )
 
 
@@ -201,10 +196,9 @@ def _resolve_configured_username() -> str:
 
 
 def _build_env() -> dict[str, str]:
-    env = dict(os.environ)
-    env.pop("CLAUDECODE", None)
-    env.pop("CLAUDE_CODE", None)
-    return env
+    from cato.vault_bootstrap import safe_subprocess_environment
+
+    return safe_subprocess_environment()
 
 
 def _find_claude() -> Optional[str]:

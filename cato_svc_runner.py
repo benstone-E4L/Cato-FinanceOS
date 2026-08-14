@@ -14,15 +14,6 @@ _DATA_DIR = Path(os.environ.get("APPDATA", Path.home())) / "cato"
 _DATA_DIR.mkdir(parents=True, exist_ok=True)
 _DAEMON_LOG = _DATA_DIR / "daemon_runner.log"
 
-# Vault password must be set in the environment before running this script.
-# Example: set CATO_VAULT_PASSWORD=your-strong-password (Windows CMD)
-#          $env:CATO_VAULT_PASSWORD = "your-strong-password" (PowerShell)
-_vault_pw = os.environ.get("CATO_VAULT_PASSWORD")
-if not _vault_pw:
-    print("[CATO] ERROR: CATO_VAULT_PASSWORD environment variable is not set.")
-    print("[CATO] Set it before running: set CATO_VAULT_PASSWORD=<your-strong-password>")
-    sys.exit(1)
-
 # Hidden/background launches on Windows can have no real stdout/stderr.
 if sys.stdout is None:
     sys.stdout = open(os.devnull, "w", encoding="utf-8")  # type: ignore[assignment]
@@ -43,8 +34,7 @@ logging.basicConfig(
     ],
 )
 
-# Prefer encrypted vault for operator secrets; .env only fills missing keys.
-# Never logs secret values.
+# Operator credentials are resolved from the encrypted vault only.
 from cato.vault import VaultError
 from cato.vault_bootstrap import bootstrap_launch_credentials
 
@@ -52,16 +42,13 @@ try:
     _vault, _boot = bootstrap_launch_credentials(
         repo_root=_REPO_ROOT,
         require_password=True,
-        load_dotenv=True,
+        load_dotenv=False,
     )
     logging.info(
-        "Launch credentials: vault_present=%s unlocked=%s vault_keys=%d "
-        "applied_from_vault=%s filled_from_dotenv=%s",
+        "Launch credentials: vault_present=%s unlocked=%s vault_keys=%d",
         _boot.vault_present,
         _boot.vault_unlocked,
         _boot.vault_keys_total,
-        list(_boot.applied_from_vault),
-        list(_boot.filled_from_dotenv),
     )
 except VaultError as _exc:
     logging.error("Vault bootstrap failed: %s", _exc)

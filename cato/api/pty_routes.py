@@ -18,7 +18,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import secrets
 
 from aiohttp import web, WSMsgType
@@ -38,6 +37,7 @@ from cato.orchestrator.pty_session import (
     remove_idle_sessions,
     remove_session,
 )
+from cato.vault_bootstrap import safe_subprocess_environment
 
 logger = logging.getLogger(__name__)
 
@@ -47,26 +47,9 @@ ALLOWED_CLIS = ALLOWED_PTY_CLIS
 
 
 def _pty_env_for_cli(cli_name: str) -> dict[str, str]:
-    """Base env for PTY: OS env, unset CLAUDECODE, set TERM, inject vault keys per CLI."""
-    env = dict(os.environ)
-    env.pop("CLAUDECODE", None)
+    """Build a non-secret PTY environment for a natively authenticated CLI."""
+    env = safe_subprocess_environment()
     env["TERM"] = "xterm-256color"
-    try:
-        from cato.config import CatoConfig
-        cfg = CatoConfig.load()
-        if getattr(cfg, "vault", None):
-            if cli_name == "codex":
-                key = getattr(cfg, "codex_api_key_env", "OPENAI_API_KEY")
-                val = cfg.get(key)
-                if val:
-                    env[key] = val
-            elif cli_name == "gemini":
-                for key in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
-                    val = cfg.get(key)
-                    if val:
-                        env[key] = val
-    except Exception:
-        pass
     return env
 
 

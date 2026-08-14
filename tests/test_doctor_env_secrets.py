@@ -34,7 +34,7 @@ def test_env_secrets_flagged_when_live(tmp_path: Path, monkeypatch: pytest.Monke
     report._check_env_secrets()
 
     problems = [p for p, _fix in report._failures]
-    assert any("ANTHROPIC_API_KEY" in p for p in problems), problems
+    assert any("Repository .env" in p for p in problems), problems
 
 
 def test_env_secrets_clean_when_only_nonsecret_config_remains(
@@ -54,7 +54,7 @@ def test_env_secrets_clean_when_only_nonsecret_config_remains(
     report = _make_report()
     report._check_env_secrets()
 
-    assert report._failures == []
+    assert any("Repository .env" in problem for problem, _ in report._failures)
 
 
 def test_env_secrets_clean_when_env_file_absent(

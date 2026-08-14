@@ -5,8 +5,8 @@ Wraps the ``gh`` CLI (GitHub CLI) for GitHub operations.  On Windows,
 .CMD wrappers are detected via shutil.which() and executed through cmd.exe /c,
 identical to how codex/gemini are handled in cli_invoker.py.
 
-GitHub token is stored in the vault as ``github_token`` and injected as
-``GH_TOKEN`` environment variable to all subprocesses.
+GitHub CLI subprocesses rely on ``gh``'s native secure authentication state;
+Cato never injects a token into their environments.
 
 3-Model PR Review pipeline:
   1. Fetch diff via ``gh pr diff <number>``
@@ -22,7 +22,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 import shutil
 import sys
@@ -32,6 +31,7 @@ from ..orchestrator.cli_invoker import _resolve_cli, _run_subprocess_async, Subp
 from ..orchestrator.confidence_extractor import extract_confidence
 from ..orchestrator.early_terminator import wait_for_threshold
 from ..orchestrator.synthesis import simple_synthesis
+from ..vault_bootstrap import safe_subprocess_environment
 
 logger = logging.getLogger(__name__)
 
@@ -114,29 +114,8 @@ class GitHubTool:
     # ------------------------------------------------------------------ #
 
     def _gh_env(self) -> dict[str, str]:
-        """Return environment dict with GH_TOKEN injected if available."""
-        env = dict(os.environ)
-
-        # Resolve token: check env vars first, then vault, in priority order.
-        token = (
-            os.environ.get("GITHUB_TOKEN")
-            or os.environ.get("GH_TOKEN")
-            or os.environ.get("github_token")
-        )
-
-        if not token and self._vault is not None:
-            try:
-                token = (
-                    self._vault.get("GITHUB_TOKEN")
-                    or self._vault.get("GH_TOKEN")
-                    or self._vault.get("github_token")
-                )
-            except Exception:
-                pass
-
-        if token:
-            env["GH_TOKEN"] = token
-        return env
+        """Return a minimal environment for natively authenticated ``gh``."""
+        return safe_subprocess_environment()
 
     async def _run_gh(self, args: list[str], timeout_sec: float = 30.0) -> str:
         """

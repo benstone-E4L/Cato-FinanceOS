@@ -1,10 +1,9 @@
 """
 cato/vault_bootstrap.py — Launch-time credential loading with vault preference.
 
-Order of precedence for operator secrets:
-  1. Values already in the process environment (explicit operator overrides)
-  2. Encrypted vault.enc (preferred durable store)
-  3. Optional plaintext .env fill for keys still missing (legacy fallback)
+Production operator secrets are resolved only from the encrypted vault.
+Repository dotenv parsing is available only to the explicit one-shot migration
+command and is never part of launch or runtime credential resolution.
 
 Never logs or prints secret values. CATO_VAULT_PASSWORD must be present in the
 environment (or the process-level vault password cache) before unlock.
@@ -16,7 +15,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Mapping, Optional, Sequence
+from typing import Mapping, Optional, Sequence
 
 from .platform import get_data_dir
 from .vault import CANARY_KEY_NAME, Vault, VaultError, _get_vault_password
@@ -28,6 +27,8 @@ OPERATOR_VAULT_KEYS: tuple[str, ...] = (
     "ANTHROPIC_API_KEY",
     "OPENROUTER_API_KEY",
     "OPENAI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GEMINI_API_KEY",
     "TELEGRAM_BOT_TOKEN",
     "CATODESKTOP_BOT_TOKEN",
     "SWARMSYNC_API_KEY",
@@ -36,11 +37,25 @@ OPERATOR_VAULT_KEYS: tuple[str, ...] = (
     "GH_TOKEN",
     "GATEWAY_API_KEY",
     "BREVO_SMTP_KEY",
+    "BREVO_SMTP_LOGIN",
     "BREVO_API_KEY",
     "CONDUITSCORE_API_KEY",
     "GMAIL_CLIENT_ID",
     "GMAIL_CLIENT_SECRET",
     "GMAIL_REFRESH_TOKEN",
+    "FINANCEOS_CAPABILITY_TOKEN",
+    "PHOENIX_API_KEY",
+    "SWARMSYNC_VERIFYAPI_KEY",
+    "CATO_DAEMON_TOKEN",
+    "CLAUDE_BRIDGE_TOKEN",
+    "SMTP_ACCOUNTS",
+    "CATO_APPROVAL_SIGNING_KEY",
+    "SLACK_BOT_TOKEN",
+    "BRAVE_API_KEY",
+    "EXA_API_KEY",
+    "TAVILY_API_KEY",
+    "PERPLEXITY_API_KEY",
+    "SEMANTIC_SCHOLAR_API_KEY",
 )
 
 # Keys that must never be copied from .env into the vault via migrate-env.
@@ -51,20 +66,38 @@ _MIGRATE_SKIP_KEYS: frozenset[str] = frozenset(
     }
 )
 
-# Real credentials already present in the vault under a differently-named key
-# than the one the rest of the codebase reads. Discovered 2026-08-13: the
-# recovered vault holds SWARMSYNC_VERIFYAPI_KEY and GITHUB_FOXFIREPOETS_TOKEN,
-# neither of which OPERATOR_VAULT_KEYS or any consumer looks for by that exact
-# name, so both credentials were silently unused. This maps canonical name ->
-# the alias(es) that may hold the same value, resolved at bootstrap time only
-# (an environ assignment, never a second vault entry) so nothing is duplicated
-# or exposed — see apply_vault_to_environ().
+# Historical vault entries may use a differently-named key than current
+# consumers. This metadata maps canonical names to aliases without copying any
+# value into the process environment.
 CANONICAL_KEY_ALIASES: dict[str, tuple[str, ...]] = {
     "SWARMSYNC_API_KEY": ("SWARMSYNC_VERIFYAPI_KEY",),
     "SWARM_SYNC_API_KEY": ("SWARMSYNC_VERIFYAPI_KEY",),
     "GITHUB_TOKEN": ("GITHUB_FOXFIREPOETS_TOKEN",),
     "GH_TOKEN": ("GITHUB_FOXFIREPOETS_TOKEN",),
 }
+
+
+def safe_subprocess_environment(
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Return the minimal non-secret environment required to launch a child."""
+    source = os.environ if environ is None else environ
+    if os.name == "nt":
+        allowed = {
+            "PATH",
+            "PATHEXT",
+            "SYSTEMROOT",
+            "SYSTEMDRIVE",
+            "COMSPEC",
+            "WINDIR",
+            "TEMP",
+            "TMP",
+            "USERPROFILE",
+            "USERNAME",
+        }
+    else:
+        allowed = {"PATH", "HOME", "USER", "LANG", "TERM", "TMPDIR", "TMP", "TEMP"}
+    return {key: value for key, value in source.items() if key.upper() in allowed}
 
 
 @dataclass(frozen=True)
@@ -171,83 +204,6 @@ def _parse_dotenv_fallback(env_file: Path) -> dict[str, str]:
     return out
 
 
-def fill_environ_from_dotenv(
-    env_file: Path,
-    *,
-    keys: Sequence[str] | None = None,
-    environ: Optional[dict[str, str]] = None,
-) -> tuple[str, ...]:
-    """Fill missing environ keys from .env. Never overwrites existing values.
-
-    Returns the names of keys that were filled (values never returned).
-    """
-    target = environ if environ is not None else os.environ
-    parsed = _read_dotenv_map(env_file)
-    allow = set(keys) if keys is not None else None
-    filled: list[str] = []
-    for key, value in parsed.items():
-        if allow is not None and key not in allow:
-            continue
-        if key in _MIGRATE_SKIP_KEYS:
-            continue
-        existing = (target.get(key) or "").strip()
-        if existing:
-            continue
-        if not str(value).strip():
-            continue
-        target[key] = str(value)
-        filled.append(key)
-    return tuple(sorted(filled))
-
-
-def apply_vault_to_environ(
-    vault: Vault,
-    *,
-    keys: Sequence[str] | None = None,
-    environ: Optional[dict[str, str]] = None,
-    only_if_present: bool = True,
-) -> tuple[str, ...]:
-    """Copy vault-stored secrets into *environ*, vault winning over .env fills.
-
-    Only writes keys that have a non-empty stored vault value. Existing process
-    env values that were set before bootstrap are overwritten when the vault
-    has the key (vault is the preferred durable store).
-
-    A canonical key with no value under its own name falls back to
-    CANONICAL_KEY_ALIASES: if the vault holds the same credential under a
-    differently-named key, that value is applied under the CANONICAL name
-    only — the vault itself is never written to, so nothing is duplicated.
-
-    Returns key names applied — never values.
-    """
-    target = environ if environ is not None else os.environ
-    stored = vault.stored_mapping()
-    wanted: Iterable[str]
-    if keys is None:
-        wanted = sorted(set(OPERATOR_VAULT_KEYS) | set(stored.keys()))
-    else:
-        wanted = keys
-
-    applied: list[str] = []
-    for key in wanted:
-        if key in _MIGRATE_SKIP_KEYS or key == CANARY_KEY_NAME:
-            continue
-        value = stored.get(key)
-        if value is None or not str(value).strip():
-            for alias in CANONICAL_KEY_ALIASES.get(key, ()):
-                alias_value = stored.get(alias)
-                if alias_value is not None and str(alias_value).strip():
-                    value = alias_value
-                    break
-        if value is None or not str(value).strip():
-            if only_if_present:
-                continue
-            continue
-        target[key] = str(value)
-        applied.append(key)
-    return tuple(sorted(set(applied)))
-
-
 def unlock_vault(
     *,
     vault_path: Path | None = None,
@@ -272,16 +228,17 @@ def bootstrap_launch_credentials(
     vault_path: Path | None = None,
     env_file: Path | None = None,
     require_password: bool = True,
-    load_dotenv: bool = True,
+    load_dotenv: bool = False,
 ) -> tuple[Optional[Vault], BootstrapReport]:
-    """Prepare process env for daemon launch: .env fill, then vault preference.
+    """Unlock the daemon vault without loading or exporting credentials.
 
     Raises VaultError when require_password is True and the password is unset,
-    or when the vault file exists but cannot be unlocked.
+    or when the vault file exists but cannot be unlocked.  The legacy dotenv
+    arguments remain accepted for compatibility but never cause a read; dotenv
+    is supported only by the explicit ``migrate_env_to_vault`` command.
     """
-    root = resolve_repo_root(repo_root)
+    del repo_root, env_file
     vpath = Path(vault_path) if vault_path else (get_data_dir() / "vault.enc")
-    epath = Path(env_file) if env_file else (root / ".env")
 
     errors: list[str] = []
     filled: tuple[str, ...] = ()
@@ -290,26 +247,38 @@ def bootstrap_launch_credentials(
     unlocked = False
     keys_total = 0
 
-    if load_dotenv and epath.is_file():
-        # Fill any missing keys from .env (legacy). Vault wins next for
-        # operator secrets it actually stores.
-        filled = fill_environ_from_dotenv(epath, keys=None)
+    if load_dotenv:
+        logger.warning(
+            "Repository dotenv loading is disabled for launch; use the encrypted vault"
+        )
 
     if require_password:
         # Fail closed before touching the vault file when password is missing.
         require_vault_password()
+
+    # Refuse inherited plaintext operator credentials even though all consumers
+    # are vault-only.  Pop by key name without reading, printing, or retaining
+    # values so child processes cannot inherit stale credentials.
+    purged_count = 0
+    for key in OPERATOR_VAULT_KEYS:
+        if key in os.environ:
+            del os.environ[key]
+            purged_count += 1
+    if purged_count:
+        logger.warning(
+            "Removed %d plaintext operator credential(s) from process environment",
+            purged_count,
+        )
 
     if vpath.exists():
         try:
             vault = unlock_vault(vault_path=vpath)
             unlocked = True
             keys_total = len(vault.list_keys())
-            applied = apply_vault_to_environ(vault, keys=OPERATOR_VAULT_KEYS)
             logger.info(
-                "Vault bootstrap: unlocked %s (%d keys); applied %d operator key(s) to environ",
+                "Vault bootstrap: unlocked %s (%d keys); credentials retained in vault",
                 vpath,
                 keys_total,
-                len(applied),
             )
         except VaultError as exc:
             errors.append(f"vault_unlock_failed: {exc}")
@@ -325,15 +294,9 @@ def bootstrap_launch_credentials(
         msg = f"vault_absent: {vpath}"
         errors.append(msg)
         logger.warning(
-            "Vault file not found at %s — using .env/environ only. "
-            "Run 'cato init' then 'cato vault migrate-env'.",
+            "Vault file not found at %s; launch credentials are unavailable. "
+            "Run 'cato init' before starting the daemon.",
             vpath,
-        )
-
-    if filled:
-        logger.info(
-            "Vault bootstrap: filled %d missing key(s) from dotenv (vault still preferred when present)",
-            len(filled),
         )
 
     report = BootstrapReport(
@@ -343,7 +306,7 @@ def bootstrap_launch_credentials(
         vault_keys_total=keys_total,
         applied_from_vault=applied,
         filled_from_dotenv=filled,
-        env_file=epath if epath.is_file() else None,
+        env_file=None,
         errors=tuple(errors),
     )
     return vault, report

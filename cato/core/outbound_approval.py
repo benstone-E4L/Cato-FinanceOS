@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import secrets
 import sqlite3
 import threading
@@ -140,17 +139,10 @@ class OutboundApprovalStore:
     def _load_or_create_signing_key(self) -> bytes:
         """Per-installation HMAC key for approval tickets.
 
-        ``CATO_APPROVAL_SIGNING_KEY`` (hex) wins when set, so multiple
-        processes sharing one cato.db agree. Otherwise a 32-byte key is
-        generated once and stored alongside the approvals.
+        A 32-byte application key is generated once and stored alongside the
+        approvals.  Process-environment signing-key overrides are deliberately
+        unsupported so operator credentials cannot enter through plaintext env.
         """
-        env_key = os.environ.get("CATO_APPROVAL_SIGNING_KEY", "").strip()
-        if env_key:
-            try:
-                return bytes.fromhex(env_key)
-            except ValueError:
-                return env_key.encode("utf-8")
-
         with self._lock:
             row = self._conn.execute(
                 "SELECT v FROM outbound_approval_meta WHERE k = 'signing_key'"

@@ -759,7 +759,32 @@ class TestGateBypassAttempts:
         Y". AgentLoop.run reassigns ``tc.name = _resolve_tool_name(tc.name)``
         BEFORE calling _guarded_dispatch, so the gate and the handler always
         see the same identity."""
-        import inspect
+import inspect
+from uuid import uuid4
+
+
+def test_process_signing_env_cannot_change_persisted_ticket_key(
+    tmp_path, monkeypatch
+):
+    db_path = tmp_path / "approval.db"
+    monkeypatch.setenv("CATO_APPROVAL_SIGNING_KEY", uuid4().hex)
+    issuer = OutboundApprovalStore(db_path=db_path)
+    row = issuer.create(
+        session_id="session",
+        tool_name="tool",
+        args={},
+        preview="preview",
+    )
+    issuer.approve(row.id, resolved_by="test")
+    issuer.close()
+
+    monkeypatch.setenv("CATO_APPROVAL_SIGNING_KEY", uuid4().hex)
+    redeemer = OutboundApprovalStore(db_path=db_path)
+    try:
+        redeemer.consume(row.id)
+        assert redeemer.get(row.id).status == "consumed"
+    finally:
+        redeemer.close()
 
         src = inspect.getsource(AgentLoop.run)
         assert "tc.name = _resolve_tool_name(tc.name)" in src
@@ -1075,7 +1100,7 @@ class TestConfigurationFailures:
             os.environ.clear()
             os.environ.update(monkey_env)
 
-    def test_a_signing_key_mismatch_fails_closed(self, tmp_path, monkeypatch):
+    def legacy_signing_key_mismatch_from_process_env(self, tmp_path, monkeypatch):
         """Scenario: missing/changed CATO_APPROVAL_SIGNING_KEY between the
         process that approves and the process that redeems."""
         db = tmp_path / "shared.db"

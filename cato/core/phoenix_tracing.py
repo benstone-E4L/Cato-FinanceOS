@@ -70,6 +70,17 @@ def _env(name: str) -> str:
     return (os.getenv(name) or "").strip()
 
 
+def _vault_secret(name: str) -> str:
+    """Resolve an observability credential from the encrypted vault only."""
+    try:
+        from cato.vault import get_vault
+
+        value = get_vault().get(name)
+    except Exception:
+        value = None
+    return str(value or "").strip()
+
+
 def collector_endpoint() -> str:
     """Phoenix base URL from the first configured alias, or ""."""
     for name in ("PHOENIX_COLLECTOR_ENDPOINT", "PHOENIX_ENDPOINT",
@@ -139,7 +150,7 @@ def _build_tracer() -> Any:
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
     headers = {}
-    api_key = _env("PHOENIX_API_KEY")
+    api_key = _vault_secret("PHOENIX_API_KEY")
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 

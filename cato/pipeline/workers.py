@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import abc
 import asyncio
-import os
 import time
 from pathlib import Path
 from typing import Optional
 
 from cato.orchestrator.cli_invoker import _resolve_cli
 from cato.orchestrator.confidence_extractor import extract_confidence
+from cato.vault_bootstrap import safe_subprocess_environment
 
 from .models import WorkerAssignment, WorkerResult
 
@@ -27,7 +27,7 @@ async def _run_cli(
     cwd: Optional[Path],
     timeout_sec: float,
 ) -> tuple[int, str, str, float]:
-    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+    env = safe_subprocess_environment()
     start = time.time()
     proc = await asyncio.create_subprocess_exec(
         *args,

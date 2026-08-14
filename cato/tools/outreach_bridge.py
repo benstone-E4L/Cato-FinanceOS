@@ -1,13 +1,10 @@
-"""
-cato/tools/outreach_bridge.py — Invoke external cold-outreach engines from Cato (dry-run default).
-"""
+"""Fail-closed bridge for outreach engines lacking secure credential transport."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -140,28 +137,8 @@ async def execute_outreach_run(args: dict[str, Any]) -> str:
             "message": "Dry-run only — outreach package layout not found.",
         })
 
-    from ..core.outreach_credentials import build_outreach_env
-
-    env = build_outreach_env(engine_root=root, base=os.environ)
-    env["CATO_OUTREACH_DRY_RUN"] = "1" if dry_run else "0"
-
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=str(root),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-        )
-        stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=120.0)
-        return json.dumps({
-            "ok": proc.returncode == 0,
-            "returncode": proc.returncode,
-            "stdout": (stdout_b or b"").decode("utf-8", errors="replace")[:2000],
-            "stderr": (stderr_b or b"").decode("utf-8", errors="replace")[:1000],
-            "cmd": cmd,
-        })
-    except asyncio.TimeoutError:
-        return json.dumps({"ok": False, "error": "timeout", "cmd": cmd})
-    except Exception as exc:
-        return json.dumps({"ok": False, "error": type(exc).__name__, "message": str(exc), "cmd": cmd})
+    return json.dumps({
+        "ok": False,
+        "error": "credential_transport_unavailable",
+        "message": "Outreach execution is unavailable because the external transport lacks a secure credential channel.",
+    })

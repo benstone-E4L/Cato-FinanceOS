@@ -8,7 +8,6 @@ values and they do not make live calls to third-party services.
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -174,8 +173,7 @@ def _integration_status(
     vault_keys: set[str],
 ) -> dict[str, Any]:
     vault_present = sorted(key for key in spec.vault_keys if key in vault_keys)
-    env_present = sorted(key for key in spec.env_keys if os.environ.get(key))
-    configured_secret = bool(vault_present or env_present)
+    configured_secret = bool(vault_present)
 
     enabled = True
     if spec.enable_config_key:
@@ -207,12 +205,12 @@ def _integration_status(
         "status": "connected" if connected else ("configured" if configured else "not_configured"),
         "metadata": {
             "vault_keys_present": vault_present,
-            "env_keys_present": env_present,
+            "env_keys_present": [],
             "config": config_values,
             "required_vault_keys": list(spec.vault_keys),
             "required_env_keys": list(spec.env_keys),
             "safe_config_guidance": (
-                "Store credentials in the encrypted vault or environment. "
+                "Store operator credentials in the encrypted vault only. "
                 "This endpoint only reports key names/presence and redacted config metadata."
             ),
         },
@@ -241,8 +239,8 @@ async def integration_status(request: web.Request) -> web.Response:
         "config_guidance": {
             "restart_required": False,
             "message": (
-                "Configuration status is computed from current config, vault key names, "
-                "and environment variables. No third-party services are contacted."
+                "Configuration status is computed from current config and vault key names. "
+                "No third-party services are contacted."
             ),
         },
         "integrations": integrations,

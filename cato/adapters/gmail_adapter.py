@@ -472,13 +472,10 @@ class GmailAdapter:
         loop = asyncio.get_event_loop()
 
         # Validate credentials before hitting the API
-        refresh_token = (
-            self._vault.get("GMAIL_REFRESH_TOKEN")
-            or os.environ.get("GMAIL_REFRESH_TOKEN", "")
-        )
+        refresh_token = self._vault.get("GMAIL_REFRESH_TOKEN")
         if not refresh_token:
             logger.error(
-                "[GmailAdapter] GMAIL_REFRESH_TOKEN not found in vault or environment. "
+                "[GmailAdapter] GMAIL_REFRESH_TOKEN not found in vault. "
                 "Gmail integration is disabled. Run 'cato init' to configure Gmail."
             )
             self._enabled = False

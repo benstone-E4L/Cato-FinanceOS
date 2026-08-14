@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Awaitable, Callable, Optional
@@ -199,15 +198,16 @@ class AnthropicDirectClient:
 
     # -- credentials ----------------------------------------------------
     def _api_key(self) -> str:
-        """Resolve ANTHROPIC_API_KEY from the vault, else the environment.
+        """Resolve ANTHROPIC_API_KEY from the encrypted vault only.
 
-        The value is never logged, echoed, or included in any record.
+        ``vault`` is also the explicit injection seam for tests.  A missing or
+        locked vault fails closed; process-environment credentials are ignored.
         """
         try:
             value = self._vault.get("ANTHROPIC_API_KEY") if self._vault else None
         except Exception:
             value = None
-        return str(value or os.environ.get("ANTHROPIC_API_KEY", "") or "")
+        return str(value or "").strip()
 
     def has_credentials(self) -> bool:
         return bool(self._api_key())

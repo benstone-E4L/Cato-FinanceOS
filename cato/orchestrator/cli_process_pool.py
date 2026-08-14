@@ -26,6 +26,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from cato.orchestrator.cli_invoker import _resolve_cli
+from cato.vault_bootstrap import safe_subprocess_environment
 
 logger = logging.getLogger(__name__)
 
@@ -247,9 +248,8 @@ class PersistentProcess:
         args = self.protocol.spawn_args()
         logger.info("Starting persistent %s process: %s", self.name, " ".join(args))
 
-        # Unset CLAUDECODE so claude CLI doesn't refuse with "nested session" error
-        import os as _os
-        env = {k: v for k, v in _os.environ.items() if k != "CLAUDECODE"}
+        # Minimal launch metadata only; no parent credential state is inherited.
+        env = safe_subprocess_environment()
 
         self._proc = await asyncio.create_subprocess_exec(
             *args,

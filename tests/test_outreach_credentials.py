@@ -1,58 +1,49 @@
-"""Outreach credential merge and status redaction."""
+"""Outreach credential isolation and status redaction."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-import pytest
+from uuid import uuid4
 
 
-@pytest.fixture
-def outreach_env_files(tmp_path: Path, monkeypatch) -> Path:
-    engine = tmp_path / "engine"
-    engine.mkdir()
-    (engine / ".env").write_text(
-        "CONDUITSCORE_API_BASE=https://from-env.example\n"
-        "BREVO_SMTP_KEY=env-secret-key\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("BREVO_SMTP_KEY", "")
-    monkeypatch.delenv("CONDUITSCORE_API_BASE", raising=False)
-    return engine
-
-
-def test_vault_overrides_dotenv(outreach_env_files: Path, monkeypatch) -> None:
+def test_outreach_child_environment_never_contains_credentials(tmp_path: Path) -> None:
     from cato.core import outreach_credentials as oc
 
-    monkeypatch.setattr(
-        oc,
-        "_vault_secrets",
-        lambda: {
-            "BREVO_SMTP_KEY": "vault-secret",
-            "CONDUITSCORE_API_BASE": "https://vault.example",
+    secret_value = uuid4().hex
+    env = oc.build_outreach_env(
+        engine_root=tmp_path,
+        base={
+            "PATH": str(tmp_path),
+            "BREVO_SMTP_KEY": secret_value,
+            "CONDUITSCORE_API_KEY": secret_value,
+            "CATO_VAULT_PASSWORD": secret_value,
         },
     )
 
-    env = oc.build_outreach_env(engine_root=outreach_env_files, base={})
-    assert env["BREVO_SMTP_KEY"] == "vault-secret"
-    assert env["CONDUITSCORE_API_BASE"] == "https://vault.example"
+    assert env.get("PATH") == str(tmp_path)
+    assert secret_value not in env.values()
+    assert set(env).isdisjoint(
+        {"BREVO_SMTP_KEY", "CONDUITSCORE_API_KEY", "CATO_VAULT_PASSWORD"}
+    )
 
 
-def test_status_never_prints_secrets(outreach_env_files: Path, monkeypatch) -> None:
+def test_status_reports_vault_presence_without_returning_values(
+    tmp_path: Path, monkeypatch
+) -> None:
     from cato.core import outreach_credentials as oc
+    import cato.vault as vault_mod
 
-    monkeypatch.setattr(
-        oc,
-        "_vault_secrets",
-        lambda: {"BREVO_SMTP_KEY": "super-secret-value"},
-    )
-    monkeypatch.setattr(
-        oc,
-        "default_outreach_engine_root",
-        lambda: outreach_env_files,
-    )
+    secret_value = uuid4().hex
 
-    st = oc.outreach_credentials_status(engine_root=outreach_env_files)
+    class FakeVault:
+        def get(self, key: str):
+            return secret_value if key == "BREVO_SMTP_KEY" else None
+
+    monkeypatch.setattr(vault_mod, "Vault", FakeVault)
+
+    st = oc.outreach_credentials_status(engine_root=tmp_path)
     blob = json.dumps(st)
-    assert "super-secret-value" not in blob
+    assert secret_value not in blob
     assert st["keys_configured"]["BREVO_SMTP_KEY"] is True
+    assert st["execution_available"] is False

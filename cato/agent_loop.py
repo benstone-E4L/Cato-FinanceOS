@@ -1790,14 +1790,13 @@ def _check_llm_config(cfg: Any, vault: Any) -> bool:
 
 
 def _anthropic_key_present(vault: Any) -> bool:
-    """True when an Anthropic credential is reachable.  The value is never read
+    """True when an Anthropic credential is stored in the vault.  The value is never read
     into a log, message, or record — only its presence is reported."""
-    import os as _os
     try:
         value = vault.get("ANTHROPIC_API_KEY") if vault is not None else None
     except Exception:
         value = None
-    return bool(str(value or _os.environ.get("ANTHROPIC_API_KEY", "") or "").strip())
+    return bool(str(value or "").strip())
 
 
 # ---------------------------------------------------------------------------

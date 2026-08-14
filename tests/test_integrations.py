@@ -55,7 +55,7 @@ def test_catalog_status_metadata_redacts_secret_values(monkeypatch: pytest.Monke
     rendered = _render(status)
     assert secret not in rendered
     assert "SWARMSYNC_API_KEY" in status["metadata"]["vault_keys_present"]
-    assert "SWARMSYNC_API_KEY" in status["metadata"]["env_keys_present"]
+    assert status["metadata"]["env_keys_present"] == []
     assert status["metadata"]["required_vault_keys"] == ["SWARMSYNC_API_KEY"]
 
 
@@ -93,7 +93,7 @@ def test_vault_presence_marks_secret_configured_without_exposing_value(monkeypat
     assert status["metadata"]["env_keys_present"] == []
 
 
-def test_env_presence_marks_secret_configured_without_exposing_value(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_env_presence_does_not_configure_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = "env-secret-that-must-not-leak"
     monkeypatch.setenv("CATO_TEST_INTEGRATION_KEY", secret)
     spec = integration_routes.IntegrationSpec(
@@ -107,9 +107,9 @@ def test_env_presence_marks_secret_configured_without_exposing_value(monkeypatch
 
     status = integration_routes._integration_status(spec, CatoConfig(), set())
 
-    assert status["configured"] is True
+    assert status["configured"] is False
     assert status["metadata"]["vault_keys_present"] == []
-    assert status["metadata"]["env_keys_present"] == ["CATO_TEST_INTEGRATION_KEY"]
+    assert status["metadata"]["env_keys_present"] == []
     assert secret not in _render(status)
 
 

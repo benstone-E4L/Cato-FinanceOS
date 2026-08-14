@@ -23,15 +23,6 @@ os.chdir(_REPO_ROOT)
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-# Vault password must be set in the environment before installing/starting the service.
-# Example: set CATO_VAULT_PASSWORD=your-strong-password
-_vault_pw = os.environ.get("CATO_VAULT_PASSWORD")
-if not _vault_pw:
-    print("[CATO] ERROR: CATO_VAULT_PASSWORD environment variable is not set.")
-    print("[CATO] Set it before running: set CATO_VAULT_PASSWORD=<your-strong-password>")
-    sys.exit(1)
-
-
 class CatoDaemonService(win32serviceutil.ServiceFramework):
     _svc_name_ = "CatoDaemon"
     _svc_display_name_ = "Cato AI Daemon"
@@ -103,16 +94,13 @@ class CatoDaemonService(win32serviceutil.ServiceFramework):
             _vault, _boot = bootstrap_launch_credentials(
                 repo_root=_REPO_ROOT,
                 require_password=True,
-                load_dotenv=True,
+                load_dotenv=False,
             )
             logging.info(
-                "Launch credentials: vault_present=%s unlocked=%s vault_keys=%d "
-                "applied_from_vault=%s filled_from_dotenv=%s",
+                "Launch credentials: vault_present=%s unlocked=%s vault_keys=%d",
                 _boot.vault_present,
                 _boot.vault_unlocked,
                 _boot.vault_keys_total,
-                list(_boot.applied_from_vault),
-                list(_boot.filled_from_dotenv),
             )
         except VaultError as exc:
             logging.error("Vault bootstrap failed: %s", exc)

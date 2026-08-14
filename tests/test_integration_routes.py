@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from unittest.mock import patch
 
 import pytest
@@ -26,7 +27,7 @@ class TestIntegrationRoutes(AioHTTPTestCase):
         with (
             patch.object(integration_routes.CatoConfig, "load", return_value=CatoConfig()),
             patch.object(integration_routes, "_load_vault_keys", return_value=({"GITHUB_TOKEN"}, "available")),
-            patch.dict(integration_routes.os.environ, {"GITHUB_TOKEN": secret}, clear=False),
+            patch.dict(os.environ, {"GITHUB_TOKEN": secret}, clear=False),
         ):
             resp = await self.client.get("/api/integrations/status")
 
@@ -38,14 +39,14 @@ class TestIntegrationRoutes(AioHTTPTestCase):
         assert data["live_checks_performed"] is False
         github = next(item for item in data["integrations"] if item["id"] == "github")
         assert github["metadata"]["vault_keys_present"] == ["GITHUB_TOKEN"]
-        assert github["metadata"]["env_keys_present"] == ["GITHUB_TOKEN"]
+        assert github["metadata"]["env_keys_present"] == []
 
     async def test_catalog_alias_route_redacts_secret_values(self) -> None:
         secret = "xoxb_route_secret_that_must_not_leak"
         with (
             patch.object(integration_routes.CatoConfig, "load", return_value=CatoConfig()),
             patch.object(integration_routes, "_load_vault_keys", return_value=({"SLACK_BOT_TOKEN"}, "available")),
-            patch.dict(integration_routes.os.environ, {"SLACK_BOT_TOKEN": secret}, clear=False),
+            patch.dict(os.environ, {"SLACK_BOT_TOKEN": secret}, clear=False),
         ):
             resp = await self.client.get("/api/integrations")
 

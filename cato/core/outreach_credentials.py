@@ -1,14 +1,8 @@
-"""
-cato/core/outreach_credentials.py — Merge vault + outreach .env for subprocess tools.
-
-Secrets never logged. Brevo SMTP and ConduitScore API keys live in the encrypted vault
-and/or the outreach pipeline's local .env (gitignored).
-"""
+"""Vault-backed outreach status without subprocess credential transport."""
 
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -56,52 +50,20 @@ def default_outreach_engine_root() -> Path | None:
     return None
 
 
-def _load_dotenv_file(path: Path, env: dict[str, str]) -> None:
-    if not path.is_file():
-        return
-    try:
-        from dotenv import dotenv_values
-
-        for key, val in (dotenv_values(path) or {}).items():
-            if key and val is not None and key not in env:
-                env[key] = str(val)
-    except OSError as exc:
-        logger.debug("outreach .env read skipped: %s", exc)
-
-
-def _vault_secrets() -> dict[str, str]:
-    out: dict[str, str] = {}
-    try:
-        from ..vault import Vault
-
-        vault = Vault()
-        for key in OUTREACH_VAULT_KEYS:
-            val = vault.get(key)
-            if val:
-                out[key] = val
-    except Exception:
-        pass
-    return out
-
-
 def build_outreach_env(
     *,
     engine_root: Path | None = None,
     base: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    """Build env dict for outreach subprocess: OS env → pipeline .env → vault overrides."""
-    env = dict(base or os.environ)
-    root = engine_root or default_outreach_engine_root()
-    if root:
-        _load_dotenv_file(root / ".env", env)
-    env.update(_vault_secrets())
-    return env
+    """Return a non-secret child environment; outreach credentials are not injected."""
+    from ..vault_bootstrap import safe_subprocess_environment
+
+    return safe_subprocess_environment(base)
 
 
 def outreach_credentials_status(engine_root: Path | None = None) -> dict[str, Any]:
     """Safe status for CLI — never returns secret values."""
     root = engine_root or default_outreach_engine_root()
-    env = build_outreach_env(engine_root=root)
     vault_only: dict[str, bool] = {}
     try:
         from ..vault import Vault
@@ -114,8 +76,7 @@ def outreach_credentials_status(engine_root: Path | None = None) -> dict[str, An
 
     configured = {}
     for key in OUTREACH_STATUS_KEYS:
-        val = (env.get(key) or "").strip()
-        configured[key] = bool(val) or vault_only.get(key, False)
+        configured[key] = vault_only.get(key, False)
 
     return {
         "engine_root": str(root) if root else None,
@@ -123,8 +84,8 @@ def outreach_credentials_status(engine_root: Path | None = None) -> dict[str, An
         "env_file_exists": (root / ".env").is_file() if root else False,
         "template_version_hint": "1.2-halbert (ConduitScore templates/VERSION)",
         "keys_configured": configured,
-        "postal_address_set": bool((env.get("CANSPAM_POSTAL_ADDRESS") or "").strip()),
-        "brevo_smtp_ready": bool(
-            (env.get("BREVO_SMTP_KEY") or env.get("SMTP_ACCOUNTS") or "").strip()
-        ),
+        "postal_address_set": vault_only.get("CANSPAM_POSTAL_ADDRESS", False),
+        "brevo_smtp_ready": vault_only.get("BREVO_SMTP_KEY", False),
+        "execution_available": False,
+        "unavailable_reason": "External outreach transport lacks a secure credential channel.",
     }

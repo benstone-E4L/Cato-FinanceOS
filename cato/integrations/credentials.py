@@ -1,12 +1,7 @@
-"""Credential lookup helpers for integration tools.
-
-Credentials may come from Cato's encrypted vault or from process environment
-variables. Values are never returned by public status APIs.
-"""
+"""Vault-only credential lookup helpers for integration tools."""
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -32,7 +27,7 @@ class CredentialLookup:
 
 
 def resolve_credential(vault: Any, names: tuple[str, ...]) -> CredentialLookup:
-    """Resolve the first available credential from vault, then environment."""
+    """Resolve the first available credential from the encrypted vault."""
     if vault is not None:
         for name in names:
             try:
@@ -47,17 +42,6 @@ def resolve_credential(vault: Any, names: tuple[str, ...]) -> CredentialLookup:
                     key_name=name,
                     value=str(value),
                 )
-
-    for name in names:
-        value = os.environ.get(name)
-        if value:
-            return CredentialLookup(
-                names=names,
-                found=True,
-                source="env",
-                key_name=name,
-                value=value,
-            )
 
     return CredentialLookup(names=names, found=False)
 

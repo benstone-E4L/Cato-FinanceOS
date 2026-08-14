@@ -148,6 +148,47 @@ async def test_outreach_dry_run(policy_yaml: Path, monkeypatch, tmp_path: Path) 
 
 
 @pytest.mark.asyncio
+async def test_outreach_transport_fails_closed_without_starting_subprocess(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from uuid import uuid4
+
+    from cato.tools import outreach_bridge
+    import cato.core.night_shift_policy as policy_mod
+
+    engine_root = tmp_path / "engine"
+    (engine_root / "src").mkdir(parents=True)
+    secret_value = uuid4().hex
+    monkeypatch.setenv("BREVO_SMTP_KEY", secret_value)
+    monkeypatch.setattr(policy_mod, "assert_skill_allowed", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        policy_mod,
+        "load_night_shift_policy",
+        lambda: SimpleNamespace(paths={}),
+    )
+    monkeypatch.setattr(
+        outreach_bridge,
+        "_resolve_engine_root",
+        lambda *_a, **_k: engine_root,
+    )
+    spawn = AsyncMock()
+    monkeypatch.setattr(outreach_bridge.asyncio, "create_subprocess_exec", spawn)
+
+    result = json.loads(
+        await outreach_bridge.execute_outreach_run(
+            {"contact_id": "synthetic-contact", "dry_run": False}
+        )
+    )
+
+    assert result["ok"] is False
+    assert result["error"] == "credential_transport_unavailable"
+    assert secret_value not in json.dumps(result)
+    spawn.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_agent_loop_gates_outbound_tool(monkeypatch) -> None:
     from cato.agent_loop import AgentLoop, ToolCall
 

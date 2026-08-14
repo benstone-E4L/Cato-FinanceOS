@@ -20,7 +20,6 @@ All credentials are fetched from the Vault — no hardcoded tokens.
 from __future__ import annotations
 
 import logging
-import os
 import re
 from typing import TYPE_CHECKING, Optional
 
@@ -91,12 +90,11 @@ class TelegramAdapter(BaseAdapter):
         self._bot_token = (
             self.vault.get("TELEGRAM_BOT_TOKEN")
             or self.vault.get("CATODESKTOP_BOT_TOKEN")
-            or os.environ.get("CATODESKTOP_BOT_TOKEN", "").strip()
-            or os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
         )
         if not self._bot_token:
             raise ValueError(
-                "Telegram bot token not found. Set CATODESKTOP_BOT_TOKEN or TELEGRAM_BOT_TOKEN in vault/.env."
+                "Telegram bot token not found in the encrypted vault. "
+                "Run 'cato init' to configure Telegram."
             )
 
         self.app = Application.builder().token(self._bot_token).build()

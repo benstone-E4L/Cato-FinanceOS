@@ -23,7 +23,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Awaitable, Callable, Optional
@@ -178,15 +177,16 @@ class OpenAIDirectClient:
 
     # -- credentials ----------------------------------------------------
     def _api_key(self) -> str:
-        """Resolve OPENAI_API_KEY from the vault, else the environment.
+        """Resolve OPENAI_API_KEY from the encrypted vault only.
 
-        The value is never logged, echoed, or included in any record.
+        The value is never logged, echoed, or included in any record.  A
+        missing or locked vault fails closed; process environment is ignored.
         """
         try:
             value = self._vault.get("OPENAI_API_KEY") if self._vault else None
         except Exception:
             value = None
-        return str(value or os.environ.get("OPENAI_API_KEY", "") or "")
+        return str(value or "").strip()
 
     def has_credentials(self) -> bool:
         return bool(self._api_key())

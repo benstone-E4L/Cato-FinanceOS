@@ -1,12 +1,7 @@
-"""Tests for vault-preferring launch bootstrap and .env → vault migration.
-
-Never asserts on secret *values* in stdout — only key names, sizes, and presence.
-"""
-
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -14,243 +9,152 @@ from cato.vault import Vault, VaultError
 from cato.vault_bootstrap import (
     CANONICAL_KEY_ALIASES,
     OPERATOR_VAULT_KEYS,
-    apply_vault_to_environ,
     bootstrap_launch_credentials,
-    fill_environ_from_dotenv,
     migrate_env_to_vault,
     require_vault_password,
 )
 
 
+def _fresh_vault(tmp_path, monkeypatch):
+    import cato.vault as vault_mod
+
+    password = uuid4().hex
+    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
+    monkeypatch.setenv("CATO_VAULT_PASSWORD", password)
+    vault_path = tmp_path / "vault.enc"
+    vault = Vault(vault_path=vault_path)
+    vault.unlock(password, allow_create=True)
+    return vault, vault_path, password
+
+
 def test_require_vault_password_fails_when_unset(monkeypatch):
-    monkeypatch.delenv("CATO_VAULT_PASSWORD", raising=False)
     import cato.vault as vault_mod
 
     monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
+    monkeypatch.delenv("CATO_VAULT_PASSWORD", raising=False)
     with pytest.raises(VaultError, match="CATO_VAULT_PASSWORD"):
         require_vault_password()
 
 
-def test_fill_environ_from_dotenv_does_not_override(tmp_path, monkeypatch):
-    env_file = tmp_path / ".env"
-    env_file.write_text(
-        "TELEGRAM_BOT_TOKEN=from-dotenv\nOPENROUTER_API_KEY=or-from-dotenv\n",
-        encoding="utf-8",
-    )
-    environ = {"TELEGRAM_BOT_TOKEN": "already-set"}
-    filled = fill_environ_from_dotenv(env_file, environ=environ)
-    assert "OPENROUTER_API_KEY" in filled
-    assert "TELEGRAM_BOT_TOKEN" not in filled
-    assert environ["TELEGRAM_BOT_TOKEN"] == "already-set"
-    assert environ["OPENROUTER_API_KEY"] == "or-from-dotenv"
+def test_bootstrap_never_reads_repository_dotenv_or_exports_credentials(
+    tmp_path, monkeypatch
+):
+    import cato.vault_bootstrap as bootstrap_mod
 
-
-def test_apply_vault_prefers_vault_over_dotenv(tmp_path, monkeypatch):
-    monkeypatch.setenv("CATO_VAULT_PASSWORD", "unit-test-vault-pw")
-    import cato.vault as vault_mod
-
-    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
-
-    vault_path = tmp_path / "vault.enc"
-    vault = Vault(vault_path=vault_path)
-    vault.unlock("unit-test-vault-pw", allow_create=True)
-    vault.set("TELEGRAM_BOT_TOKEN", "vault-telegram")
-    vault.set("OPENROUTER_API_KEY", "vault-openrouter")
-
-    environ = {
-        "TELEGRAM_BOT_TOKEN": "dotenv-telegram",
-        "OPENROUTER_API_KEY": "dotenv-openrouter",
-        "ANTHROPIC_API_KEY": "dotenv-only",
-    }
-    applied = apply_vault_to_environ(vault, environ=environ)
-    assert "TELEGRAM_BOT_TOKEN" in applied
-    assert "OPENROUTER_API_KEY" in applied
-    assert environ["TELEGRAM_BOT_TOKEN"] == "vault-telegram"
-    assert environ["OPENROUTER_API_KEY"] == "vault-openrouter"
-    assert environ["ANTHROPIC_API_KEY"] == "dotenv-only"
-
-
-def test_bootstrap_launch_credentials_prefers_vault(tmp_path, monkeypatch):
-    monkeypatch.setenv("CATO_VAULT_PASSWORD", "bootstrap-pw")
-    import cato.vault as vault_mod
-
-    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
+    vault, vault_path, _password = _fresh_vault(tmp_path, monkeypatch)
+    vault_value = uuid4().hex
+    process_value = uuid4().hex
+    file_value = uuid4().hex
+    vault.set("ANTHROPIC_API_KEY", vault_value)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", process_value)
 
     env_file = tmp_path / ".env"
-    env_file.write_text(
-        "TELEGRAM_BOT_TOKEN=dotenv-tg\nOPENROUTER_API_KEY=dotenv-or\nEXTRA_LEGACY=keep-me\n",
-        encoding="utf-8",
+    env_file.write_text(f"ANTHROPIC_API_KEY={file_value}\n", encoding="utf-8")
+    monkeypatch.setattr(
+        bootstrap_mod,
+        "_read_dotenv_map",
+        lambda _path: (_ for _ in ()).throw(AssertionError("dotenv was read")),
     )
-    vault_path = tmp_path / "vault.enc"
-    v = Vault(vault_path=vault_path)
-    v.unlock("bootstrap-pw", allow_create=True)
-    v.set("TELEGRAM_BOT_TOKEN", "vault-tg")
-    v.set("OPENROUTER_API_KEY", "vault-or")
 
-    # Clear target keys so fill + apply are observable on real os.environ
-    for key in ("TELEGRAM_BOT_TOKEN", "OPENROUTER_API_KEY", "EXTRA_LEGACY"):
-        monkeypatch.delenv(key, raising=False)
-
-    vault, report = bootstrap_launch_credentials(
+    unlocked, report = bootstrap_launch_credentials(
         repo_root=tmp_path,
         vault_path=vault_path,
         env_file=env_file,
         require_password=True,
         load_dotenv=True,
     )
-    assert vault is not None
+
+    assert unlocked is not None
+    assert unlocked.get_stored("ANTHROPIC_API_KEY") == vault_value
+    assert "ANTHROPIC_API_KEY" not in os.environ
+    assert report.applied_from_vault == ()
+    assert report.filled_from_dotenv == ()
+    assert report.env_file is None
+    assert "CATO_VAULT_PASSWORD" not in os.environ
+
+
+def test_bootstrap_unlocks_encrypted_vault_without_environment_export(
+    tmp_path, monkeypatch
+):
+    vault, vault_path, _password = _fresh_vault(tmp_path, monkeypatch)
+    stored_value = uuid4().hex
+    vault.set("ANTHROPIC_API_KEY", stored_value)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    unlocked, report = bootstrap_launch_credentials(
+        vault_path=vault_path,
+        require_password=True,
+        load_dotenv=False,
+    )
+
+    assert unlocked is not None
+    assert unlocked.get("ANTHROPIC_API_KEY") == stored_value
     assert report.vault_unlocked is True
-    assert report.vault_keys_total >= 2
-    assert "TELEGRAM_BOT_TOKEN" in report.applied_from_vault
-    assert "OPENROUTER_API_KEY" in report.applied_from_vault
-    assert os.environ["TELEGRAM_BOT_TOKEN"] == "vault-tg"
-    assert os.environ["OPENROUTER_API_KEY"] == "vault-or"
-    assert os.environ.get("EXTRA_LEGACY") == "keep-me"
+    assert report.vault_keys_total >= 1
+    assert "ANTHROPIC_API_KEY" not in os.environ
+    assert "CATO_VAULT_PASSWORD" not in os.environ
 
 
-def test_migrate_env_to_vault_grows_vault_and_lists_keys(tmp_path, monkeypatch):
-    monkeypatch.setenv("CATO_VAULT_PASSWORD", "migrate-pw")
-    import cato.vault as vault_mod
-
-    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
-
+def test_migrate_env_to_vault_is_explicit_and_lists_keys(tmp_path, monkeypatch):
+    vault, vault_path, password = _fresh_vault(tmp_path, monkeypatch)
+    values = {name: uuid4().hex for name in ("BREVO_API_KEY", "ANTHROPIC_API_KEY")}
     env_file = tmp_path / ".env"
     env_file.write_text(
-        "\n".join(
-            [
-                "TELEGRAM_BOT_TOKEN=tg-secret-value",
-                "OPENROUTER_API_KEY=or-secret-value",
-                "ANTHROPIC_API_KEY=anth-secret-value",
-                "CATO_VAULT_PASSWORD=must-not-migrate",
-                "UNRELATED=skip-unless-operator",
-            ]
-        )
-        + "\n",
+        "".join(f"{name}={value}\n" for name, value in values.items()),
         encoding="utf-8",
     )
-    vault_path = tmp_path / "vault.enc"
-    # Create empty vault first
-    Vault(vault_path=vault_path).unlock("migrate-pw", allow_create=True)
-    size_before = vault_path.stat().st_size
-    assert size_before > 0
 
     report = migrate_env_to_vault(
         env_file=env_file,
         vault_path=vault_path,
-        password="migrate-pw",
+        password=password,
         overwrite=False,
-        dry_run=False,
     )
+
     assert report.ok
-    assert "TELEGRAM_BOT_TOKEN" in report.migrated
-    assert "OPENROUTER_API_KEY" in report.migrated
-    assert "ANTHROPIC_API_KEY" in report.migrated
-    assert "CATO_VAULT_PASSWORD" not in report.migrated
-    assert "UNRELATED" not in report.migrated
-
-    size_after = vault_path.stat().st_size
-    assert size_after > size_before
-
-    # Relock via fresh instance — list keys only (no values in assertions on stdout)
-    v2 = Vault(vault_path=vault_path)
-    v2.unlock("migrate-pw", allow_create=False)
-    keys = v2.list_keys()
-    assert "TELEGRAM_BOT_TOKEN" in keys
-    assert "OPENROUTER_API_KEY" in keys
-    assert "ANTHROPIC_API_KEY" in keys
-    assert "CATO_VAULT_PASSWORD" not in keys
+    assert sorted(report.migrated) == sorted(values)
+    reread = Vault(vault_path=vault_path)
+    reread.unlock(password, allow_create=False)
+    assert all(reread.get_stored(name) == value for name, value in values.items())
+    assert all(name not in os.environ for name in values)
 
 
 def test_migrate_skips_existing_without_overwrite(tmp_path, monkeypatch):
-    monkeypatch.setenv("CATO_VAULT_PASSWORD", "migrate-pw-2")
-    import cato.vault as vault_mod
-
-    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
-
-    vault_path = tmp_path / "vault.enc"
-    v = Vault(vault_path=vault_path)
-    v.unlock("migrate-pw-2", allow_create=True)
-    v.set("TELEGRAM_BOT_TOKEN", "already-in-vault")
-
+    vault, vault_path, password = _fresh_vault(tmp_path, monkeypatch)
+    original = uuid4().hex
+    candidate = uuid4().hex
+    vault.set("BREVO_API_KEY", original)
     env_file = tmp_path / ".env"
-    env_file.write_text("TELEGRAM_BOT_TOKEN=from-dotenv\n", encoding="utf-8")
+    env_file.write_text(f"BREVO_API_KEY={candidate}\n", encoding="utf-8")
 
     report = migrate_env_to_vault(
         env_file=env_file,
         vault_path=vault_path,
-        password="migrate-pw-2",
+        password=password,
         overwrite=False,
     )
+
     assert report.migrated == []
-    assert "TELEGRAM_BOT_TOKEN" in report.skipped_existing
-    assert v.get_stored("TELEGRAM_BOT_TOKEN") == "already-in-vault"
+    assert "BREVO_API_KEY" in report.skipped_existing
+    assert vault.get_stored("BREVO_API_KEY") == original
 
 
 def test_operator_vault_keys_include_required_targets():
-    assert "TELEGRAM_BOT_TOKEN" in OPERATOR_VAULT_KEYS
-    assert "OPENROUTER_API_KEY" in OPERATOR_VAULT_KEYS
-    assert "ANTHROPIC_API_KEY" in OPERATOR_VAULT_KEYS
+    required = {
+        "ANTHROPIC_API_KEY",
+        "OPENAI_API_KEY",
+        "TELEGRAM_BOT_TOKEN",
+        "GITHUB_TOKEN",
+        "PHOENIX_API_KEY",
+        "FINANCEOS_CAPABILITY_TOKEN",
+    }
+    assert required <= set(OPERATOR_VAULT_KEYS)
 
 
-def test_swarmsync_verifyapi_key_resolves_via_alias(tmp_path, monkeypatch):
-    """Regression: the recovered vault holds SWARMSYNC_VERIFYAPI_KEY, not
-    SWARMSYNC_API_KEY — bootstrap must still recognize it under the
-    canonical name the rest of the codebase reads, without a second vault
-    entry existing anywhere."""
-    monkeypatch.setenv("CATO_VAULT_PASSWORD", "alias-pw")
-    import cato.vault as vault_mod
-
-    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
-
-    vault_path = tmp_path / "vault.enc"
-    v = Vault(vault_path=vault_path)
-    v.unlock("alias-pw", allow_create=True)
-    v.set("SWARMSYNC_VERIFYAPI_KEY", "swarmsync-real-value")
-    assert "SWARMSYNC_API_KEY" not in v.list_keys()
-
-    environ = {}
-    applied = apply_vault_to_environ(v, environ=environ)
-    assert "SWARMSYNC_API_KEY" in applied
-    assert environ["SWARMSYNC_API_KEY"] == "swarmsync-real-value"
-    # The alias key itself is never promoted directly under its own name
-    # unless something else also wants it — only the canonical name is what
-    # this test asserts on, matching what OPERATOR_VAULT_KEYS actually reads.
-
-
-def test_github_foxfirepoets_token_resolves_via_alias(tmp_path, monkeypatch):
-    monkeypatch.setenv("CATO_VAULT_PASSWORD", "alias-pw-2")
-    import cato.vault as vault_mod
-
-    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
-
-    vault_path = tmp_path / "vault.enc"
-    v = Vault(vault_path=vault_path)
-    v.unlock("alias-pw-2", allow_create=True)
-    v.set("GITHUB_FOXFIREPOETS_TOKEN", "github-real-value")
-
-    environ = {}
-    applied = apply_vault_to_environ(v, environ=environ)
-    assert "GITHUB_TOKEN" in applied
-    assert environ["GITHUB_TOKEN"] == "github-real-value"
-
-
-def test_canonical_value_wins_over_alias_when_both_present(tmp_path, monkeypatch):
-    monkeypatch.setenv("CATO_VAULT_PASSWORD", "alias-pw-3")
-    import cato.vault as vault_mod
-
-    monkeypatch.setattr(vault_mod, "_CACHED_VAULT_PASSWORD", None)
-
-    vault_path = tmp_path / "vault.enc"
-    v = Vault(vault_path=vault_path)
-    v.unlock("alias-pw-3", allow_create=True)
-    v.set("GITHUB_TOKEN", "canonical-value")
-    v.set("GITHUB_FOXFIREPOETS_TOKEN", "alias-value")
-
-    environ = {}
-    apply_vault_to_environ(v, environ=environ)
-    assert environ["GITHUB_TOKEN"] == "canonical-value"
-
-
-def test_alias_map_only_covers_the_two_confirmed_mismatches():
-    assert CANONICAL_KEY_ALIASES["SWARMSYNC_API_KEY"] == ("SWARMSYNC_VERIFYAPI_KEY",)
-    assert CANONICAL_KEY_ALIASES["GITHUB_TOKEN"] == ("GITHUB_FOXFIREPOETS_TOKEN",)
+def test_alias_map_only_covers_confirmed_legacy_names():
+    assert CANONICAL_KEY_ALIASES == {
+        "SWARMSYNC_API_KEY": ("SWARMSYNC_VERIFYAPI_KEY",),
+        "SWARM_SYNC_API_KEY": ("SWARMSYNC_VERIFYAPI_KEY",),
+        "GITHUB_TOKEN": ("GITHUB_FOXFIREPOETS_TOKEN",),
+        "GH_TOKEN": ("GITHUB_FOXFIREPOETS_TOKEN",),
+    }

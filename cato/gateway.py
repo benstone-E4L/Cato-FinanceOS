@@ -32,6 +32,7 @@ from .core.operator_ledger import (
 from .node import NodeManager
 from .platform import get_data_dir
 from .vault import Vault
+from .vault_bootstrap import safe_subprocess_environment
 
 logger = logging.getLogger(__name__)
 
@@ -1381,8 +1382,7 @@ class Gateway:
                 if dest.exists():
                     _shutil.rmtree(dest)
                 import asyncio
-                import os as _os
-                env = dict(_os.environ)
+                env = safe_subprocess_environment()
                 env.update(_GIT_CLONE_ENV)
                 proc = await asyncio.create_subprocess_exec(
                     "git", *_GIT_CLONE_CONFIG,

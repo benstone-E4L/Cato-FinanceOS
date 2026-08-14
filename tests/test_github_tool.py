@@ -4,7 +4,7 @@ tests/test_github_tool.py — Tests for SKILL 3: Super-GitHub 3-Model PR Review.
 Covers:
 - _resolve_gh() path resolution (normal + Windows .CMD)
 - _extract_pr_number() URL and integer parsing
-- GitHubTool._gh_env() token injection from vault
+- GitHubTool._gh_env() native-auth environment isolation
 - GitHubTool.pr_merge() — delegates to gh CLI
 - GitHubTool.issue_create() / issue_list()
 - GitHubTool.release_create()
@@ -101,19 +101,21 @@ class TestExtractPrNumber:
 # ---------------------------------------------------------------------------
 
 class TestGhEnv:
-    def test_no_vault_returns_os_env(self):
+    def test_no_vault_returns_minimal_env(self):
         from cato.tools.github_tool import GitHubTool
         tool = GitHubTool(vault=None)
         env = tool._gh_env()
         assert isinstance(env, dict)
 
-    def test_vault_injects_gh_token(self):
+    def test_vault_token_is_not_injected(self):
         from cato.tools.github_tool import GitHubTool
         vault = MagicMock()
-        vault.get.return_value = "ghp_test_token_123"
+        vault.get.return_value = "synthetic-token"
         tool = GitHubTool(vault=vault)
         env = tool._gh_env()
-        assert env.get("GH_TOKEN") == "ghp_test_token_123"
+        assert "GH_TOKEN" not in env
+        assert "GITHUB_TOKEN" not in env
+        vault.get.assert_not_called()
 
     def test_vault_exception_does_not_crash(self):
         from cato.tools.github_tool import GitHubTool

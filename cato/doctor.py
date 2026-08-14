@@ -22,7 +22,6 @@ Checks performed:
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import socket
 import urllib.error
@@ -204,11 +203,7 @@ class DoctorReport:
     )
 
     def _check_env_secrets(self) -> None:
-        """Fail if any known operator secret still holds a live value in .env.
-
-        Never prints values — key names only. A missing/absent .env file, or
-        an .env with only non-secret config, is the healthy end state.
-        """
+        """Report repository dotenv presence without parsing assigned values."""
         from cato.vault_bootstrap import resolve_repo_root
 
         try:
@@ -219,29 +214,13 @@ class DoctorReport:
             console.print("  [green]OK[/green] — no .env file present (no plaintext secrets)")
             return
 
-        try:
-            from dotenv import dotenv_values
-            parsed = {
-                k: v for k, v in (dotenv_values(env_path) or {}).items()
-                if v is not None and str(v).strip() != ""
-            }
-        except Exception as exc:
-            console.print(f"  [yellow]WARN[/yellow] — could not parse {env_path}: {exc}")
-            return
-
-        leaked = sorted(k for k in parsed if k in self._ENV_SECRET_KEYS)
-        if leaked:
-            console.print(
-                f"  [red]LIVE SECRETS IN .env[/red] — {len(leaked)} key(s) still plaintext: "
-                f"{', '.join(leaked)}"
-            )
-            self._fail(
-                f"{len(leaked)} operator secret(s) still live in .env: {', '.join(leaked)}",
-                "Run: cato vault migrate-env, then remove those keys from .env "
-                "(non-secret config like GMAIL_ADDRESS/TELEGRAM_CHAT_ID may stay).",
-            )
-        else:
-            console.print("  [green]OK[/green] — no live operator secrets remaining in .env")
+        console.print(
+            "  [yellow]Repository .env present[/yellow] — assigned values were not read"
+        )
+        self._fail(
+            "Repository .env cannot be used for production credentials",
+            "Run the explicit 'cato vault migrate-env' command, verify the vault, then remove .env.",
+        )
 
     def _check_workspaces(self) -> None:
         """Check 3: per-agent workspace file token audit."""
@@ -449,31 +428,27 @@ class DoctorReport:
         """Check SwarmSync key aliases that have caused empty-response confusion."""
         console.print("\n[bold]SwarmSync Key Normalization[/bold]")
         cfg_enabled = bool(getattr(self._config, "swarmsync_enabled", False)) if self._config else False
-        env_keys = self._read_env_keys()
-        env_new = env_keys.get("SWARMSYNC_API_KEY") or os.environ.get("SWARMSYNC_API_KEY")
-        env_legacy = env_keys.get("SWARM_SYNC_API_KEY") or os.environ.get("SWARM_SYNC_API_KEY")
         vault_new = vault_legacy = None
         key_status: dict[str, object] = {"present": False, "source": "", "needs_normalization": False}
-        if os.environ.get("CATO_VAULT_PASSWORD"):
-            try:
-                from cato.vault import get_vault
-                vault = get_vault()
-                key_status = swarmsync_key_status(vault)
-                vault_new = vault.get("SWARMSYNC_API_KEY")
-                vault_legacy = vault.get("SWARM_SYNC_API_KEY")
-            except Exception as exc:
-                console.print(f"  [yellow]Vault key check skipped[/yellow]  {exc}")
+        try:
+            from cato.vault import get_vault
+            vault = get_vault()
+            key_status = swarmsync_key_status(vault)
+            vault_new = vault.get("SWARMSYNC_API_KEY")
+            vault_legacy = vault.get("SWARM_SYNC_API_KEY")
+        except Exception as exc:
+            console.print(f"  [yellow]Vault key check skipped[/yellow]  {exc}")
 
-        has_key = bool(env_new or env_legacy or vault_new or vault_legacy)
+        has_key = bool(vault_new or vault_legacy)
         console.print(f"  swarmsync_enabled: {'true' if cfg_enabled else 'false'}")
-        console.print(f"  SWARMSYNC_API_KEY present: {'yes' if bool(env_new or vault_new) else 'no'}")
-        console.print(f"  legacy SWARM_SYNC_API_KEY present: {'yes' if bool(env_legacy or vault_legacy) else 'no'}")
+        console.print(f"  SWARMSYNC_API_KEY present: {'yes' if bool(vault_new) else 'no'}")
+        console.print(f"  legacy SWARM_SYNC_API_KEY present: {'yes' if bool(vault_legacy) else 'no'}")
         if key_status.get("present"):
             console.print(f"  normalized source: {key_status.get('source')}")
         if cfg_enabled and not has_key:
-            self._fail("SwarmSync is enabled but no key was found", "Set SWARMSYNC_API_KEY in the vault or root .env; do not rely on OpenRouter for routed calls")
-        if key_status.get("needs_normalization") or ((env_legacy or vault_legacy) and not (env_new or vault_new)):
-            self._fail("Only legacy SWARM_SYNC_API_KEY is present", "Normalize to SWARMSYNC_API_KEY in the vault or root .env")
+            self._fail("SwarmSync is enabled but no key was found", "Set SWARMSYNC_API_KEY in the encrypted vault")
+        if key_status.get("needs_normalization") or (vault_legacy and not vault_new):
+            self._fail("Only legacy SWARM_SYNC_API_KEY is present", "Normalize to SWARMSYNC_API_KEY in the encrypted vault")
 
     def _check_routing_status(self) -> None:
         """Check /api/routing/status from the running daemon."""
@@ -562,24 +537,6 @@ class DoctorReport:
             return (_cato_dir() / "daemon.token").read_text(encoding="utf-8").strip()
         except OSError:
             return ""
-
-    @staticmethod
-    def _read_env_keys() -> dict[str, str]:
-        repo_root = Path(__file__).resolve().parents[1]
-        keys: dict[str, str] = {}
-        for path in (repo_root / ".env", _cato_dir() / ".env"):
-            if not path.exists():
-                continue
-            try:
-                for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
-                    line = raw.strip()
-                    if not line or line.startswith("#") or "=" not in line:
-                        continue
-                    key, value = line.split("=", 1)
-                    keys[key.strip()] = value.strip().strip("\"'")
-            except OSError:
-                continue
-        return keys
 
     def _check_channels(self) -> None:
         """Check 6: Telegram configured."""

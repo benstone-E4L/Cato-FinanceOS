@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -88,7 +89,10 @@ async def test_direct_anthropic_completion_records_persistent_route(tmp_path, mo
 
     router = ModelRouter(
         vault=None,
-        anthropic_client=AnthropicDirectClient(vault=None, transport=fake_transport),
+        anthropic_client=AnthropicDirectClient(
+            vault=SimpleNamespace(get=lambda _key: uuid4().hex),
+            transport=fake_transport,
+        ),
     )
     model, message, decision = await router.complete_message(
         [{"role": "user", "content": "hello"}],

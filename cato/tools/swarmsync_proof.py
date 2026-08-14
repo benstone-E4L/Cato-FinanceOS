@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any, Optional
 
 import aiohttp
@@ -62,7 +61,7 @@ _UPSTREAM_BODY_TRUNCATE = 1000
 
 
 def _get_verify_api_key(vault: Any = None) -> str:
-    """Resolve the VerifyAPI key (ssk_live_...) from vault, else environment.
+    """Resolve the VerifyAPI key from the encrypted vault only.
 
     Stored under SWARMSYNC_VERIFYAPI_KEY -- deliberately NOT the old
     SWARMSYNC_API_KEY name, so no future code path can accidentally revive
@@ -72,7 +71,7 @@ def _get_verify_api_key(vault: Any = None) -> str:
         value = vault.get("SWARMSYNC_VERIFYAPI_KEY") if vault else None
     except Exception:
         value = None
-    return str(value or os.environ.get("SWARMSYNC_VERIFYAPI_KEY", "") or "")
+    return str(value or "").strip()
 
 
 class SwarmSyncProofClient:

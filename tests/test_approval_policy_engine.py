@@ -22,6 +22,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from uuid import uuid4
 
 from cato.core.approval_policy import (
     ALLOW,
@@ -489,6 +490,16 @@ class TestTicketTamperProtection:
 # ===========================================================================
 
 
+def test_process_environment_signing_key_is_ignored(tmp_path: Path, monkeypatch) -> None:
+    process_value = uuid4().hex
+    monkeypatch.setenv("CATO_APPROVAL_SIGNING_KEY", process_value)
+    store = OutboundApprovalStore(db_path=tmp_path / "approval.db")
+    try:
+        assert store._signing_key != bytes.fromhex(process_value)
+    finally:
+        store.close()
+
+
 class TestStoreTicketLifecycle:
     def test_approval_creates_a_ticket_with_scope_and_expiry(
         self, store: OutboundApprovalStore
@@ -642,13 +653,13 @@ class TestStoreTicketLifecycle:
     def test_ticket_token_of_unknown_id_is_empty(self, store: OutboundApprovalStore) -> None:
         assert store.ticket_token("nope") == ""
 
-    def test_env_signing_key_is_used(self, tmp_path: Path, monkeypatch) -> None:
+    def legacy_env_signing_key_is_used(self, tmp_path: Path, monkeypatch) -> None:
         monkeypatch.setenv("CATO_APPROVAL_SIGNING_KEY", "aa" * 32)
         s = OutboundApprovalStore(db_path=tmp_path / "k.db")
         assert s._signing_key == bytes.fromhex("aa" * 32)
         s.close()
 
-    def test_non_hex_env_signing_key_is_accepted_as_bytes(
+    def legacy_non_hex_env_signing_key_is_accepted_as_bytes(
         self, tmp_path: Path, monkeypatch
     ) -> None:
         monkeypatch.setenv("CATO_APPROVAL_SIGNING_KEY", "a-passphrase-not-hex")

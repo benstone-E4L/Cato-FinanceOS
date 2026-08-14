@@ -149,7 +149,12 @@ async def _fetch_finance_control_room() -> dict[str, Any]:
     if parsed.scheme not in {"http", "https"} or parsed.hostname not in _LOCAL_REMOTES:
         raise ValueError("FINANCEOS_CONTROL_ROOM_URL must target localhost")
 
-    token = (os.environ.get("FINANCEOS_CAPABILITY_TOKEN") or "").strip() or None
+    try:
+        from cato.vault import get_vault
+
+        token = (get_vault().get("FINANCEOS_CAPABILITY_TOKEN") or "").strip() or None
+    except Exception:
+        token = None
     client = FinanceOSClient(base_url, capability_token=token, timeout=4.0)
 
     def _fetch_sync() -> tuple[Any, Any]:

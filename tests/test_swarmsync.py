@@ -28,11 +28,10 @@ def test_swarmsync_key_accepts_legacy_vault() -> None:
     assert status["needs_normalization"] is True
 
 
-def test_normalize_process_env_copies_legacy(monkeypatch) -> None:
+def test_normalize_process_env_never_copies_legacy_credentials(monkeypatch) -> None:
     monkeypatch.delenv("SWARMSYNC_API_KEY", raising=False)
     monkeypatch.setenv("SWARM_SYNC_API_KEY", "legacy-env")
 
     normalize_process_env()
 
-    assert get_swarmsync_api_key()[0] == "legacy-env"
-    assert get_swarmsync_api_key()[1] == "env:SWARMSYNC_API_KEY"
+    assert get_swarmsync_api_key() == ("", "")

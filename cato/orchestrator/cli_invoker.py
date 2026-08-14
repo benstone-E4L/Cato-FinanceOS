@@ -95,8 +95,8 @@ async def _run_subprocess_async(
         asyncio.TimeoutError: If the process exceeds timeout_sec.
         SubprocessError: If the process exits with non-zero return code.
     """
-    import os as _os
-    _env = {k: v for k, v in _os.environ.items() if k != "CLAUDECODE"}
+    from cato.vault_bootstrap import safe_subprocess_environment
+    _env = safe_subprocess_environment()
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdin=asyncio.subprocess.PIPE if stdin_data is not None else None,
