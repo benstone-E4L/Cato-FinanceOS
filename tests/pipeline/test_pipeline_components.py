@@ -110,16 +110,16 @@ class TestEnvironment:
         assert py.exists(), f"Python 3.13 not found at {py}"
 
     def test_cursor_agent_installed(self):
-        base = Path(os.environ.get("LOCALAPPDATA", "")) / "cursor-agent" / "versions"
-        assert base.is_dir(), f"cursor-agent not installed (expected {base})"
-        versions = list(base.iterdir())
-        assert len(versions) > 0, "cursor-agent versions directory is empty"
+        cursor = _load_module("invoke_cursor_environment", SCRIPTS_DIR / "invoke_cursor.py")
+        node_exe, index_js = cursor._resolve_cursor_agent()
+        assert Path(node_exe).is_file()
+        assert Path(index_js).is_file()
 
     def test_cursor_node_and_index_exist(self):
-        base = Path(os.environ.get("LOCALAPPDATA", "")) / "cursor-agent" / "versions"
-        latest = sorted(p for p in base.iterdir() if p.is_dir())[-1]
-        assert (latest / "node.exe").exists(), f"node.exe missing in {latest}"
-        assert (latest / "index.js").exists(),  f"index.js missing in {latest}"
+        cursor = _load_module("invoke_cursor_install", SCRIPTS_DIR / "invoke_cursor.py")
+        node_exe, index_js = cursor._resolve_cursor_agent()
+        assert Path(node_exe).name == "node.exe"
+        assert Path(index_js).name == "index.js"
 
     def test_scripts_dir_exists(self):
         assert SCRIPTS_DIR.is_dir(), f"Pipeline scripts dir missing: {SCRIPTS_DIR}"
@@ -251,6 +251,14 @@ def cursor_mod():
 
 
 class TestInvokeCursor:
+    @staticmethod
+    def _make_install(base: Path, version: str = "2026.01.01-test") -> Path:
+        install = base / "cursor-agent" / "versions" / version
+        install.mkdir(parents=True)
+        (install / "node.exe").touch()
+        (install / "index.js").touch()
+        return install
+
     def test_module_loads(self, cursor_mod):
         assert cursor_mod is not None
 
@@ -258,6 +266,67 @@ class TestInvokeCursor:
         node_exe, index_js = cursor_mod._resolve_cursor_agent()
         assert Path(node_exe).exists(), f"node.exe not found: {node_exe}"
         assert Path(index_js).exists(), f"index.js not found: {index_js}"
+
+    def test_resolve_cursor_agent_prefers_same_profile(
+        self, cursor_mod, tmp_path, monkeypatch
+    ):
+        current = self._make_install(tmp_path / "current", "2026.01.02-current")
+        owner = self._make_install(tmp_path / "owner", "2026.01.03-owner")
+        monkeypatch.delenv(cursor_mod.CURSOR_AGENT_VERSIONS_DIR_ENV, raising=False)
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "current"))
+        monkeypatch.setattr(
+            cursor_mod, "_pipeline_owner_local_app_data", lambda: tmp_path / "owner"
+        )
+
+        node_exe, index_js = cursor_mod._resolve_cursor_agent()
+
+        assert Path(node_exe) == current / "node.exe"
+        assert Path(index_js) == current / "index.js"
+
+    def test_resolve_cursor_agent_honors_explicit_version_directory(
+        self, cursor_mod, tmp_path, monkeypatch
+    ):
+        configured = self._make_install(tmp_path / "configured")
+        self._make_install(tmp_path / "current")
+        monkeypatch.setenv(cursor_mod.CURSOR_AGENT_VERSIONS_DIR_ENV, str(configured))
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "current"))
+
+        node_exe, index_js = cursor_mod._resolve_cursor_agent()
+
+        assert Path(node_exe) == configured / "node.exe"
+        assert Path(index_js) == configured / "index.js"
+
+    def test_resolve_cursor_agent_uses_approved_pipeline_owner_profile(
+        self, cursor_mod, tmp_path, monkeypatch
+    ):
+        owner = self._make_install(tmp_path / "owner", "2026.01.03-owner")
+        monkeypatch.delenv(cursor_mod.CURSOR_AGENT_VERSIONS_DIR_ENV, raising=False)
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "missing-current"))
+        monkeypatch.setattr(
+            cursor_mod, "_pipeline_owner_local_app_data", lambda: tmp_path / "owner"
+        )
+
+        node_exe, index_js = cursor_mod._resolve_cursor_agent()
+
+        assert Path(node_exe) == owner / "node.exe"
+        assert Path(index_js) == owner / "index.js"
+
+    def test_resolve_cursor_agent_rejects_missing_and_malformed_installs(
+        self, cursor_mod, tmp_path, monkeypatch
+    ):
+        malformed = tmp_path / "malformed" / "cursor-agent" / "versions" / "v1"
+        malformed.mkdir(parents=True)
+        (malformed / "node.exe").touch()
+        monkeypatch.setenv(cursor_mod.CURSOR_AGENT_VERSIONS_DIR_ENV, str(malformed))
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "missing-current"))
+        monkeypatch.setattr(
+            cursor_mod,
+            "_pipeline_owner_local_app_data",
+            lambda: tmp_path / "missing-owner",
+        )
+
+        with pytest.raises(FileNotFoundError, match="approved location"):
+            cursor_mod._resolve_cursor_agent()
 
     def test_build_codebase_context_returns_string(self, cursor_mod, tmp_path):
         # Create some fake source files
