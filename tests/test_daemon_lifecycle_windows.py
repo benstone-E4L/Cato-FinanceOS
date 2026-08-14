@@ -143,6 +143,25 @@ class TestTerminatePid:
         assert cato_platform.terminate_pid(0) is False
 
 
+class TestGracefulSignalRegistration:
+    def test_windows_registers_ctrl_break_for_process_group_shutdown(self):
+        registered: list[int] = []
+
+        with (
+            patch.object(cato_platform, "IS_WINDOWS", True),
+            patch.object(
+                cato_platform.signal,
+                "signal",
+                side_effect=lambda signum, _handler: registered.append(signum),
+            ),
+            patch.object(cato_platform.atexit, "register"),
+        ):
+            cato_platform.setup_signal_handlers(lambda: None)
+
+        assert cato_platform.signal.SIGINT in registered
+        assert cato_platform.signal.SIGBREAK in registered
+
+
 # ---------------------------------------------------------------------------
 # _read_live_pid must not delete state for a live daemon
 # ---------------------------------------------------------------------------

@@ -56,6 +56,7 @@ except VaultError as _exc:
     sys.exit(1)
 
 from cato.cli import CatoConfig, BudgetManager, _CATO_DIR, _run_daemon, _PID_FILE, _read_live_pid
+from cato.platform import setup_signal_handlers
 
 config = CatoConfig.load()
 budget = BudgetManager(session_cap=config.session_cap, monthly_cap=config.monthly_cap, daily_cap=config.daily_cap)
@@ -75,6 +76,10 @@ if live_pid is not None and live_pid != os.getpid():
 _PID_FILE.write_text(str(os.getpid()))
 
 try:
+    # On Windows, process-group shutdown is delivered as CTRL_BREAK_EVENT.
+    # The shared handler raises SystemExit only after requesting shutdown;
+    # asyncio.run then cancels the main task and executes daemon-owned cleanup.
+    setup_signal_handlers(lambda: logging.info("Production runner shutdown requested."))
     _run_daemon(config, "claude", "all")
 finally:
     _PID_FILE.unlink(missing_ok=True)

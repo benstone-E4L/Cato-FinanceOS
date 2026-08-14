@@ -12,7 +12,7 @@ Usage::
     data_dir = get_data_dir()          # %APPDATA%/cato on Windows, ~/.cato on POSIX
     p = safe_path("~/some/path")       # always a resolved Path
     safe_print("Hello \u2713")         # safe on cp1252 terminals
-    setup_signal_handlers(my_shutdown) # SIGINT everywhere, SIGTERM on POSIX only
+    setup_signal_handlers(my_shutdown) # SIGINT + Windows SIGBREAK, SIGTERM on POSIX
 """
 
 from __future__ import annotations
@@ -365,9 +365,10 @@ def setup_signal_handlers(shutdown_fn: Callable[[], None]) -> None:
     """
     Register *shutdown_fn* as the handler for graceful shutdown signals.
 
-    - SIGINT  (Ctrl-C) — registered on all platforms.
-    - SIGTERM           — registered on POSIX only (not available on Windows).
-    - atexit            — registered on all platforms as a final safety net.
+    - SIGINT   (Ctrl-C)     — registered on all platforms.
+    - SIGBREAK (Ctrl-Break) — registered on Windows for process-group shutdown.
+    - SIGTERM              — registered on POSIX only.
+    - atexit               — registered on all platforms as a final safety net.
 
     The shutdown function is called at most once (idempotent guard).
     """
@@ -394,8 +395,18 @@ def setup_signal_handlers(shutdown_fn: Callable[[], None]) -> None:
     # SIGINT is available everywhere
     signal.signal(signal.SIGINT, _handler)
 
-    # SIGTERM is POSIX-only
-    if not IS_WINDOWS:
+    if IS_WINDOWS:
+        # CREATE_NEW_PROCESS_GROUP ignores Ctrl-C by default, while Ctrl-Break
+        # is deliverable to that exact group. Register it so asyncio.run can
+        # unwind pending tasks and execute daemon-owned cleanup blocks.
+        sigbreak = getattr(signal, "SIGBREAK", None)
+        if sigbreak is not None:
+            try:
+                signal.signal(sigbreak, _handler)
+            except (OSError, ValueError) as exc:
+                logger.debug("Could not register SIGBREAK: %s", exc)
+    else:
+        # SIGTERM is POSIX-only.
         try:
             signal.signal(signal.SIGTERM, _handler)
         except (OSError, ValueError) as exc:
@@ -404,5 +415,5 @@ def setup_signal_handlers(shutdown_fn: Callable[[], None]) -> None:
     atexit.register(_atexit_handler)
     logger.debug(
         "Signal handlers registered (SIGINT%s + atexit)",
-        "+SIGTERM" if not IS_WINDOWS else "",
+        "+SIGBREAK" if IS_WINDOWS else "+SIGTERM",
     )
