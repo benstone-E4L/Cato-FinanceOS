@@ -187,7 +187,14 @@ async def run_phoenix_eval(
 
 def _log_results(report: EvalReport, *, log_path: Optional[Path]) -> None:
     logged_to_phoenix = _try_log_to_phoenix(report)
-    target = log_path or Path(".ralph") / "context-log.md"
+    if log_path:
+        target = log_path
+    elif os.environ.get("CATO_EVAL_LOG_PATH"):
+        target = Path(os.environ["CATO_EVAL_LOG_PATH"])
+    elif os.environ.get("RALPH_WORKSPACE_DIR"):
+        target = Path(os.environ["RALPH_WORKSPACE_DIR"]) / ".ralph" / "context-log.md"
+    else:
+        target = Path(".ralph") / "context-log.md"
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         with target.open("a", encoding="utf-8") as fh:

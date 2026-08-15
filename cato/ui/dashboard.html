@@ -187,7 +187,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .usage-bar-val{width:60px;text-align:right;font-size:12px;color:#64748b;flex-shrink:0}
 
 /* ── Logs page ───────────────────────────────────────────────────── */
-#log-output{background:#0a0c11;border-radius:8px;padding:14px;font-family:'Cascadia Code','Fira Code','Consolas',monospace;font-size:12px;overflow-y:auto;max-height:calc(100vh - 220px);min-height:300px;border:1px solid #1e2433}
+#log-output{background:#0a0c11;border-radius:8px;padding:14px;font-family:'JetBrains Mono','Consolas',monospace;font-size:12px;overflow-y:auto;max-height:calc(100vh - 220px);min-height:300px;border:1px solid var(--e4-border)}
 .log-line{padding:1px 0;white-space:pre-wrap;word-break:break-all}
 .log-ERROR{color:#f87171}
 .log-WARN,.log-WARNING{color:#fbbf24}
@@ -220,7 +220,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .cron-add-form{background:#0f1117;border:1px solid #1e2433;border-radius:8px;padding:16px;margin-bottom:16px;display:none}
 .cron-add-form.open{display:block}
 .cron-row-meta{display:flex;gap:6px;flex-direction:column}
-.cron-schedule-tag{font-size:11px;font-family:'Cascadia Code','Consolas',monospace;color:#93c5fd;background:#1e3a5f22;border:1px solid #1e3a5f;padding:2px 6px;border-radius:4px;display:inline-block}
+.cron-schedule-tag{font-size:11px;font-family:'JetBrains Mono','Consolas',monospace;color:var(--e4-gold-light);background:rgba(201,169,110,0.12);border:1px solid var(--e4-border);padding:2px 6px;border-radius:4px;display:inline-block}
 
 /* ── Onboarding wizard ───────────────────────────────────────────── */
 #onboarding-overlay{position:fixed;inset:0;background:#0f1117;z-index:200;display:flex;align-items:center;justify-content:center}
@@ -241,9 +241,9 @@ textarea.form-input{resize:vertical;min-height:80px}
 .tool-card{background:#0f1117;border:1px solid #374151;border-radius:8px;margin:8px 0;overflow:hidden}
 .tool-card-header{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;user-select:none}
 .tool-card-header:hover{background:#1e2433}
-.tool-card-name{font-size:12px;font-weight:600;color:#a78bfa;font-family:'Cascadia Code','Consolas',monospace}
+.tool-card-name{font-size:12px;font-weight:600;color:var(--e4-gold);font-family:'JetBrains Mono','Consolas',monospace}
 .tool-card-arrow{font-size:10px;color:#4b5563;transition:transform .2s;margin-left:auto}
-.tool-card-body{display:none;padding:10px 12px;border-top:1px solid #1e2433;font-size:12px;color:#64748b;white-space:pre-wrap;word-break:break-all;font-family:'Cascadia Code','Consolas',monospace}
+.tool-card-body{display:none;padding:10px 12px;border-top:1px solid #1e2433;font-size:12px;color:#64748b;white-space:pre-wrap;word-break:break-all;font-family:'JetBrains Mono','Consolas',monospace}
 .tool-card-body.open{display:block}
 .token-usage-line{font-size:10px;color:#374151;margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
 .token-usage-line span{color:#4b5563}
@@ -264,7 +264,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .cli-badges{display:flex;gap:6px;margin-top:4px}
 .vault-key-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1e2433}
 .vault-key-row:last-child{border-bottom:none}
-.vault-key-name{flex:1;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;color:#93c5fd}
+.vault-key-name{flex:1;font-family:'JetBrains Mono','Consolas',monospace;font-size:12px;color:var(--e4-gold-light)}
 .vault-key-set{color:#60a5fa;font-size:11px}
 .vault-key-missing{color:#64748b;font-size:11px}
 
@@ -289,7 +289,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .skill-editor-sidebar{width:260px;min-width:200px;border-right:1px solid #1e2433;overflow-y:auto;padding-right:0}
 .skill-editor-main{flex:1;display:flex;flex-direction:column;padding-left:16px}
 .skill-editor-title{font-size:14px;font-weight:600;color:#f1f5f9;margin-bottom:8px}
-.skill-editor-textarea{flex:1;background:#0a0c11;border:1px solid #1e2433;border-radius:6px;padding:14px;color:#e2e8f0;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;line-height:1.6;resize:none;outline:none;min-height:300px}
+.skill-editor-textarea{flex:1;background:#0a0c11;border:1px solid #1e2433;border-radius:6px;padding:14px;color:#e2e8f0;font-family:'JetBrains Mono','Consolas',monospace;font-size:12px;line-height:1.6;resize:none;outline:none;min-height:300px}
 .skill-editor-textarea:focus{border-color:#3b82f6}
 .skill-toggle{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
 .skill-toggle input{opacity:0;width:0;height:0;position:absolute}
@@ -322,12 +322,12 @@ textarea.form-input{resize:vertical;min-height:80px}
 /* ── CHUNK 7: Sessions + Audit + Memory ──────────────────────────── */
 .audit-entry-row{display:flex;gap:8px;padding:8px 12px;border-bottom:1px solid #0f111744;font-size:12px;align-items:flex-start}
 .audit-entry-row:last-child{border-bottom:none}
-.audit-hash{font-family:'Cascadia Code','Consolas',monospace;font-size:10px;color:#374151;word-break:break-all}
+.audit-hash{font-family:'JetBrains Mono','Consolas',monospace;font-size:10px;color:var(--e4-text-muted);word-break:break-all}
 .memory-file-card{background:#0f1117;border:1px solid #1e2433;border-radius:8px;padding:12px 16px;cursor:pointer;transition:border-color .15s;margin-bottom:8px}
-.memory-file-card:hover{border-color:#3b82f6}
-.memory-file-name{font-size:13px;font-weight:600;color:#93c5fd;margin-bottom:4px}
+.memory-file-card:hover{border-color:var(--e4-gold)}
+.memory-file-name{font-size:13px;font-weight:600;color:var(--e4-gold-light);margin-bottom:4px}
 .memory-file-meta{font-size:11px;color:#4b5563}
-.memory-editor-ta{width:100%;background:#0a0c11;border:1px solid #1e2433;border-radius:6px;padding:14px;color:#e2e8f0;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;line-height:1.6;resize:vertical;outline:none;min-height:300px}
+.memory-editor-ta{width:100%;background:#0a0c11;border:1px solid #1e2433;border-radius:6px;padding:14px;color:#e2e8f0;font-family:'JetBrains Mono','Consolas',monospace;font-size:12px;line-height:1.6;resize:vertical;outline:none;min-height:300px}
 .memory-editor-ta:focus{border-color:#3b82f6}
 
 /* ── CHUNK 8: Config enhancements + Differentiators ─────────────── */

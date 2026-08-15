@@ -135,7 +135,7 @@
 .setting-group textarea {
   min-height: 180px;
   resize: vertical;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   line-height: 1.5;
 }
 

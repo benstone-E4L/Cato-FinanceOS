@@ -372,7 +372,7 @@ body {
   padding: 4px 10px;
   color: #e2e8f0;
   font-size: 12px;
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   outline: none;
 }
 
@@ -960,13 +960,13 @@ body {
 .data-table .row-error td { background: #7f1d1d11; }
 
 .code-cell {
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   font-size: 11px;
   color: var(--text-secondary);
 }
 
 .hash-cell {
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   font-size: 10px;
   color: var(--text-muted);
 }
@@ -1221,7 +1221,7 @@ body {
 }
 
 .dash-session-id {
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   font-size: 11px;
   flex: 1;
 }
@@ -1300,7 +1300,7 @@ body {
 .log-container {
   flex: 1;
   overflow-y: auto;
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   font-size: 11px;
   background: #0a0d14;
   border: 1px solid var(--border-color);
@@ -1385,7 +1385,7 @@ body {
   border-radius: 8px;
   padding: 12px;
   color: var(--text-primary);
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   font-size: 12px;
   resize: none;
   outline: none;
@@ -1435,7 +1435,7 @@ body {
 
 .cli-status-info { display: flex; flex-direction: column; gap: 3px; }
 .cli-label { font-size: 13px; font-weight: 600; }
-.cli-cmd { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 11px; color: var(--text-muted); }
+.cli-cmd { font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace); font-size: 11px; color: var(--text-muted); }
 .cli-status-actions { display: flex; align-items: center; gap: 8px; }
 .cli-note { font-size: 11px; color: var(--text-muted); font-style: italic; }
 
@@ -1452,7 +1452,7 @@ body {
 }
 
 .vault-key-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.vault-key-name { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 12px; }
+.vault-key-name { font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace); font-size: 12px; }
 .vault-key-desc { font-size: 11px; color: var(--text-muted); }
 
 .add-key-form { padding-top: 8px; border-top: 1px solid var(--border-color); margin-top: 4px; }
@@ -1478,7 +1478,7 @@ body {
   border-radius: 8px;
   padding: 12px;
   color: var(--text-primary);
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   font-size: 12px;
   resize: none;
   outline: none;
@@ -1492,7 +1492,7 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 12px;
-  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   font-size: 11px;
   color: var(--text-secondary);
   overflow-x: auto;
@@ -1968,7 +1968,7 @@ select:focus-visible {
   color: var(--text-primary);
   border: none;
   padding: 16px;
-  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', 'Source Code Pro', monospace);
   font-size: 13px;
   line-height: 1.6;
   resize: none;
