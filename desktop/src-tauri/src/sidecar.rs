@@ -4,7 +4,6 @@
 //! startup never searches PATH for Python or another interpreter.
 //! Gracefully shuts down on app exit.
 
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri_plugin_shell::{
@@ -52,7 +51,12 @@ impl SidecarManager {
     /// opening the desktop app: the child is None, but the daemon health route
     /// is still responding on the discovered HTTP port.
     pub async fn is_running(&mut self) -> bool {
-        self.refresh_ports_from_disk();
+        // A generic HTTP 200 on the constructor's fallback port does not prove
+        // Cato identity. Only a Cato-owned lifecycle marker may select the
+        // endpoint used for health acceptance.
+        if !self.refresh_ports_from_disk() {
+            return false;
+        }
 
         // The shell plugin owns process observation. Health is the runtime
         // contract whether this manager spawned the process or it was already
@@ -85,7 +89,15 @@ impl SidecarManager {
         if let Some(child) = self.child.take() {
             let _ = child.kill();
         }
-        let sidecar_env = Self::load_env_file();
+
+        // The launch password is a one-child handoff, not retained desktop
+        // state. Capture it once, remove it from the long-lived GUI process,
+        // and inject it only into the daemon start command below. The stop
+        // command never receives it.
+        let vault_password = std::env::var_os("CATO_VAULT_PASSWORD");
+        if vault_password.is_some() {
+            std::env::remove_var("CATO_VAULT_PASSWORD");
+        }
 
         // Clear any stale PID file through the same bundled executable.
         log::info!("Clearing any stale Cato daemon state...");
@@ -94,15 +106,13 @@ impl SidecarManager {
 
         log::info!("Starting Tauri-bundled Cato daemon: start --channel webchat");
 
-        let mut cmd = Self::sidecar_command(app)?.args(["start", "--channel", "webchat"]);
-
-        for (key, value) in &sidecar_env {
-            if std::env::var_os(key).is_none() {
-                cmd = cmd.env(key, value);
-            }
+        let mut start_command =
+            Self::sidecar_command(app)?.args(["start", "--channel", "webchat"]);
+        if let Some(password) = vault_password {
+            start_command = start_command.env("CATO_VAULT_PASSWORD", password);
         }
 
-        let (receiver, child) = cmd
+        let (receiver, child) = start_command
             .spawn()
             .map_err(|e| format!("Failed to spawn Tauri-bundled Cato daemon: {e}"))?;
         Self::spawn_log_drain(receiver);
@@ -150,34 +160,36 @@ impl SidecarManager {
                 return Err("Cato daemon health check timed out".into());
             }
 
-            self.refresh_ports_from_disk();
-            let url = format!("http://127.0.0.1:{}/health", self.http_port);
-            match client.get(&url).timeout(Duration::from_secs(2)).send().await {
-                Ok(resp) if resp.status().is_success() => return Ok(()),
-                _ => {}
+            if self.refresh_ports_from_disk() {
+                let url = format!("http://127.0.0.1:{}/health", self.http_port);
+                match client.get(&url).timeout(Duration::from_secs(2)).send().await {
+                    Ok(resp) if resp.status().is_success() => return Ok(()),
+                    _ => {}
+                }
             }
 
             sleep(Duration::from_millis(500)).await;
         }
     }
 
-    fn refresh_ports_from_disk(&mut self) {
+    fn refresh_ports_from_disk(&mut self) -> bool {
         let Some(port_path) = Self::port_file_path() else {
-            return;
+            return false;
         };
 
         let Ok(raw_port) = std::fs::read_to_string(&port_path) else {
-            return;
+            return false;
         };
 
         let Ok(http_port) = raw_port.trim().parse::<u16>() else {
             log::warn!("Invalid port file contents in {}", port_path.display());
-            return;
+            return false;
         };
 
         self.http_port = http_port;
         // Desktop chat and coding-agent traffic both ride the aiohttp /ws surface.
         self.ws_port = http_port;
+        true
     }
 
     fn spawn_log_drain(mut receiver: tauri::async_runtime::Receiver<CommandEvent>) {
@@ -206,95 +218,19 @@ impl SidecarManager {
         });
     }
 
-    /// Load supplemental environment variables from the standard Cato .env locations.
-    /// Existing process env vars always win over values from disk.
-    fn load_env_file() -> BTreeMap<String, String> {
-        for env_path in Self::env_file_candidates() {
-            if !env_path.exists() {
-                continue;
-            }
-
-            match std::fs::read_to_string(&env_path) {
-                Ok(contents) => {
-                    let parsed = Self::parse_dotenv(&contents);
-                    if !parsed.is_empty() {
-                        log::info!("Loaded sidecar environment from {}", env_path.display());
-                        return parsed;
-                    }
-                }
-                Err(err) => {
-                    log::warn!("Failed to read {}: {}", env_path.display(), err);
-                }
-            }
-        }
-
-        BTreeMap::new()
-    }
-
-    fn env_file_candidates() -> Vec<PathBuf> {
-        let mut candidates = Vec::new();
-
-        if let Ok(path) = std::env::var("CATO_ENV_FILE") {
-            let path = PathBuf::from(path);
-            if path.is_absolute() {
-                candidates.push(path);
-            } else if let Ok(cwd) = std::env::current_dir() {
-                candidates.push(cwd.join(path));
-            }
-        }
-
-        if let Some(data_dir) = Self::cato_data_dir() {
-            candidates.push(data_dir.join(".env"));
-        }
-
-        if let Some(base_dir) = Self::current_exe_base_dir() {
-            candidates.push(base_dir.join(".env"));
-        }
-
-        if let Ok(cwd) = std::env::current_dir() {
-            candidates.push(cwd.join(".env"));
-        }
-
-        candidates
-    }
-
-    fn parse_dotenv(contents: &str) -> BTreeMap<String, String> {
-        let mut out = BTreeMap::new();
-
-        for raw_line in contents.lines() {
-            let line = raw_line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-
-            let line = line.strip_prefix("export ").unwrap_or(line);
-            let Some((key, value)) = line.split_once('=') else {
-                continue;
-            };
-
-            let key = key.trim();
-            if key.is_empty() {
-                continue;
-            }
-
-            let value = value.trim();
-            let value = if value.len() >= 2
-                && ((value.starts_with('"') && value.ends_with('"'))
-                    || (value.starts_with('\'') && value.ends_with('\'')))
-            {
-                value[1..value.len() - 1].to_string()
-            } else {
-                value.to_string()
-            };
-
-            out.insert(key.to_string(), value);
-        }
-
-        out
-    }
-
     fn cato_data_dir() -> Option<PathBuf> {
         if cfg!(windows) {
+            // Python's canonical get_data_dir() uses APPDATA on Windows. Honor
+            // the same absolute launch-profile path so the desktop and daemon
+            // cannot split token/port/vault state across different profiles.
+            // Normal Windows launches preserve existing behavior because
+            // APPDATA is the OS roaming-app-data known folder.
+            if let Some(appdata) = std::env::var_os("APPDATA") {
+                let appdata = PathBuf::from(appdata);
+                if appdata.is_absolute() {
+                    return Some(appdata.join("cato"));
+                }
+            }
             dirs::config_dir().map(|dir| dir.join("cato"))
         } else {
             dirs::home_dir().map(|dir| dir.join(".cato"))
@@ -319,7 +255,7 @@ impl SidecarManager {
 
 impl Drop for SidecarManager {
     fn drop(&mut self) {
-        if let Some(mut child) = self.child.take() {
+        if let Some(child) = self.child.take() {
             let _ = child.kill();
         }
     }

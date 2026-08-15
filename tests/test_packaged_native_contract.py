@@ -106,6 +106,71 @@ def test_packaged_sidecar_never_assembles_a_command_string():
     assert "tauri_plugin_shell::{" in sidecar
 
 
+def test_packaged_sidecar_never_reads_plaintext_env_files():
+    """Release startup inherits explicit process environment only.
+
+    Credential-bearing configuration belongs in the encrypted Cato vault. The
+    desktop executable must never rediscover plaintext values from a repository,
+    install directory, working directory, or profile-local dotenv file.
+    """
+    sidecar = _source("desktop/src-tauri/src/sidecar.rs")
+
+    assert "load_env_file" not in sidecar
+    assert "env_file_candidates" not in sidecar
+    assert "parse_dotenv" not in sidecar
+    assert "CATO_ENV_FILE" not in sidecar
+    assert 'join(".env")' not in sidecar
+    assert "dotenv" not in sidecar.lower()
+
+
+def test_packaged_sidecar_uses_the_same_windows_profile_root_as_python():
+    """Desktop port/token discovery must follow Python's APPDATA contract."""
+    sidecar = _source("desktop/src-tauri/src/sidecar.rs")
+    data_dir_fn = re.search(
+        r"fn cato_data_dir\(\) -> Option<PathBuf> \{(?P<body>.*?)\n    \}",
+        sidecar,
+        re.DOTALL,
+    )
+    assert data_dir_fn, "cato_data_dir implementation is missing"
+    body = data_dir_fn.group("body")
+    assert 'std::env::var_os("APPDATA")' in body
+    assert "appdata.is_absolute()" in body
+    assert 'appdata.join("cato")' in body
+    assert 'dirs::config_dir().map(|dir| dir.join("cato"))' in body
+
+
+def test_vault_password_is_a_single_start_child_handoff():
+    """The GUI must not retain or expose the vault unlock password."""
+    sidecar = _source("desktop/src-tauri/src/sidecar.rs")
+    start_fn = re.search(
+        r"pub async fn start\((?P<body>.*?)\n    \}\n\n    /// Stop",
+        sidecar,
+        re.DOTALL,
+    )
+    assert start_fn, "SidecarManager::start implementation is missing"
+    body = start_fn.group("body")
+
+    assert body.count('std::env::var_os("CATO_VAULT_PASSWORD")') == 1
+    assert body.count('std::env::remove_var("CATO_VAULT_PASSWORD")') == 1
+    assert body.count('.env("CATO_VAULT_PASSWORD", password)') == 1
+    assert body.index('.arg("stop").output().await') < body.index(
+        '.env("CATO_VAULT_PASSWORD", password)'
+    )
+    assert "log::" not in "\n".join(
+        line for line in body.splitlines() if "CATO_VAULT_PASSWORD" in line
+    )
+
+
+def test_daemon_health_requires_a_cato_lifecycle_port_marker():
+    """An unrelated service on the fallback port must not impersonate Cato."""
+    sidecar = _source("desktop/src-tauri/src/sidecar.rs")
+
+    assert "fn refresh_ports_from_disk(&mut self) -> bool" in sidecar
+    assert "if !self.refresh_ports_from_disk() {\n            return false;\n        }" in sidecar
+    assert "if self.refresh_ports_from_disk() {" in sidecar
+    assert "self.ws_port = http_port;\n        true" in sidecar
+
+
 def test_missing_bundled_sidecar_is_fail_visible():
     """A missing sidecar must surface, not silently fall back to anything."""
     sidecar = _source("desktop/src-tauri/src/sidecar.rs")
