@@ -15,6 +15,7 @@
  */
 import React, { useCallback, useEffect, useState } from "react";
 import type { View } from "../components/Sidebar";
+import { isFinanceStale, WORK_INBOX_GROUPS, type WorkInboxGroupId } from "../workInboxContract";
 
 interface WorkInboxViewProps {
   httpPort: number;
@@ -42,19 +43,7 @@ function preview(text?: string | null, max = 140): string {
   return value.length > max ? `${value.slice(0, max)}...` : value;
 }
 
-const GROUP_ORDER = ["needs_me", "waiting", "approvals", "due_soon", "fyi", "resolved"] as const;
-type GroupId = (typeof GROUP_ORDER)[number];
-
-const GROUP_LABELS: Record<GroupId, string> = {
-  needs_me: "Needs Me",
-  waiting: "Waiting",
-  approvals: "Approvals",
-  due_soon: "Due Soon",
-  fyi: "FYI / Summarized",
-  resolved: "Resolved",
-};
-
-const GROUP_EMPTY_HINT: Record<GroupId, string> = {
+const GROUP_EMPTY_HINT: Record<WorkInboxGroupId, string> = {
   needs_me: "No cross-system items need direct action yet — full correlation lands in a later phase.",
   waiting: "No tracked follow-ups yet — the Coordination Ledger/waitpoints backend is a later phase.",
   approvals: "Nothing waiting for your approval.",
@@ -99,7 +88,7 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
 
   if (loading) return <div className="view-loading"><div className="app-loading-spinner" /></div>;
 
-  const groups: Record<GroupId, React.ReactNode[]> = {
+  const groups: Record<WorkInboxGroupId, React.ReactNode[]> = {
     needs_me: [],
     waiting: [],
     approvals: drafts.map((d) => (
@@ -119,7 +108,7 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
           <div className="work-inbox-card" key="finance-card">
             <div className="work-inbox-card-header">
               <span className="work-inbox-card-title">FinanceOS status</span>
-              {finance.connected ? <span className="action-badge">Live</span> : <span className="work-inbox-card-stale">Stale</span>}
+              {!isFinanceStale(finance) ? <span className="action-badge">Live</span> : <span className="work-inbox-card-stale">Stale</span>}
             </div>
             {finance.data?.control_room ? (
               <div className="work-inbox-card-meta">
@@ -147,16 +136,16 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
 
       {error && <div className="page-error">{error}</div>}
 
-      {GROUP_ORDER.map((groupId) => (
-        <div className="work-inbox-group" key={groupId}>
+      {WORK_INBOX_GROUPS.map((group) => (
+        <div className="work-inbox-group" key={group.id}>
           <div className="work-inbox-group-header">
-            <span className="work-inbox-group-title">{GROUP_LABELS[groupId]}</span>
-            <span className="work-inbox-group-count">{groups[groupId].length}</span>
+            <span className="work-inbox-group-title">{group.label}</span>
+            <span className="work-inbox-group-count">{groups[group.id].length}</span>
           </div>
-          {groups[groupId].length === 0 ? (
-            <div className="work-inbox-empty-group">{GROUP_EMPTY_HINT[groupId]}</div>
+          {groups[group.id].length === 0 ? (
+            <div className="work-inbox-empty-group">{GROUP_EMPTY_HINT[group.id]}</div>
           ) : (
-            groups[groupId]
+            groups[group.id]
           )}
         </div>
       ))}

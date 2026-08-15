@@ -13,9 +13,10 @@
  * Finance approvals are never rendered or actioned here — Cato has no write
  * path to FinanceOS by construction (guardrails.md: "FinanceOS is
  * read-only from Cato, always"), so this view only explains where finance
- * approvals happen instead of inventing a deep-link URL Cato doesn't have.
+ * approvals happen and links to the separate loopback FinanceOS authority.
  */
 import React, { useCallback, useEffect, useState } from "react";
+import { FINANCEOS_APPROVALS_URL } from "../workInboxContract";
 
 interface ApprovalsViewProps {
   httpPort: number;
@@ -133,6 +134,15 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({ httpPort }) => {
           Cato never approves or writes to FinanceOS — that boundary is enforced at the client
           level, not just in this view. Finance approvals happen in FinanceOS/Airtable directly.
         </p>
+        <a
+          className="btn-secondary-sm external-approval-link"
+          href={FINANCEOS_APPROVALS_URL}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open FinanceOS approvals in a separate application"
+        >
+          Open FinanceOS approvals ↗
+        </a>
       </div>
     </div>
   );

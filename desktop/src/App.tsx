@@ -29,6 +29,7 @@ import { AskE4LView } from "./views/AskE4LView";
 import { ActivityAutomationsView } from "./views/ActivityAutomationsView";
 import { SettingsDiagnosticsView } from "./views/SettingsDiagnosticsView";
 import { AlertsView } from "./views/AlertsView";
+import { DEFAULT_VIEW, resolveView } from "./workInboxContract";
 import "./styles/app.css";
 import "./styles/finance-shell.css";
 
@@ -42,41 +43,6 @@ interface DaemonInfo {
 }
 
 const DAEMON_DEFAULT_PORT = 8080;
-
-// Legacy view id -> which of the 9 new nav items absorbed it, and (for the
-// tab-hub nav items) which sub-tab to preselect. `null` subTab means the
-// legacy id maps directly onto a non-hub view (e.g. "inbox" -> Work Inbox).
-const LEGACY_VIEW_REDIRECT: Record<string, { newView: View; subTab: string | null }> = {
-  dashboard: { newView: "work-inbox", subTab: null },
-  inbox: { newView: "work-inbox", subTab: null },
-  alerts: { newView: "work-inbox", subTab: null },
-  chat: { newView: "ask-e4l", subTab: "chat" },
-  memory: { newView: "ask-e4l", subTab: "memory" },
-  audit: { newView: "activity-automations", subTab: "audit" },
-  cron: { newView: "activity-automations", subTab: "cron" },
-  sessions: { newView: "activity-automations", subTab: "sessions" },
-  usage: { newView: "activity-automations", subTab: "usage" },
-  logs: { newView: "activity-automations", subTab: "logs" },
-  budget: { newView: "activity-automations", subTab: "budget" },
-  settings: { newView: "settings-diagnostics", subTab: "settings" },
-  config: { newView: "settings-diagnostics", subTab: "config" },
-  identity: { newView: "settings-diagnostics", subTab: "identity" },
-  "auth-keys": { newView: "settings-diagnostics", subTab: "auth-keys" },
-  skills: { newView: "settings-diagnostics", subTab: "skills" },
-  system: { newView: "settings-diagnostics", subTab: "system" },
-  diagnostics: { newView: "settings-diagnostics", subTab: "diagnostics" },
-  nodes: { newView: "settings-diagnostics", subTab: "nodes" },
-  flows: { newView: "settings-diagnostics", subTab: "flows" },
-  "coding-agent": { newView: "settings-diagnostics", subTab: "coding-agent" },
-  "interactive-cli": { newView: "settings-diagnostics", subTab: "interactive-cli" },
-};
-
-/** Resolve any legacy or current view id to {view, subTab} for rendering. */
-function resolveView(view: View): { view: View; subTab: string | null } {
-  const redirect = LEGACY_VIEW_REDIRECT[view as string];
-  if (redirect) return { view: redirect.newView, subTab: redirect.subTab };
-  return { view, subTab: null };
-}
 
 function useDaemonInfo(): DaemonInfo {
   const [info, setInfo] = useState<DaemonInfo>({
@@ -219,7 +185,7 @@ function renderView(
 }
 
 function App() {
-  const [view, setView] = useState<View>("work-inbox");
+  const [view, setView] = useState<View>(DEFAULT_VIEW);
   const daemon = useDaemonInfo();
   const [chatStatus, setChatStatus] = useState<ChatConnectionStatus | "idle">("idle");
 
