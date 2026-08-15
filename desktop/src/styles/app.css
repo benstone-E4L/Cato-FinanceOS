@@ -2,6 +2,9 @@
    app.css — Cato Desktop App Styles
    ============================================================ */
 
+/* ── Energy4Life Brand Fonts Import ─────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 /* ── Import talk-page styles (must be first) ──────────────── */
 @import "./talk-page.css";
 
@@ -12,23 +15,40 @@
   padding: 0;
 }
 
-/* ── CSS Variables ────────────────────────────────────────── */
+/* ── Energy4Life (E4L) CSS Variables ──────────────────────── */
 :root {
-  --color-claude:  #3B82F6;
-  --color-codex:   #F59E0B;
-  --color-gemini:  #A855F7;
+  /* Brand Accent Hierarchy */
+  --color-accent:      #C9A96E; /* Amber Signal (Core Brand Gold) */
+  --color-accent-hover:#E8D5B0;
+  --color-gold:        #C9A96E;
+  --color-gold-deep:   #D4A843; /* Equation Gold */
+  --color-lavender:    #C4B5D4; /* Soft Lavender */
+  --color-plum:        #5B3A5E; /* Plum Depth */
+  --color-ember:       #D4693A; /* Burnt Ember */
 
-  --color-conf-high:   #2563EB;
-  --color-conf-medium: #EAB308;
-  --color-conf-low:    #F97316;
+  --color-claude:      #C9A96E;
+  --color-codex:       #D4A843;
+  --color-gemini:      #8B6A9E;
 
-  --bg-dark:       #0f1117;
-  --bg-panel:      #1a1d26;
-  --bg-card:       #1e2433;
-  --border-color:  #1e2433;
-  --text-primary:  #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted:    #64748b;
+  --color-conf-high:   #C9A96E;
+  --color-conf-medium: #D4A843;
+  --color-conf-low:    #D4693A;
+
+  /* E4L Dark Surfaces (Deep Earth & Walnut Obsidian) */
+  --bg-dark:           #141416;
+  --bg-panel:          #1A1A17;
+  --bg-card:           #221C28;
+  --border-color:      rgba(201, 169, 110, 0.2);
+  --border-color-glow: rgba(201, 169, 110, 0.4);
+  --text-primary:      #FAF8F5; /* Ivory White */
+  --text-secondary:    #C4B5D4; /* Soft Lavender Tint */
+  --text-muted:        #8C827A; /* Warm Earth Muted */
+
+  /* E4L Certified Typography */
+  --font-display:      'Cormorant Garamond', Georgia, serif;
+  --font-heading:      'Cormorant Garamond', Georgia, serif;
+  --font-body:         'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:         'JetBrains Mono', 'Source Code Pro', monospace;
 }
 
 html, body, #root {
@@ -38,7 +58,7 @@ html, body, #root {
 }
 
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   background: var(--bg-dark);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;

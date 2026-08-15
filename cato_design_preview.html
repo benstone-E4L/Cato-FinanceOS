@@ -1,0 +1,2663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CATO — E4Life Sovereign FinanceOS Interface</title>
+  <!-- Energy4Life Brand Typography (Cormorant Garamond, DM Sans, JetBrains Mono) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ==========================================================================
+       ENERGY4LIFE (E4L) SOVEREIGN BRAND & DESIGN SYSTEM
+       Physics Made Visible · Amber Signal Gold · Soft Lavender · Deep Earth & Walnut
+       ========================================================================== */
+
+    :root {
+      /* Core E4L Deep Earth & Walnut Obsidian Surfaces */
+      --cato-void: #141416; /* Deep Earth Charcoal */
+      --cato-bg: #1a1a17; /* Deep Earth Ground */
+      --cato-panel: #221c28; /* Walnut Plum Obsidian */
+      --cato-panel-trans: rgba(26, 26, 23, 0.88);
+      --cato-card: #2a1f1a; /* Warm Walnut Slate */
+      --cato-card-trans: rgba(34, 28, 40, 0.78);
+      --cato-card-hover: #382736;
+      --cato-surface-glow: rgba(201, 169, 110, 0.04);
+
+      /* Primary E4L Amber Signal Gold & Equation Gold */
+      --cato-gold: #c9a96e; /* Amber Signal (Core Brand Gold) */
+      --cato-gold-bright: #e8d5b0; /* Gold Light */
+      --cato-gold-deep: #d4a843; /* Equation Gold */
+      --cato-gold-glow: rgba(201, 169, 110, 0.4);
+      --cato-gold-soft: rgba(201, 169, 110, 0.12);
+
+      /* Backward-compatible mappings to E4L Amber Signal Gold */
+      --cato-cyan: #c9a96e;
+      --cato-cyan-bright: #e8d5b0;
+      --cato-cyan-dim: #d4a843;
+      --cato-cyan-glow: rgba(201, 169, 110, 0.4);
+      --cato-cyan-soft: rgba(201, 169, 110, 0.12);
+      --cato-azure: #d4a843;
+      --cato-cobalt: #b88d33;
+
+      /* E4L Soft Lavender, Plum Depth & Product Accents */
+      --cato-lavender: #c4b5d4; /* Soft Lavender Signature Texture */
+      --cato-lavender-glow: rgba(196, 181, 212, 0.35);
+      --cato-plum: #5b3a5e; /* Plum Depth (Infoceuticals / Correct) */
+      --cato-plum-light: #8b6a9e; /* Plum Light (GEM / Protect) */
+      --cato-ember: #d4693a; /* Burnt Ember (miHealth / Urgent) */
+      --cato-teal: #3a6b80; /* Deep Teal (BWS / Detect) */
+
+      /* Tactical Functional Status Accents (E4L Warmth) */
+      --cato-emerald: #10b981;
+      --cato-emerald-glow: rgba(16, 185, 129, 0.4);
+      --cato-amber: #c9a96e;
+      --cato-amber-glow: rgba(201, 169, 110, 0.35);
+      --cato-ruby: #d4693a;
+      --cato-ruby-glow: rgba(212, 105, 58, 0.4);
+      --cato-amethyst: #8b6a9e;
+      --cato-amethyst-glow: rgba(139, 106, 158, 0.35);
+
+      /* Borders & Glass Specular Highlights */
+      --cato-border: rgba(201, 169, 110, 0.2);
+      --cato-border-strong: rgba(201, 169, 110, 0.42);
+      --cato-border-glow: 0 0 14px rgba(201, 169, 110, 0.28);
+      --cato-specular: rgba(255, 255, 255, 0.12);
+
+      /* E4L Certified Typography */
+      --font-display: 'Cormorant Garamond', Georgia, serif;
+      --font-heading: 'Cormorant Garamond', Georgia, serif;
+      --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', 'Source Code Pro', monospace;
+
+      /* Text Contrast Hierarchy (E4L Ivory White & Warm Muted Tones) */
+      --text-pure: #ffffff;
+      --text-primary: #faf8f5; /* Ivory White */
+      --text-secondary: #c4b5d4; /* Soft Lavender Tint */
+      --text-muted: #8c827a; /* Warm Earth Muted */
+      --text-dim: #5a524c;
+
+      /* Shadow Depths with Amber Gold Aura */
+      --shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.5);
+      --shadow-panel: 0 12px 40px rgba(0, 0, 0, 0.7), inset 0 1px 0 var(--cato-specular);
+      --shadow-elevated: 0 20px 50px rgba(0, 0, 0, 0.85), 0 0 30px rgba(201, 169, 110, 0.12);
+      --shadow-neon: 0 0 20px rgba(201, 169, 110, 0.35);
+    }
+
+    /* Reset & Base Setup */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background-color: var(--cato-void);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient Background Cyber-Mesh & Physics Equation Watermark Layer */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: 
+        radial-gradient(circle at 15% 10%, rgba(201, 169, 110, 0.09) 0%, transparent 40%),
+        radial-gradient(circle at 85% 90%, rgba(91, 58, 94, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(26, 26, 23, 0.95) 0%, var(--cato-void) 100%),
+        linear-gradient(rgba(201, 169, 110, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(201, 169, 110, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Subtle Physics Watermark Overlay */
+    body::after {
+      content: "E=mc²   ·   f = 1/(2π√LC)   ·   I = V/R   ·   H|ψ⟩ = E|ψ⟩   ·   ∇×B = μ₀J   ·   S = k·ln(Ω)";
+      position: fixed;
+      bottom: 12px;
+      right: 28px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-style: italic;
+      letter-spacing: 0.25em;
+      color: var(--cato-gold-deep);
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Custom Futuristic Scrollbars */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(20, 20, 22, 0.8); }
+    ::-webkit-scrollbar-thumb { background: #2a1f1a; border-radius: 4px; border: 1px solid var(--cato-border); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--cato-gold-deep); box-shadow: 0 0 8px var(--cato-gold-glow); }
+
+    /* ==========================================================================
+       MAIN APP LAYOUT
+       ========================================================================== */
+
+    .cato-app {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+    }
+
+    /* ==========================================================================
+       SIDEBAR — OBSIDIAN GLASS & TACTICAL NAVIGATION
+       ========================================================================== */
+
+    .cato-sidebar {
+      background: var(--cato-panel-trans);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-right: 1px solid var(--cato-border);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      box-shadow: 10px 0 30px rgba(0, 0, 0, 0.6);
+      position: relative;
+      z-index: 20;
+    }
+
+    /* Brand Header with Glowing Paw Emblem */
+    .brand-container {
+      padding: 22px 18px 18px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      border-bottom: 1px solid var(--cato-border);
+      position: relative;
+      background: linear-gradient(180deg, rgba(201, 169, 110, 0.09) 0%, rgba(26, 26, 23, 0.6) 100%);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .brand-logo-wrapper {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: linear-gradient(135deg, rgba(201, 169, 110, 0.2) 0%, rgba(34, 28, 40, 0.95) 100%);
+      border: 1.5px solid rgba(201, 169, 110, 0.5);
+      border-radius: 14px;
+      padding: 5px;
+      box-shadow: 0 0 24px rgba(201, 169, 110, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+    }
+
+    .brand-logo-wrapper:hover {
+      border-color: var(--cato-gold-bright);
+      box-shadow: 0 0 32px rgba(201, 169, 110, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.5);
+      transform: scale(1.04);
+    }
+
+    .brand-logo-glow {
+      position: absolute;
+      inset: -8px;
+      border-radius: 18px;
+      background: radial-gradient(circle, rgba(201, 169, 110, 0.6) 0%, rgba(91, 58, 94, 0.35) 55%, transparent 75%);
+      filter: blur(10px);
+      opacity: 0.85;
+      animation: pulseGlow 3s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes pulseGlow {
+      0% { transform: scale(0.92); opacity: 0.5; }
+      100% { transform: scale(1.2); opacity: 0.95; }
+    }
+
+    .brand-logo-img {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 0 10px rgba(201, 169, 110, 0.95)) drop-shadow(0 0 20px rgba(212, 168, 67, 0.5));
+      z-index: 2;
+      transition: filter 0.3s ease, transform 0.3s ease;
+    }
+
+    .brand-logo-wrapper:hover .brand-logo-img {
+      filter: drop-shadow(0 0 14px rgba(201, 169, 110, 1)) drop-shadow(0 0 28px rgba(201, 169, 110, 0.7));
+    }
+
+    .brand-meta {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-name {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      background: linear-gradient(135deg, #ffffff 30%, var(--cato-gold-bright) 70%, var(--cato-gold) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 16px rgba(201, 169, 110, 0.5));
+      line-height: 1.1;
+    }
+
+    .brand-subtitle {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--cato-cyan-bright);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-subtitle::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--cato-cyan);
+      box-shadow: 0 0 10px var(--cato-cyan);
+      display: inline-block;
+    }
+
+    /* Navigation Sections */
+    .nav-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-group-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 8px 12px 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-btn {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      font-family: var(--font-heading);
+      font-size: 13.5px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+    }
+
+    .nav-btn:hover {
+      background: rgba(0, 240, 255, 0.05);
+      border-color: rgba(56, 189, 248, 0.2);
+      color: var(--text-pure);
+      transform: translateX(3px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .nav-btn.active {
+      background: linear-gradient(90deg, rgba(0, 240, 255, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%);
+      border-color: var(--cato-cyan);
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    .nav-btn.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 15%;
+      bottom: 15%;
+      width: 3px;
+      background: var(--cato-cyan);
+      border-radius: 0 4px 4px 0;
+      box-shadow: 0 0 12px var(--cato-cyan);
+    }
+
+    .nav-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      color: var(--text-muted);
+      transition: color 0.2s, filter 0.2s;
+    }
+
+    .nav-btn:hover .nav-icon {
+      color: var(--cato-cyan-bright);
+      filter: drop-shadow(0 0 6px var(--cato-cyan-glow));
+    }
+
+    .nav-btn.active .nav-icon {
+      color: var(--cato-cyan);
+      filter: drop-shadow(0 0 8px var(--cato-cyan));
+    }
+
+    .nav-title-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .nav-hint {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-muted);
+      font-family: var(--font-body);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 140px;
+    }
+
+    .nav-btn.active .nav-hint {
+      color: rgba(224, 242, 254, 0.7);
+    }
+
+    .nav-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--cato-border);
+      color: var(--text-secondary);
+    }
+
+    .nav-badge.urgent {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: var(--cato-ruby);
+      color: #fda4af;
+      box-shadow: 0 0 10px var(--cato-ruby-glow);
+    }
+
+    .nav-badge.waiting {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: var(--cato-amber);
+      color: #fcd34d;
+    }
+
+    /* Sidebar Footer / Security Telemetry */
+    .sidebar-footer {
+      padding: 14px 16px;
+      border-top: 1px solid rgba(56, 189, 248, 0.12);
+      background: rgba(5, 8, 17, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .telemetry-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .telemetry-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .status-dot.online {
+      background: var(--cato-emerald);
+      box-shadow: 0 0 10px var(--cato-emerald);
+      animation: pulseGreen 2.5s infinite;
+    }
+
+    @keyframes pulseGreen {
+      0% { opacity: 0.7; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.1); }
+      100% { opacity: 0.7; transform: scale(0.9); }
+    }
+
+    .vault-tag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--cato-cyan-bright);
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* ==========================================================================
+       MAIN CONTENT CONTAINER & TOPBAR
+       ========================================================================== */
+
+    .cato-main {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      background: transparent;
+      position: relative;
+    }
+
+    /* Top Command Hub */
+    .cato-topbar {
+      height: 56px;
+      background: var(--cato-panel-trans);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--cato-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      gap: 16px;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-heading);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-pure);
+      letter-spacing: 0.02em;
+    }
+
+    .breadcrumb-chevron {
+      color: var(--cato-cyan);
+      font-size: 12px;
+      opacity: 0.7;
+    }
+
+    .view-indicator-chip {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      color: var(--cato-cyan);
+      letter-spacing: 0.08em;
+    }
+
+    /* Global Search / Command Bar */
+    .command-search-wrap {
+      position: relative;
+      width: 320px;
+    }
+
+    .command-search-input {
+      width: 100%;
+      height: 34px;
+      background: rgba(5, 8, 17, 0.85);
+      border: 1px solid var(--cato-border);
+      border-radius: 6px;
+      padding: 0 60px 0 34px;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 12.5px;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .command-search-input:focus {
+      border-color: var(--cato-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.25), inset 0 0 8px rgba(0, 240, 255, 0.08);
+      background: rgba(10, 15, 29, 0.95);
+    }
+
+    .command-search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 15px;
+      height: 15px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .kbd-shortcut {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid rgba(71, 85, 105, 0.6);
+      padding: 1px 5px;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Live Activity Indicator Orb */
+    .activity-orb-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .activity-orb-container:hover {
+      border-color: var(--cato-cyan);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.2);
+    }
+
+    .activity-pulsar {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cato-cyan);
+      box-shadow: 0 0 10px var(--cato-cyan);
+      position: relative;
+    }
+
+    .activity-pulsar::after {
+      content: "";
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      border: 1px solid var(--cato-cyan);
+      animation: ripple 2s infinite;
+    }
+
+    @keyframes ripple {
+      0% { transform: scale(0.8); opacity: 1; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    .activity-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--cato-cyan-bright);
+    }
+
+    /* Action Buttons */
+    .btn-tactical {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      height: 34px;
+      padding: 0 14px;
+      border-radius: 6px;
+      font-family: var(--font-heading);
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
+      text-decoration: none;
+    }
+
+    .btn-primary-cyan {
+      background: linear-gradient(135deg, var(--cato-cyan-dim) 0%, var(--cato-azure) 100%);
+      border: 1px solid var(--cato-cyan);
+      color: #ffffff;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-primary-cyan:hover {
+      background: linear-gradient(135deg, var(--cato-cyan) 0%, var(--cato-azure) 100%);
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary-obsidian {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--cato-border);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary-obsidian:hover {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: rgba(56, 189, 248, 0.4);
+      color: #ffffff;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      transform: translateY(-1px);
+    }
+
+    /* ==========================================================================
+       SCROLLABLE VIEWPORT CONTENT
+       ========================================================================== */
+
+    .cato-content-viewport {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 28px 48px;
+      position: relative;
+    }
+
+    .view-panel {
+      display: none;
+      animation: fadeInView 0.25s ease-out forwards;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    .view-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeInView {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ==========================================================================
+       HERO STATS & TELEMETRY STRIP (WORK INBOX & FINANCE)
+       ========================================================================== */
+
+    .hero-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--cato-card-trans);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--cato-border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-panel);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .stat-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cato-cyan), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .stat-card:hover {
+      border-color: rgba(0, 240, 255, 0.35);
+      transform: translateY(-2px);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 240, 255, 0.1);
+    }
+
+    .stat-card:hover::before {
+      opacity: 1;
+    }
+
+    .stat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .stat-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-secondary);
+    }
+
+    .stat-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .stat-badge.cyan {
+      background: rgba(0, 240, 255, 0.12);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      color: var(--cato-cyan);
+    }
+
+    .stat-badge.emerald {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--cato-emerald);
+    }
+
+    .stat-badge.amber {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      color: var(--cato-amber);
+    }
+
+    .stat-badge.ruby {
+      background: rgba(244, 63, 94, 0.12);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      color: var(--cato-ruby);
+    }
+
+    .stat-value {
+      font-family: var(--font-heading);
+      font-size: 26px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .stat-sub {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* ==========================================================================
+       FACETED SECTION HEADERS & GROUP CONTAINERS
+       ========================================================================== */
+
+    .section-block {
+      margin-bottom: 28px;
+    }
+
+    .section-header-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.12);
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .section-header-wrap::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 48px;
+      height: 2px;
+      background: var(--cato-cyan);
+      box-shadow: 0 0 10px var(--cato-cyan);
+    }
+
+    .section-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: 16px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .count-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--cato-border);
+      color: var(--text-secondary);
+    }
+
+    .count-pill.alert {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: var(--cato-ruby);
+      color: #fda4af;
+      box-shadow: 0 0 8px var(--cato-ruby-glow);
+    }
+
+    /* ==========================================================================
+       FACETED WORK INBOX & FEED CARDS
+       ========================================================================== */
+
+    .inbox-card-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .faceted-card {
+      background: var(--cato-card-trans);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--cato-border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      position: relative;
+      box-shadow: var(--shadow-panel);
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .faceted-card:hover {
+      background: rgba(20, 32, 54, 0.85);
+      border-color: rgba(0, 240, 255, 0.4);
+      transform: translateY(-2px) scale(1.002);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 240, 255, 0.12);
+    }
+
+    .card-edge-tag {
+      width: 4px;
+      height: 38px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .card-edge-tag.cyan { background: var(--cato-cyan); box-shadow: 0 0 10px var(--cato-cyan); }
+    .card-edge-tag.ruby { background: var(--cato-ruby); box-shadow: 0 0 10px var(--cato-ruby); }
+    .card-edge-tag.amber { background: var(--cato-amber); box-shadow: 0 0 10px var(--cato-amber); }
+    .card-edge-tag.emerald { background: var(--cato-emerald); box-shadow: 0 0 10px var(--cato-emerald); }
+
+    .card-main-col {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .card-row-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .card-headline {
+      font-family: var(--font-heading);
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .card-tag-pill {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(5, 8, 17, 0.8);
+      border: 1px solid var(--cato-border);
+      color: var(--text-secondary);
+    }
+
+    .card-snippet {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .card-meta-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .card-actions-col {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Small Action Buttons */
+    .btn-action-sm {
+      padding: 6px 12px;
+      font-size: 11.5px;
+      font-weight: 700;
+      border-radius: 5px;
+      font-family: var(--font-heading);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid transparent;
+    }
+
+    .btn-action-approve {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--cato-cyan);
+      color: #ffffff;
+    }
+
+    .btn-action-approve:hover {
+      background: var(--cato-cyan);
+      color: var(--cato-void);
+      box-shadow: 0 0 14px var(--cato-cyan);
+    }
+
+    .btn-action-dismiss {
+      background: rgba(15, 23, 42, 0.7);
+      border-color: var(--cato-border);
+      color: var(--text-secondary);
+    }
+
+    .btn-action-dismiss:hover {
+      border-color: rgba(244, 63, 94, 0.5);
+      color: #fda4af;
+    }
+
+    /* ==========================================================================
+       VIEW: ASK E4L / NEURAL CHAT
+       ========================================================================== */
+
+    .chat-layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+      height: calc(100vh - 130px);
+    }
+
+    .chat-stream-container {
+      background: var(--cato-card-trans);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--cato-border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: var(--shadow-panel);
+    }
+
+    .chat-stream-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--cato-border);
+      background: rgba(5, 8, 17, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .model-routing-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(168, 85, 247, 0.12);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      color: #d8b4fe;
+    }
+
+    .chat-messages-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .chat-message-bubble {
+      display: flex;
+      gap: 14px;
+      max-width: 88%;
+      animation: messageSlide 0.25s ease-out;
+    }
+
+    @keyframes messageSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-message-bubble.user {
+      margin-left: auto;
+      flex-direction: row-reverse;
+    }
+
+    .chat-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .chat-avatar.agent {
+      background: linear-gradient(135deg, #0c1833, #0284c7);
+      border: 1px solid var(--cato-cyan);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+      color: #ffffff;
+    }
+
+    .chat-avatar.user {
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #e2e8f0;
+    }
+
+    .chat-bubble-content {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--cato-border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: var(--shadow-subtle);
+      font-size: 13.5px;
+      line-height: 1.55;
+    }
+
+    .chat-message-bubble.user .chat-bubble-content {
+      background: linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.85) 100%);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    .code-block-embed {
+      background: #03060d;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin: 10px 0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: #38bdf8;
+      overflow-x: auto;
+    }
+
+    /* Chat Input Area */
+    .chat-input-bar {
+      padding: 16px 20px;
+      border-top: 1px solid var(--cato-border);
+      background: rgba(5, 8, 17, 0.9);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chat-input-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .chat-textarea {
+      flex: 1;
+      height: 42px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--cato-border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #ffffff;
+      font-family: var(--font-body);
+      font-size: 13.5px;
+      resize: none;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .chat-textarea:focus {
+      border-color: var(--cato-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+    }
+
+    /* Chat Context Inspector Panel */
+    .chat-context-panel {
+      background: var(--cato-card-trans);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--cato-border);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    /* ==========================================================================
+       VIEW: FINANCEOS CONTROL ROOM
+       ========================================================================== */
+
+    .finance-hero-banner {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(10, 24, 56, 0.9) 100%);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-radius: 14px;
+      padding: 24px 28px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 240, 255, 0.1);
+    }
+
+    .finance-hero-banner::after {
+      content: "";
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 300px;
+      background: radial-gradient(circle at 100% 50%, rgba(0, 240, 255, 0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .finance-hero-title {
+      font-family: var(--font-heading);
+      font-size: 24px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .finance-hero-subtitle {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .progress-bar-cato {
+      height: 8px;
+      background: rgba(5, 8, 17, 0.8);
+      border-radius: 10px;
+      border: 1px solid var(--cato-border);
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cato-azure), var(--cato-cyan));
+      box-shadow: 0 0 10px var(--cato-cyan);
+      border-radius: 10px;
+      width: 92%;
+    }
+
+    /* ==========================================================================
+       VIEW: ACTIVITY & AUDIT CHAIN
+       ========================================================================== */
+
+    .audit-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .audit-table th {
+      text-align: left;
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--cato-border);
+      background: rgba(5, 8, 17, 0.6);
+    }
+
+    .audit-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.08);
+      color: var(--text-secondary);
+      vertical-align: middle;
+    }
+
+    .audit-table tr:hover td {
+      background: rgba(0, 240, 255, 0.03);
+      color: #ffffff;
+    }
+
+    .hash-code {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--cato-cyan-bright);
+      background: rgba(0, 240, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 240, 255, 0.2);
+    }
+
+    /* ==========================================================================
+       INTERACTIVE MODAL OVERLAY
+       ========================================================================== */
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 4, 8, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: modalFade 0.2s ease-out;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    @keyframes modalFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-box {
+      width: 560px;
+      max-width: 90vw;
+      background: var(--cato-panel);
+      border: 1px solid var(--cato-cyan);
+      border-radius: 14px;
+      box-shadow: 0 0 50px rgba(0, 240, 255, 0.25), 0 25px 60px rgba(0,0,0,0.9);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .modal-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--cato-border);
+      background: linear-gradient(90deg, rgba(0, 240, 255, 0.08) 0%, transparent 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-body {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-footer {
+      padding: 16px 22px;
+      border-top: 1px solid var(--cato-border);
+      background: rgba(5, 8, 17, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* Attach Artifact Link & Tray */
+    .attach-artifact-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: none;
+      border: 1px solid transparent;
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .attach-artifact-btn:hover {
+      color: var(--cato-cyan);
+      background: rgba(0, 240, 255, 0.08);
+      border-color: rgba(0, 240, 255, 0.3);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+
+    .attached-artifacts-tray {
+      display: none;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(3, 6, 13, 0.85);
+      border: 1px dashed rgba(0, 240, 255, 0.35);
+      border-radius: 8px;
+      margin-bottom: 4px;
+      animation: fadeInView 0.2s ease-out;
+    }
+
+    .attached-artifacts-tray.has-items {
+      display: flex;
+    }
+
+    .artifact-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(10, 15, 29, 0.95);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    .artifact-chip-size {
+      color: var(--cato-cyan);
+      font-size: 10px;
+    }
+
+    .artifact-chip-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 0 2px;
+      margin-left: 4px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .artifact-chip-remove:hover {
+      color: #fda4af;
+    }
+
+    .preset-artifact-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: rgba(10, 15, 29, 0.85);
+      border: 1px solid var(--cato-border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .preset-artifact-row:hover {
+      border-color: var(--cato-cyan);
+      background: rgba(15, 23, 42, 0.95);
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.15);
+      transform: translateX(3px);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cato-app">
+    
+    <!-- ========================================================================
+         SIDEBAR NAVIGATION
+         ======================================================================== -->
+    <aside class="cato-sidebar">
+      
+      <!-- Brand Logo Header -->
+      <div class="brand-container">
+        <div class="brand-logo-wrapper" title="CATO Sovereign FinanceOS">
+          <div class="brand-logo-glow"></div>
+          <img src="New Logos/CATO-E4Life-Structure-Transparent.png" alt="Cato Emblem" class="brand-logo-img" onerror="this.style.display='none'; document.getElementById('brand-fallback-icon').style.display='block';" />
+          <svg id="brand-fallback-icon" class="brand-logo-img" style="display:none; color: var(--cato-cyan);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2" fill="rgba(0, 240, 255, 0.2)"/>
+            <polyline points="2 17 12 22 22 17"/>
+            <polyline points="2 12 12 17 22 12"/>
+          </svg>
+        </div>
+        <div class="brand-meta">
+          <div class="brand-name">CATO</div>
+          <div class="brand-subtitle">E4Life FinanceOS</div>
+        </div>
+      </div>
+
+      <!-- Nav Items -->
+      <nav class="nav-wrapper">
+        <div class="nav-group-label">
+          <span>Sovereign Operations</span>
+          <span style="color: var(--cato-cyan); font-size: 9px;">9 CORES</span>
+        </div>
+
+        <button class="nav-btn active" data-view="work-inbox" onclick="switchView('work-inbox')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5h16v14H4V5Zm0 9h5l2 2h2l2-2h5"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Work Inbox</span>
+            <span class="nav-hint">Attention & queue</span>
+          </div>
+          <span class="nav-badge urgent">3</span>
+        </button>
+
+        <button class="nav-btn" data-view="waiting-followups" onclick="switchView('waiting-followups')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Waiting / Follow-ups</span>
+            <span class="nav-hint">Timers & owners</span>
+          </div>
+          <span class="nav-badge waiting">2</span>
+        </button>
+
+        <button class="nav-btn" data-view="approvals" onclick="switchView('approvals')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m5 13 4 4L19 7"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Approvals</span>
+            <span class="nav-hint">Drafts & wire gates</span>
+          </div>
+          <span class="nav-badge urgent">1</span>
+        </button>
+
+        <button class="nav-btn" data-view="calendar" onclick="switchView('calendar')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Calendar</span>
+            <span class="nav-hint">Executive timeline</span>
+          </div>
+        </button>
+
+        <button class="nav-btn" data-view="company-tasks" onclick="switchView('company-tasks')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Company Tasks</span>
+            <span class="nav-hint">Monday.com mirror</span>
+          </div>
+        </button>
+
+        <button class="nav-btn" data-view="finance" onclick="switchView('finance')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Finance</span>
+            <span class="nav-hint">Control room & close</span>
+          </div>
+          <span class="nav-badge" style="color: var(--cato-cyan-bright);">LIVE</span>
+        </button>
+
+        <button class="nav-btn" data-view="ask-e4l" onclick="switchView('ask-e4l')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Ask E4L (AI Chat)</span>
+            <span class="nav-hint">Direct Anthropic API</span>
+          </div>
+          <span class="nav-badge" style="background: rgba(168,85,247,0.15); color: #d8b4fe; border-color: var(--cato-amethyst);">SONNET 5</span>
+        </button>
+
+        <div class="nav-group-label" style="margin-top: 12px;">
+          <span>System & Engine</span>
+        </div>
+
+        <button class="nav-btn" data-view="activity-automations" onclick="switchView('activity-automations')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3 5 6v5c0 4.6 2.9 8 7 10 4.1-2 7-5.4 7-10V6l-7-3Zm-3 9 2 2 4-5"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Activity / Automations</span>
+            <span class="nav-hint">Audit chain & crons</span>
+          </div>
+        </button>
+
+        <button class="nav-btn" data-view="settings-diagnostics" onclick="switchView('settings-diagnostics')">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <div class="nav-title-group">
+            <span>Settings / Diagnostics</span>
+            <span class="nav-hint">Vault & operator tier</span>
+          </div>
+        </button>
+      </nav>
+
+      <!-- Security & Daemon Telemetry Footer -->
+      <div class="sidebar-footer">
+        <div class="telemetry-card">
+          <div class="telemetry-row">
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <span class="status-dot online"></span>
+              <strong style="color: #ffffff;">SYSTEMS ONLINE</strong>
+            </span>
+            <span style="color: var(--cato-cyan);">HTTP:8080</span>
+          </div>
+          <div class="telemetry-row" style="margin-top: 2px;">
+            <span class="vault-tag">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              VAULT AES-256
+            </span>
+            <span style="color: var(--text-muted); font-size: 9.5px;">PING: 14ms</span>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ========================================================================
+         MAIN CONTENT AREA & TOP COMMAND BAR
+         ======================================================================== -->
+    <main class="cato-main">
+      
+      <!-- Top Command Hub -->
+      <header class="cato-topbar">
+        <div class="topbar-left">
+          <div class="breadcrumb">
+            <span style="color: var(--text-muted);">CATO</span>
+            <span class="breadcrumb-chevron">/</span>
+            <span id="current-view-name">Work Inbox</span>
+          </div>
+          <span class="view-indicator-chip" id="current-view-badge">ATTENTION CORE</span>
+        </div>
+
+        <div class="command-search-wrap">
+          <svg class="command-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" class="command-search-input" placeholder="Jump to command, approval or doc..." />
+          <span class="kbd-shortcut">CTRL K</span>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Active Activity Indicator Pill -->
+          <div class="activity-orb-container" onclick="triggerApprovalModal()">
+            <div class="activity-pulsar"></div>
+            <span class="activity-label">IDLE · SUPERVISED</span>
+          </div>
+
+          <button class="btn-tactical btn-secondary-obsidian" onclick="triggerRefresh()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+            Sync
+          </button>
+
+          <button class="btn-tactical btn-primary-cyan" onclick="openNewTask()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Task
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Viewport with Full Screen Previews -->
+      <div class="cato-content-viewport">
+        
+        <!-- ====================================================================
+             VIEW 1: WORK INBOX (DEFAULT / CORE VIEW)
+             ==================================================================== -->
+        <div class="view-panel active" id="view-work-inbox">
+          
+          <!-- Key Operational Metrics -->
+          <div class="hero-stat-grid">
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Needs My Action</span>
+                <span class="stat-badge ruby">URGENT</span>
+              </div>
+              <div class="stat-value">1 <span style="font-size: 14px; color: var(--text-muted); font-weight: 500;">pending item</span></div>
+              <div class="stat-sub">
+                <span style="color: var(--cato-ruby);">●</span> Wire authorization gate
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Pending Approvals</span>
+                <span class="stat-badge amber">2 DRAFTS</span>
+              </div>
+              <div class="stat-value">2 <span style="font-size: 14px; color: var(--text-muted); font-weight: 500;">reviews</span></div>
+              <div class="stat-sub">Gmail AI response proposals</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">FinanceOS Close</span>
+                <span class="stat-badge cyan">LIVE RECON</span>
+              </div>
+              <div class="stat-value">92% <span style="font-size: 14px; color: var(--cato-cyan-bright); font-weight: 500;">on track</span></div>
+              <div class="stat-sub">August reconciliation cycle</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Agent Status</span>
+                <span class="stat-badge emerald">100% HEALTH</span>
+              </div>
+              <div class="stat-value">DIRECT <span style="font-size: 14px; color: var(--text-muted); font-weight: 500;">Anthropic</span></div>
+              <div class="stat-sub">Codex-Sonnet-5 Router</div>
+            </div>
+          </div>
+
+          <!-- Section: Needs Me (Critical Action) -->
+          <div class="section-block">
+            <div class="section-header-wrap">
+              <div class="section-title-group">
+                <span class="section-title">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cato-ruby)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  Needs Me
+                </span>
+                <span class="count-pill alert">1 ACTION</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">Cryptographic Approval Gate</span>
+            </div>
+
+            <div class="inbox-card-stack">
+              <div class="faceted-card">
+                <div class="card-edge-tag ruby"></div>
+                <div class="card-main-col">
+                  <div class="card-row-top">
+                    <span class="card-headline">Authorize Wire Transfer #E4L-8941 ($14,250.00 USD)</span>
+                    <span class="card-tag-pill" style="border-color: var(--cato-ruby); color: #fda4af;">HIGH IMPACT</span>
+                    <span class="card-tag-pill">FINANCE GATEWAY</span>
+                  </div>
+                  <div class="card-snippet">
+                    Payee: Anthropic Direct Scale Infrastructure · Invoice #INV-202608-99 · Verified with cryptographic token match. Requires operator touch before dispatch.
+                  </div>
+                  <div class="card-meta-line">
+                    <span>Source: FinanceOS Subsystem</span>
+                    <span>•</span>
+                    <span>Received: 8 mins ago</span>
+                    <span>•</span>
+                    <span style="color: var(--cato-cyan);">Auth: SHA-256 [e4f8...b12a]</span>
+                  </div>
+                </div>
+                <div class="card-actions-col">
+                  <button class="btn-action-sm btn-action-approve" onclick="triggerApprovalModal()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Review & Sign
+                  </button>
+                  <button class="btn-action-sm btn-action-dismiss" onclick="alert('Transaction paused for review.')">Reject</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Approvals (Drafts & Gateways) -->
+          <div class="section-block">
+            <div class="section-header-wrap">
+              <div class="section-title-group">
+                <span class="section-title">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cato-amber)" stroke-width="2.5"><path d="m5 13 4 4L19 7"/></svg>
+                  Draft Approvals & Follow-ups
+                </span>
+                <span class="count-pill">2 ITEMS</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">AI Synthesized Drafts</span>
+            </div>
+
+            <div class="inbox-card-stack">
+              <div class="faceted-card">
+                <div class="card-edge-tag amber"></div>
+                <div class="card-main-col">
+                  <div class="card-row-top">
+                    <span class="card-headline">Gmail Reply to CFO: Q3 Cloud Budget & GPU Reserve Allocation</span>
+                    <span class="card-tag-pill" style="color: #fcd34d;">DRAFT REPLY</span>
+                    <span class="card-tag-pill">GMAIL INTEGRATION</span>
+                  </div>
+                  <div class="card-snippet">
+                    "Hi David, all model compute runs are directly authenticated via Anthropic API with worst-case cost projections under $2.10/hr. Our current runway remains 48.2 months..."
+                  </div>
+                  <div class="card-meta-line">
+                    <span>Sender: david.cfo@enterprise4life.com</span>
+                    <span>•</span>
+                    <span>Confidence: 98.4%</span>
+                    <span>•</span>
+                    <span>Synthesized by Codex-Sonnet-5</span>
+                  </div>
+                </div>
+                <div class="card-actions-col">
+                  <button class="btn-action-sm btn-action-approve" onclick="switchView('approvals')">Inspect Draft →</button>
+                </div>
+              </div>
+
+              <div class="faceted-card">
+                <div class="card-edge-tag cyan"></div>
+                <div class="card-main-col">
+                  <div class="card-row-top">
+                    <span class="card-headline">Monday.com Task Update: "Complete Desktop Redesign & Logo Aesthetic"</span>
+                    <span class="card-tag-pill" style="color: var(--cato-cyan);">BOARD SYNC</span>
+                  </div>
+                  <div class="card-snippet">
+                    Auto-generated sprint status report with visual assets, CSS tokens, and standalone HTML preview ready for executive review.
+                  </div>
+                  <div class="card-meta-line">
+                    <span>Target: Master Board #401</span>
+                    <span>•</span>
+                    <span>Scheduled: Automated nightly shift</span>
+                  </div>
+                </div>
+                <div class="card-actions-col">
+                  <button class="btn-action-sm btn-action-approve" onclick="alert('Synced to Monday.com board.')">Sync Board</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: FYI / Summarized -->
+          <div class="section-block">
+            <div class="section-header-wrap">
+              <div class="section-title-group">
+                <span class="section-title">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--cato-cyan)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  FYI / Autonomous Summaries
+                </span>
+                <span class="count-pill">ALL SYSTEMS GREEN</span>
+              </div>
+            </div>
+
+            <div class="inbox-card-stack">
+              <div class="faceted-card" style="opacity: 0.85;">
+                <div class="card-edge-tag emerald"></div>
+                <div class="card-main-col">
+                  <div class="card-row-top">
+                    <span class="card-headline">FinanceOS Control Room Snapshot</span>
+                    <span class="card-tag-pill" style="color: var(--cato-emerald);">CONNECTED</span>
+                  </div>
+                  <div class="card-snippet">
+                    Close status: 92% complete · 14 automatic journal reconciliation entries processed with zero variance · Next scheduled pulse in 14m.
+                  </div>
+                </div>
+                <div class="card-actions-col">
+                  <button class="btn-action-sm btn-action-dismiss" onclick="switchView('finance')">Open FinanceOS →</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ====================================================================
+             VIEW 2: ASK E4L / NEURAL AI CHAT
+             ==================================================================== -->
+        <div class="view-panel" id="view-ask-e4l">
+          <div class="chat-layout">
+            
+            <!-- Chat Feed -->
+            <div class="chat-stream-container">
+              <div class="chat-stream-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--cato-cyan); box-shadow: 0 0 10px var(--cato-cyan);"></div>
+                  <strong style="color: #ffffff; font-family: var(--font-heading);">Vault-Grounded Sovereign Chat</strong>
+                </div>
+                <div class="model-routing-pill">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                  <span>Model: Codex-Sonnet-5 (Direct API)</span>
+                </div>
+              </div>
+
+              <div class="chat-messages-area">
+                
+                <!-- Agent Welcome -->
+                <div class="chat-message-bubble">
+                  <div class="chat-avatar agent">C</div>
+                  <div class="chat-bubble-content">
+                    <div style="font-family: var(--font-mono); font-size: 11px; color: var(--cato-cyan); margin-bottom: 4px; font-weight: 700;">CATO SOVEREIGN DAEMON · Direct Anthropic API</div>
+                    <div>Hello Operator. I am Cato, grounded in your local encrypted vault and workspace memory. How can I assist your operations today?</div>
+                  </div>
+                </div>
+
+                <!-- User Message -->
+                <div class="chat-message-bubble user">
+                  <div class="chat-avatar user">OP</div>
+                  <div class="chat-bubble-content">
+                    <div>Redesign the interface to match our new obsidian crystal claw paw logo with high depth, sharp edges, cyan rim-lighting and rich tactile controls.</div>
+                  </div>
+                </div>
+
+                <!-- Agent Response with Code & Metrics -->
+                <div class="chat-message-bubble">
+                  <div class="chat-avatar agent">C</div>
+                  <div class="chat-bubble-content">
+                    <div style="font-family: var(--font-mono); font-size: 11px; color: var(--cato-cyan); margin-bottom: 4px; font-weight: 700;">CATO NEURAL CORE · Direct Routing (240ms)</div>
+                    <div>I have architected the entire Obsidian Cyber-Tactical design system. Here is the active design specification:</div>
+                    
+                    <div class="code-block-embed">
+                      /* Cato Obsidian & Electric Cyan Rim Architecture */<br/>
+                      --cato-void: #020408; /* Deep Obsidian */<br/>
+                      --cato-cyan: #00f0ff; /* Electric Icy Claw Glow */<br/>
+                      --cato-panel: rgba(10, 15, 29, 0.78); /* Frosted Glass */<br/>
+                      --cato-border-glow: 0 0 14px rgba(0, 240, 255, 0.35);
+                    </div>
+
+                    <div>All 9 primary operational cores (Work Inbox, Approvals, Finance Control Room, Calendar, Automations) have been unified under this aesthetic with razor-sharp responsive surfaces.</div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Input Bar -->
+              <div class="chat-input-bar">
+                <!-- Attached Artifacts Tray -->
+                <div id="attached-artifacts-tray" class="attached-artifacts-tray"></div>
+
+                <!-- Hidden file input for native file browsing -->
+                <input type="file" id="chat-artifact-file-input" multiple style="display:none;" onchange="handleChatFileUpload(event)" accept=".txt,.md,.py,.js,.ts,.json,.yaml,.yml,.toml,.html,.css,.csv,.tsv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.log,.xml,.sql,.sh,.ps1,.bat,.docx,.pptx">
+
+                <div class="chat-input-row">
+                  <textarea id="chat-input-textarea" class="chat-textarea" placeholder="Ask Cato anything or execute autonomous commands (e.g. /finance, /reconcile, /audit)..." onkeydown="handleChatInputKeyDown(event)"></textarea>
+                  <button class="btn-tactical btn-primary-cyan" style="height: 42px; padding: 0 18px;" onclick="sendChatMessage()">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Send
+                  </button>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted);">
+                  <div style="display: flex; gap: 12px; align-items: center;">
+                    <button type="button" class="attach-artifact-btn" onclick="openArtifactModal()" title="Attach document, ledger, code, or vault artifact">
+                      📎 <span>Attach Artifact</span>
+                    </button>
+                    <span>🔒 AES-256 Vault Memory</span>
+                    <span>⚡ Bounded Max Escalation = 2</span>
+                  </div>
+                  <span style="color: var(--cato-cyan);">Direct API Token Stream: Active</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Telemetry & Grounding Context Sidecar -->
+            <div class="chat-context-panel">
+              <div style="font-family: var(--font-heading); font-size: 14px; font-weight: 700; color: #ffffff; border-bottom: 1px solid var(--cato-border); padding-bottom: 8px;">
+                Routing & Security Telemetry
+              </div>
+              
+              <div class="telemetry-card">
+                <div class="telemetry-row">
+                  <span style="color: var(--text-muted);">Active Snapshot</span>
+                  <span style="color: #ffffff; font-weight: 600;">Codex-sonnet-5</span>
+                </div>
+                <div class="telemetry-row">
+                  <span style="color: var(--text-muted);">Cost Gate Model</span>
+                  <span style="color: var(--cato-cyan);">Pre-Dispatch Verified</span>
+                </div>
+                <div class="telemetry-row">
+                  <span style="color: var(--text-muted);">Context Ceiling</span>
+                  <span style="color: #ffffff;">200,000 tokens</span>
+                </div>
+                <div class="telemetry-row">
+                  <span style="color: var(--text-muted);">SwarmSync Status</span>
+                  <span style="color: var(--text-muted);">Inert (Direct Path)</span>
+                </div>
+              </div>
+
+              <div style="font-family: var(--font-heading); font-size: 13px; font-weight: 700; color: #ffffff; margin-top: 8px;">
+                Active Memory Context
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45; background: rgba(5, 8, 17, 0.7); border: 1px solid var(--cato-border); border-radius: 8px; padding: 10px;">
+                Loaded files from <code style="color: var(--cato-cyan);">workspace_dir</code>:<br/>
+                • SOUL.md (E4Life FinanceOS Persona)<br/>
+                • IDENTITY.md (Sovereign Operator Model)<br/>
+                • AGENTS.md (Mandatory Routing Rules)
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ====================================================================
+             VIEW 3: FINANCEOS CONTROL ROOM
+             ==================================================================== -->
+        <div class="view-panel" id="view-finance">
+          
+          <!-- Hero Banner -->
+          <div class="finance-hero-banner">
+            <div>
+              <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--cato-cyan); letter-spacing: 0.15em; text-transform: uppercase;">
+                ENTERPRISE CONTROL ROOM
+              </div>
+              <h1 class="finance-hero-title">August Monthly Close Control Room</h1>
+              <p class="finance-hero-subtitle">Automated ledger correlation · Real-time variance verification · Zero unmapped debits</p>
+              
+              <div style="margin-top: 16px; width: 440px;">
+                <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);">
+                  <span>Close Progress</span>
+                  <strong style="color: var(--cato-cyan);">92% COMPLETED</strong>
+                </div>
+                <div class="progress-bar-cato">
+                  <div class="progress-bar-fill"></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+              <button class="btn-tactical btn-primary-cyan" onclick="alert('Syncing FinanceOS Ledger...')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Execute Close Pulse
+              </button>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">Authority: Local Sovereign Bridge</span>
+            </div>
+          </div>
+
+          <!-- Financial Signal Cards -->
+          <div class="hero-stat-grid">
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Cash in Vault</span>
+                <span class="stat-badge emerald">VERIFIED</span>
+              </div>
+              <div class="stat-value">$1,842,500 <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">USD</span></div>
+              <div class="stat-sub">Across 4 Tier-1 Custody Accounts</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">30-Day Net Burn</span>
+                <span class="stat-badge cyan">-4.2% MOM</span>
+              </div>
+              <div class="stat-value">$38,200 <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">/mo</span></div>
+              <div class="stat-sub">Budget Cap: $55,000/mo</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Runway Runway</span>
+                <span class="stat-badge cyan">HEALTHY</span>
+              </div>
+              <div class="stat-value">48.2 <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">months</span></div>
+              <div class="stat-sub">Extends to Oct 2030</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">AP Gate Status</span>
+                <span class="stat-badge ruby">1 PENDING</span>
+              </div>
+              <div class="stat-value">$14,250 <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">waiting</span></div>
+              <div class="stat-sub">Cloud Infra wire approval</div>
+            </div>
+          </div>
+
+          <!-- Live Ledger Stream -->
+          <div class="section-block">
+            <div class="section-header-wrap">
+              <div class="section-title-group">
+                <span class="section-title">Cryptographic Journal Stream</span>
+                <span class="count-pill">14 TRANSACTIONS RECONCILED</span>
+              </div>
+            </div>
+
+            <div class="chat-stream-container" style="border-radius: 10px;">
+              <table class="audit-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Account / Entity</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Integrity Hash</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="font-family: var(--font-mono);">2026-08-14 17:15</td>
+                    <td><strong style="color: #ffffff;">Operating 8812</strong></td>
+                    <td>Anthropic Scale LLM Direct Compute</td>
+                    <td style="color: var(--cato-ruby); font-family: var(--font-mono);">-$2,418.50</td>
+                    <td><span class="hash-code">sha256:7f90..b4e1</span></td>
+                    <td><span class="stat-badge emerald">RECONCILED</span></td>
+                  </tr>
+                  <tr>
+                    <td style="font-family: var(--font-mono);">2026-08-14 16:40</td>
+                    <td><strong style="color: #ffffff;">Treasury 9044</strong></td>
+                    <td>Enterprise Client Retainer Wire (E4L)</td>
+                    <td style="color: var(--cato-emerald); font-family: var(--font-mono);">+$45,000.00</td>
+                    <td><span class="hash-code">sha256:1a82..d093</span></td>
+                    <td><span class="stat-badge emerald">VERIFIED</span></td>
+                  </tr>
+                  <tr>
+                    <td style="font-family: var(--font-mono);">2026-08-14 15:20</td>
+                    <td><strong style="color: #ffffff;">Cloud Reserve</strong></td>
+                    <td>AWS Production Cluster Reservation</td>
+                    <td style="color: var(--cato-ruby); font-family: var(--font-mono);">-$1,120.00</td>
+                    <td><span class="hash-code">sha256:3c44..88ff</span></td>
+                    <td><span class="stat-badge emerald">RECONCILED</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ====================================================================
+             VIEW 4: APPROVALS & FOLLOW-UPS
+             ==================================================================== -->
+        <div class="view-panel" id="view-approvals">
+          <div class="section-block">
+            <div class="section-header-wrap">
+              <div class="section-title-group">
+                <span class="section-title">Operator Approval Gates</span>
+                <span class="count-pill alert">2 GATES ACTIVE</span>
+              </div>
+            </div>
+
+            <div class="inbox-card-stack">
+              <div class="faceted-card">
+                <div class="card-edge-tag ruby"></div>
+                <div class="card-main-col">
+                  <div class="card-row-top">
+                    <span class="card-headline">Wire Release: Anthropic Scale Infrastructure ($14,250.00)</span>
+                    <span class="card-tag-pill" style="border-color: var(--cato-ruby); color: #fda4af;">WIRE GATE</span>
+                  </div>
+                  <div class="card-snippet">
+                    Direct Anthropic API model execution tokens for Cato Daemons. Projected worst-case token spend verified by policy engine.
+                  </div>
+                </div>
+                <div class="card-actions-col">
+                  <button class="btn-action-sm btn-action-approve" onclick="triggerApprovalModal()">Review & Authorize</button>
+                  <button class="btn-action-sm btn-action-dismiss">Reject</button>
+                </div>
+              </div>
+
+              <div class="faceted-card">
+                <div class="card-edge-tag amber"></div>
+                <div class="card-main-col">
+                  <div class="card-row-top">
+                    <span class="card-headline">Draft Dispatch: Board Update Letter Q3</span>
+                    <span class="card-tag-pill" style="color: #fcd34d;">EMAIL DRAFT</span>
+                  </div>
+                  <div class="card-snippet">
+                    Prepared for Operator review. Outlines 48.2 month runway and completion of Cato design architecture redesign.
+                  </div>
+                </div>
+                <div class="card-actions-col">
+                  <button class="btn-action-sm btn-action-approve" onclick="alert('Email dispatched via Gmail API.')">Approve & Send</button>
+                  <button class="btn-action-sm btn-action-dismiss">Edit Draft</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====================================================================
+             VIEW 5: ACTIVITY & AUTOMATIONS
+             ==================================================================== -->
+        <div class="view-panel" id="view-activity-automations">
+          <div class="section-block">
+            <div class="section-header-wrap">
+              <div class="section-title-group">
+                <span class="section-title">Cryptographic Hash-Chained Audit Log</span>
+                <span class="count-pill">TAMPER-PROOF VERIFIED</span>
+              </div>
+            </div>
+
+            <div class="chat-stream-container" style="border-radius: 10px;">
+              <table class="audit-table">
+                <thead>
+                  <tr>
+                    <th>Seq #</th>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Actor / Subsystem</th>
+                    <th>SHA-256 Signature</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="font-family: var(--font-mono);">#4089</td>
+                    <td style="font-family: var(--font-mono);">2026-08-14 17:30:12</td>
+                    <td><strong style="color: #ffffff;">Model Dispatch: Codex-Sonnet-5</strong></td>
+                    <td>cato/router.py</td>
+                    <td><span class="hash-code">9a4b2c88...12fe</span></td>
+                    <td><span class="stat-badge emerald">VERIFIED</span></td>
+                  </tr>
+                  <tr>
+                    <td style="font-family: var(--font-mono);">#4088</td>
+                    <td style="font-family: var(--font-mono);">2026-08-14 17:28:04</td>
+                    <td><strong style="color: #ffffff;">Vault Access: TELEGRAM_BOT_TOKEN</strong></td>
+                    <td>cato/vault.py (AES-256)</td>
+                    <td><span class="hash-code">d841e0bb...334a</span></td>
+                    <td><span class="stat-badge emerald">VERIFIED</span></td>
+                  </tr>
+                  <tr>
+                    <td style="font-family: var(--font-mono);">#4087</td>
+                    <td style="font-family: var(--font-mono);">2026-08-14 17:25:50</td>
+                    <td><strong style="color: #ffffff;">Ledger Reconciliation Pulse</strong></td>
+                    <td>FinanceOS Bridge</td>
+                    <td><span class="hash-code">7c11f9aa...90cd</span></td>
+                    <td><span class="stat-badge emerald">VERIFIED</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ====================================================================
+             VIEW 6: SETTINGS / DIAGNOSTICS
+             ==================================================================== -->
+        <div class="view-panel" id="view-settings-diagnostics">
+          <div class="hero-stat-grid">
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Encrypted Vault</span>
+                <span class="stat-badge emerald">SEALED</span>
+              </div>
+              <div class="stat-value">AES-256 <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">GCM</span></div>
+              <div class="stat-sub">%APPDATA%/cato/vault.enc</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Direct Anthropic API</span>
+                <span class="stat-badge cyan">AUTHENTICATED</span>
+              </div>
+              <div class="stat-value">DIRECT <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">execution</span></div>
+              <div class="stat-sub">Zero intermediate hops</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Core Daemons</span>
+                <span class="stat-badge emerald">RUNNING</span>
+              </div>
+              <div class="stat-value">Port 8080 <span style="font-size: 13px; color: var(--text-muted); font-weight: 500;">/ WS 8081</span></div>
+              <div class="stat-sub">Aiohttp + WebSockets</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-title">Test Suite Coverage</span>
+                <span class="stat-badge cyan">1869+ TESTS</span>
+              </div>
+              <div class="stat-value">99.8% <span style="font-size: 13px; color: var(--cato-cyan-bright); font-weight: 500;">passing</span></div>
+              <div class="stat-sub">Master pytest validation</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Generic Placeholders for remaining views -->
+        <div class="view-panel" id="view-waiting-followups">
+          <div class="section-block">
+            <div class="section-header-wrap">
+              <span class="section-title">Active Timers & Follow-ups</span>
+            </div>
+            <div class="inbox-card-stack">
+              <div class="faceted-card">
+                <div class="card-edge-tag amber"></div>
+                <div class="card-main-col">
+                  <span class="card-headline">Stripe Webhook Correlation Sync</span>
+                  <div class="card-snippet">Auto-retrying in 14 minutes. Waiting on remote Stripe ledger ack.</div>
+                </div>
+                <div class="card-actions-col">
+                  <button class="btn-action-sm btn-action-approve" onclick="alert('Forced immediate sync.')">Retry Now</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-panel" id="view-calendar">
+          <div class="section-block">
+            <div class="section-header-wrap"><span class="section-title">Today & Next Executive Engagements</span></div>
+            <div class="inbox-card-stack">
+              <div class="faceted-card">
+                <div class="card-edge-tag cyan"></div>
+                <div class="card-main-col">
+                  <span class="card-headline">18:00 — Architecture Review & Logo Redesign Approval</span>
+                  <div class="card-snippet">Demonstrating the new Obsidian Cyber-Tactical Cato interface.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="view-panel" id="view-company-tasks">
+          <div class="section-block">
+            <div class="section-header-wrap"><span class="section-title">Monday.com Master Sprint Board</span></div>
+            <div class="inbox-card-stack">
+              <div class="faceted-card">
+                <div class="card-edge-tag emerald"></div>
+                <div class="card-main-col">
+                  <span class="card-headline">Task #4102: Redesign Cato Design Interface with Obsidian Depth</span>
+                  <div class="card-snippet">Status: HTML Prototype Complete · Awaiting Owner Signoff.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ========================================================================
+       INTERACTIVE APPROVAL MODAL (DEMONSTRATING DEPTH & SHADOWING)
+       ======================================================================== -->
+  <div class="modal-backdrop" id="approval-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cato-cyan)" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <strong style="color: #ffffff; font-family: var(--font-heading); font-size: 16px;">Sovereign Approval Gate</strong>
+        </div>
+        <button onclick="closeApprovalModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px;">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="font-size: 13.5px; color: var(--text-secondary);">
+          You are reviewing a high-impact action requiring operator cryptographic signature:
+        </div>
+
+        <div class="telemetry-card" style="border-color: rgba(0, 240, 255, 0.3);">
+          <div class="telemetry-row">
+            <span style="color: var(--text-muted);">Action Type</span>
+            <span style="color: var(--cato-cyan); font-weight: 700;">WIRE AUTHORIZATION GATE</span>
+          </div>
+          <div class="telemetry-row">
+            <span style="color: var(--text-muted);">Payee</span>
+            <span style="color: #ffffff; font-weight: 600;">Anthropic Scale Infrastructure</span>
+          </div>
+          <div class="telemetry-row">
+            <span style="color: var(--text-muted);">Amount</span>
+            <span style="color: #ffffff; font-weight: 800; font-size: 15px;">$14,250.00 USD</span>
+          </div>
+          <div class="telemetry-row">
+            <span style="color: var(--text-muted);">Hash</span>
+            <span class="hash-code">sha256:e4f8a920b12ad5</span>
+          </div>
+        </div>
+
+        <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
+          This action will be written to the local hash-chained audit log and executed directly with zero intermediate hops.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-tactical btn-secondary-obsidian" onclick="closeApprovalModal()">Cancel</button>
+        <button class="btn-tactical btn-primary-cyan" onclick="signApprovalAction()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Cryptographically Sign & Execute
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       ARTIFACT ATTACHMENT MODAL
+       ======================================================================== -->
+  <div class="modal-backdrop" id="artifact-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--cato-cyan)" stroke-width="2.5"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l7.88-7.88"/></svg>
+          <strong style="color: #ffffff; font-family: var(--font-heading); font-size: 16px;">Attach Artifact to Ask E4L</strong>
+        </div>
+        <button onclick="closeArtifactModal()" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px;">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="font-size: 13px; color: var(--text-secondary);">
+          Upload files from your local system or attach pre-verified vault artifacts for grounded reasoning:
+        </div>
+
+        <!-- Local File System Upload Box -->
+        <div onclick="triggerNativeFileInput()" style="border: 2px dashed rgba(0, 240, 255, 0.4); background: rgba(5, 8, 17, 0.7); border-radius: 10px; padding: 18px; text-align: center; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.borderColor='var(--cato-cyan)'; this.style.background='rgba(10, 15, 29, 0.95)';" onmouseout="this.style.borderColor='rgba(0, 240, 255, 0.4)'; this.style.background='rgba(5, 8, 17, 0.7)';">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--cato-cyan)" stroke-width="2" style="margin-bottom: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="color: #ffffff; font-weight: 700; font-size: 13.5px;">Browse Local Files</div>
+          <div style="color: var(--text-muted); font-size: 11px; margin-top: 2px;">PDF, Excel, JSON, Parquet, Python, Markdown, SQL, Images</div>
+        </div>
+
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px;">
+          Or Select Active Vault Artifact:
+        </div>
+
+        <!-- Preset Vault Artifacts -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="preset-artifact-row" onclick="attachPresetArtifact('reconciliation_variance_audit.pdf', '1.4 MB', 'Audit Proof')">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 16px;">📑</span>
+              <div>
+                <div style="color: #ffffff; font-weight: 600; font-size: 12.5px;">reconciliation_variance_audit.pdf</div>
+                <div style="color: var(--text-muted); font-size: 10.5px;">Q3 Closed Books · SHA-256 Verified</div>
+              </div>
+            </div>
+            <span class="count-pill">1.4 MB</span>
+          </div>
+
+          <div class="preset-artifact-row" onclick="attachPresetArtifact('proof_bundle_sha256.json', '342 KB', 'Cryptographic Proof')">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 16px;">🔒</span>
+              <div>
+                <div style="color: #ffffff; font-weight: 600; font-size: 12.5px;">proof_bundle_sha256.json</div>
+                <div style="color: var(--text-muted); font-size: 10.5px;">Hash-Chained Execution Receipt</div>
+              </div>
+            </div>
+            <span class="count-pill">342 KB</span>
+          </div>
+
+          <div class="preset-artifact-row" onclick="attachPresetArtifact('tax_apportionment_schedule.xlsx', '890 KB', 'Financial Schedule')">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 16px;">📊</span>
+              <div>
+                <div style="color: #ffffff; font-weight: 600; font-size: 12.5px;">tax_apportionment_schedule.xlsx</div>
+                <div style="color: var(--text-muted); font-size: 10.5px;">State & Federal Apportionment 2026</div>
+              </div>
+            </div>
+            <span class="count-pill">890 KB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-tactical btn-secondary-obsidian" onclick="closeArtifactModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive JavaScript Logic -->
+  <script>
+    const viewLabels = {
+      'work-inbox': { name: 'Work Inbox', badge: 'ATTENTION CORE' },
+      'waiting-followups': { name: 'Waiting / Follow-ups', badge: 'TRACKED TIMERS' },
+      'approvals': { name: 'Approvals Gate', badge: 'OPERATOR GATE' },
+      'calendar': { name: 'Calendar Timeline', badge: 'EXECUTIVE TIMELINE' },
+      'company-tasks': { name: 'Company Tasks', badge: 'MONDAY.COM SYNC' },
+      'finance': { name: 'Finance Control Room', badge: 'FINANCEOS LIVE' },
+      'ask-e4l': { name: 'Ask E4L (AI Chat)', badge: 'DIRECT ANTHROPIC' },
+      'activity-automations': { name: 'Activity / Automations', badge: 'AUDIT & CRON' },
+      'settings-diagnostics': { name: 'Settings / Diagnostics', badge: 'VAULT & DEBUG' }
+    };
+
+    function switchView(viewId) {
+      // Update nav buttons
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        if (btn.getAttribute('data-view') === viewId) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      // Update panels
+      document.querySelectorAll('.view-panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+
+      const targetPanel = document.getElementById('view-' + viewId);
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+      }
+
+      // Update topbar breadcrumbs
+      const info = viewLabels[viewId] || { name: viewId, badge: 'OPERATIONAL' };
+      document.getElementById('current-view-name').textContent = info.name;
+      document.getElementById('current-view-badge').textContent = info.badge;
+    }
+
+    function triggerApprovalModal() {
+      document.getElementById('approval-modal').classList.add('open');
+    }
+
+    function closeApprovalModal() {
+      document.getElementById('approval-modal').classList.remove('open');
+    }
+
+    function signApprovalAction() {
+      alert('Cryptographic signature generated: [SIG_90a1b2]. Wire authorization dispatched to FinanceOS gateway.');
+      closeApprovalModal();
+    }
+
+    function triggerRefresh() {
+      const topbar = document.querySelector('.cato-topbar');
+      topbar.style.boxShadow = '0 0 25px rgba(0, 240, 255, 0.4)';
+      setTimeout(() => {
+        topbar.style.boxShadow = '';
+      }, 600);
+    }
+
+    function openNewTask() {
+      switchView('ask-e4l');
+      const textarea = document.getElementById('chat-input-textarea') || document.querySelector('.chat-textarea');
+      if (textarea) {
+        textarea.focus();
+        textarea.value = 'Initiate new task: ';
+      }
+    }
+
+    /* ==========================================================================
+       ARTIFACT ATTACHMENT & INTERACTIVE CHAT ENGINE
+       ========================================================================== */
+    let attachedArtifacts = [];
+
+    function openArtifactModal() {
+      const modal = document.getElementById('artifact-modal');
+      if (modal) modal.classList.add('open');
+    }
+
+    function closeArtifactModal() {
+      const modal = document.getElementById('artifact-modal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function triggerNativeFileInput() {
+      const fileInput = document.getElementById('chat-artifact-file-input');
+      if (fileInput) {
+        fileInput.click();
+      }
+    }
+
+    function formatFileSize(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function handleChatFileUpload(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!attachedArtifacts.some(a => a.name === file.name)) {
+          attachedArtifacts.push({
+            name: file.name,
+            size: formatFileSize(file.size),
+            type: file.type || 'Document'
+          });
+        }
+      }
+      event.target.value = ''; // Reset
+      renderAttachedArtifacts();
+      closeArtifactModal();
+    }
+
+    function attachPresetArtifact(name, size, type) {
+      if (!attachedArtifacts.some(a => a.name === name)) {
+        attachedArtifacts.push({ name, size, type });
+        renderAttachedArtifacts();
+      }
+      closeArtifactModal();
+    }
+
+    function removeAttachedArtifact(index) {
+      attachedArtifacts.splice(index, 1);
+      renderAttachedArtifacts();
+    }
+
+    function renderAttachedArtifacts() {
+      const tray = document.getElementById('attached-artifacts-tray');
+      if (!tray) return;
+      if (attachedArtifacts.length === 0) {
+        tray.classList.remove('has-items');
+        tray.innerHTML = '';
+        return;
+      }
+      tray.classList.add('has-items');
+      tray.innerHTML = attachedArtifacts.map((art, idx) => `
+        <div class="artifact-chip">
+          <span>📎</span>
+          <span style="font-weight: 600; color: #ffffff;">${escapeHtml(art.name)}</span>
+          <span class="artifact-chip-size">(${escapeHtml(art.size)})</span>
+          <button type="button" class="artifact-chip-remove" onclick="removeAttachedArtifact(${idx})" title="Remove artifact">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function handleChatInputKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendChatMessage();
+      }
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function sendChatMessage() {
+      const textarea = document.getElementById('chat-input-textarea');
+      const text = textarea ? textarea.value.trim() : '';
+      if (!text && attachedArtifacts.length === 0) return;
+
+      const messagesArea = document.querySelector('.chat-messages-area');
+      if (messagesArea) {
+        // Build user message bubble
+        const userBubble = document.createElement('div');
+        userBubble.className = 'chat-message-bubble user';
+        
+        let artifactsHtml = '';
+        if (attachedArtifacts.length > 0) {
+          artifactsHtml = '<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;">' +
+            attachedArtifacts.map(a => `<div class="artifact-chip" style="background: rgba(2, 6, 23, 0.85); border-color: var(--cato-cyan);">📎 <span>${escapeHtml(a.name)}</span> <span class="artifact-chip-size">(${escapeHtml(a.size)})</span></div>`).join('') +
+            '</div>';
+        }
+
+        userBubble.innerHTML = `
+          <div class="chat-avatar user">OP</div>
+          <div class="chat-bubble-content">
+            ${artifactsHtml}
+            <div>${escapeHtml(text) || '<em style="color: var(--text-muted);">Attached artifact for grounded analysis.</em>'}</div>
+          </div>
+        `;
+        messagesArea.appendChild(userBubble);
+
+        // Copy current artifacts for the agent response
+        const processedArtifacts = [...attachedArtifacts];
+
+        // Clear input and attachments
+        if (textarea) textarea.value = '';
+        attachedArtifacts = [];
+        renderAttachedArtifacts();
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+
+        // Simulate Sovereign Agent Response
+        setTimeout(() => {
+          const agentBubble = document.createElement('div');
+          agentBubble.className = 'chat-message-bubble';
+          
+          let responseText = `Received command with direct Anthropic API telemetry. `;
+          if (processedArtifacts.length > 0) {
+            const fileList = processedArtifacts.map(a => `<code style="color: var(--cato-cyan);">${escapeHtml(a.name)}</code>`).join(', ');
+            responseText += `Attached artifact(s) (${fileList}) ingested and grounded in AES-256 encrypted vault memory. No anomalies detected.`;
+          } else {
+            responseText += `Execution pipeline standing by.`;
+          }
+
+          agentBubble.innerHTML = `
+            <div class="chat-avatar agent">C</div>
+            <div class="chat-bubble-content">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--cato-cyan); margin-bottom: 4px; font-weight: 700;">CATO SOVEREIGN DAEMON · Direct Anthropic API (210ms)</div>
+              <div>${responseText}</div>
+            </div>
+          `;
+          messagesArea.appendChild(agentBubble);
+          messagesArea.scrollTop = messagesArea.scrollHeight;
+        }, 500);
+      }
+    }
+  </script>
+</body>
+</html>
