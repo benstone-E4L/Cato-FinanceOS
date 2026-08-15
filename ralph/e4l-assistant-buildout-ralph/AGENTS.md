@@ -4,12 +4,11 @@
 
 ## Environment
 
-```bash
-# Copy .env.example to .env and fill in values before first run
-cp .env.example .env
-```
+Operator credentials are stored in the encrypted Cato vault. Do not copy credentials
+into a repository `.env` or export them into the daemon environment. The explicit
+one-shot legacy migration command is the only dotenv credential ingestion path.
 
-Required environment variables:
+Required vault keys and non-secret configuration names:
 # CATO_VAULT_PASSWORD: vault master password — ROTATE before Chunk 2 (owed since 2026-08-06 audit)
 # ANTHROPIC_API_KEY: primary model provider key
 # OPENAI_API_KEY: secondary/fallback model provider key

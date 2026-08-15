@@ -1,9 +1,13 @@
 # Brevo and outreach access (Cato + ConduitScore pipeline)
 
-Secrets stay **out of git**. Two places hold them:
+Secrets stay **out of git**. Cato uses one authority:
 
-1. **ConduitScore** `conduit_outreach_pipeline/.env` (local, gitignored) — used when you run the pipeline directly.
-2. **Cato vault** `%APPDATA%\cato\vault.enc` — used when Cato or the agent runs `outreach.run` (vault overrides `.env` for the same key names).
+1. **Cato vault** `%APPDATA%\cato\vault.enc` — the only credential source when Cato or the agent runs `outreach.run`.
+
+The external pipeline may retain a legacy local `.env` for manual, non-Cato runs. Cato
+does not read it, merge it, or copy values from it. The Cato bridge sends a versioned
+one-shot credential envelope through inherited stdin; the child holds it in process
+memory, skips dotenv loading, and consumes/clears it after the run.
 
 ## Keys to store
 
@@ -47,13 +51,15 @@ cato vault list
 - **SMTP** sends the HTML/text the pipeline already rendered (Jinja **1.2-halbert**). You only need Brevo UI changes if you switch to Brevo-hosted templates or workflows.
 - **Optional REST**: store `BREVO_API_KEY` in vault if you later add scripts to update Brevo templates via API; not required for current SMTP sends.
 
-## Pipeline `.env` mirror
+## Cato-to-pipeline channel
 
-Keep the same variables in:
+`run_batch.py` is reserved for the Cato bridge and requires the inherited stdin
+credential envelope. Missing, malformed, unknown-key, or incomplete envelopes fail
+before pipeline work. Credential values never travel in environment variables,
+command-line arguments, or files.
 
-`C:\Users\Administrator\Desktop\ConduitScore\conduit_outreach_pipeline\.env`
-
-so manual runs (`python run_batch.py`, tests) work without starting Cato. Cato subprocesses load that file then apply vault overrides.
+Manual pipeline commands remain external to Cato's credential boundary and must not
+be used as evidence for Cato runtime acceptance.
 
 ## Safety (night-shift)
 

@@ -23,7 +23,9 @@ Cato does **not** guess the company name or AI visibility score in email copy. T
 | **Staging** | `https://staging.conduitscore.com` is documented for dev only; DNS is not live on this machine |
 | **Local dev** | `http://localhost:3000` when running `npm run dev` in the ConduitScore repo |
 
-Cato vault + outreach `.env` should set `CONDUITSCORE_API_BASE=https://conduitscore.com`. Rescan links in emails use the same base (`links.py`).
+Cato vault should set `CONDUITSCORE_API_BASE=https://conduitscore.com`. Cato does not
+load or merge the outreach `.env`; it supplies vault values to `run_batch.py` once over
+inherited stdin. Rescan links in emails use the same base (`links.py`).
 
 ## What the pipeline fetches automatically
 
@@ -37,7 +39,7 @@ Cato vault + outreach `.env` should set `CONDUITSCORE_API_BASE=https://conduitsc
 ## What Cato does
 
 - Tool **`outreach.run`** (dry-run by default) can spawn the pipeline CLI when G1 gates allow live sends.
-- Before subprocess, Cato merges **vault** + pipeline **`.env`** via `cato/core/outreach_credentials.py` so Brevo and API keys are available without putting secrets in git.
+- Before subprocess, Cato builds an allowlisted envelope from the **vault only** via `cato/core/outreach_credentials.py`. It sends that envelope through inherited stdin, while the child receives a minimal non-secret environment and skips dotenv loading.
 - **`cato outreach status`** shows which keys are configured (never prints values).
 
 ## Changing copy vs changing data
@@ -47,7 +49,7 @@ Cato vault + outreach `.env` should set `CONDUITSCORE_API_BASE=https://conduitsc
 | Wording / tone | Edit `.j2` templates or `render_engine.SUBJECTS` in `conduit_outreach_pipeline` |
 | Score or issues | Re-run scan (new API result); or wait for cache TTL |
 | Company name in email | Update your CSV/sheet `company_name` column |
-| Physical address in footer | `CANSPAM_POSTAL_ADDRESS` in outreach `.env` or Cato vault |
+| Physical address in footer | `CANSPAM_POSTAL_ADDRESS` in Cato vault for Cato runs |
 | Brevo templates in UI | Brevo dashboard (optional); pipeline sends rendered HTML/text from Jinja, not Brevo drag-and-drop templates |
 
 ## Related docs

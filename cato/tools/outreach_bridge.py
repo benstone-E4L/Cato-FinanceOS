@@ -1,4 +1,4 @@
-"""Fail-closed bridge for outreach engines lacking secure credential transport."""
+"""Fail-closed one-shot stdin bridge to the external outreach engine."""
 
 from __future__ import annotations
 
@@ -7,9 +7,10 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
+_OUTREACH_TIMEOUT_SECONDS = 120.0
 
 OUTREACH_SCHEMA = {
     "name": "outreach.run",
@@ -33,7 +34,7 @@ OUTREACH_SCHEMA = {
 }
 
 
-def _resolve_engine_root(engine: str, policy_paths: dict[str, str]) -> Optional[Path]:
+def _resolve_engine_root(engine: str, policy_paths: dict[str, str]) -> Path | None:
     key = "outreach_engine_cli" if engine == "auto" else f"{engine}_root"
     raw = policy_paths.get(key) or policy_paths.get("outreach_engine_cli") or ""
     if raw:
@@ -95,50 +96,88 @@ async def execute_outreach_run(args: dict[str, Any]) -> str:
             "hint_paths_checked": ["Desktop/conduit_outreach_pipeline", "Desktop/reverse_funnel_outreach"],
         })
 
-    # Prefer explicit runner scripts if present
-    runners = [
-        root / "run_batch.py",
-        root / "run.py",
-        root / "cli.py",
-        root / "main.py",
-    ]
-    runner = next((p for p in runners if p.is_file()), None)
+    # Only this entrypoint implements the versioned stdin credential protocol.
+    runner = root / "run_batch.py"
+    if not runner.is_file():
+        return json.dumps({
+            "ok": False,
+            "error": "secure_outreach_entrypoint_unavailable",
+            "message": "The outreach engine does not expose the approved stdin credential channel.",
+        })
 
-    if runner is not None:
-        cmd = [
-            sys.executable,
-            str(runner),
-            "--contact-id",
-            contact_id,
-        ]
-    else:
-        cmd = [
-            sys.executable,
-            "-m",
-            "conduit_outreach_pipeline",
-            "run-one-json",
-            "--contact-id",
-            contact_id,
-        ]
+    cmd = [sys.executable, str(runner), "--contact-id", contact_id]
 
     if artifact:
         cmd.extend(["--artifact", artifact])
     if dry_run:
         cmd.append("--dry-run")
 
-    if dry_run and runner is None and not (root / "src").is_dir():
+    from ..core.outreach_credentials import (
+        OutreachCredentialError,
+        build_credential_envelope,
+        build_outreach_env,
+    )
+
+    try:
+        envelope, credential_values = build_credential_envelope()
+    except OutreachCredentialError as exc:
         return json.dumps({
-            "ok": True,
-            "mode": "dry_run",
-            "engine_root": str(root),
-            "contact_id": contact_id,
-            "artifact_path": artifact,
-            "runner": None,
-            "message": "Dry-run only — outreach package layout not found.",
+            "ok": False,
+            "error": "outreach_credentials_unavailable",
+            "message": str(exc),
         })
 
-    return json.dumps({
-        "ok": False,
-        "error": "credential_transport_unavailable",
-        "message": "Outreach execution is unavailable because the external transport lacks a secure credential channel.",
-    })
+    child_env = build_outreach_env()
+    child_env["CATO_OUTREACH_DRY_RUN"] = "1" if dry_run else "0"
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=str(root),
+        env=child_env,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(input=envelope), timeout=_OUTREACH_TIMEOUT_SECONDS
+        )
+    except TimeoutError:
+        proc.kill()
+        await proc.communicate()
+        return json.dumps({
+            "ok": False,
+            "error": "outreach_timeout",
+            "message": "The outreach child exceeded its bounded runtime.",
+        })
+    finally:
+        # Drop the parent's serialized copy as soon as the child has consumed stdin.
+        envelope = b""
+
+    stdout_text = stdout.decode("utf-8", errors="replace").strip()
+    stderr_text = stderr.decode("utf-8", errors="replace").strip()
+    if any(value and (value in stdout_text or value in stderr_text) for value in credential_values):
+        return json.dumps({
+            "ok": False,
+            "error": "outreach_child_credential_output",
+            "message": "The outreach child emitted protected data; output was suppressed.",
+        })
+
+    try:
+        result = json.loads(stdout_text.splitlines()[-1]) if stdout_text else None
+    except (IndexError, json.JSONDecodeError):
+        result = None
+    if not isinstance(result, dict):
+        return json.dumps({
+            "ok": False,
+            "error": "outreach_child_invalid_response",
+            "message": "The outreach child returned no valid JSON response.",
+            "returncode": proc.returncode,
+        })
+    if proc.returncode != 0 and result.get("ok") is not False:
+        return json.dumps({
+            "ok": False,
+            "error": "outreach_child_failed",
+            "message": "The outreach child exited unsuccessfully.",
+            "returncode": proc.returncode,
+        })
+    return json.dumps(result)

@@ -1,14 +1,15 @@
-"""Vault-backed outreach status without subprocess credential transport."""
+"""Vault-backed one-shot credential transport for the outreach child."""
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Keys Cato may inject when calling conduit_outreach_pipeline (values from vault override .env).
+# Exact keys accepted by the outreach child's in-memory credential channel.
 OUTREACH_VAULT_KEYS: tuple[str, ...] = (
     "BREVO_SMTP_KEY",
     "BREVO_SMTP_LOGIN",
@@ -19,14 +20,22 @@ OUTREACH_VAULT_KEYS: tuple[str, ...] = (
     "SENDER_EMAIL",
     "SENDER_NAME",
     "CANSPAM_POSTAL_ADDRESS",
-)
-
-# Non-secret keys reported in `cato outreach status`.
-OUTREACH_STATUS_KEYS: tuple[str, ...] = OUTREACH_VAULT_KEYS + (
-    "UNSUBSCRIBE_BASE_URL",
     "CONDUITSCORE_API_BASE",
+    "UNSUBSCRIBE_BASE_URL",
     "GOOGLE_SHEET_ID",
 )
+
+OUTREACH_REQUIRED_KEYS: tuple[str, ...] = ("CONDUITSCORE_API_KEY",)
+OUTREACH_CREDENTIAL_PROTOCOL = "cato.outreach.credentials"
+OUTREACH_CREDENTIAL_VERSION = 1
+_MAX_CREDENTIAL_VALUE_BYTES = 16_384
+
+
+class OutreachCredentialError(RuntimeError):
+    """The vault cannot supply a valid outreach credential envelope."""
+
+# Non-secret keys reported in `cato outreach status`.
+OUTREACH_STATUS_KEYS: tuple[str, ...] = OUTREACH_VAULT_KEYS
 
 
 def default_outreach_engine_root() -> Path | None:
@@ -61,6 +70,49 @@ def build_outreach_env(
     return safe_subprocess_environment(base)
 
 
+def build_credential_envelope(*, vault: Any | None = None) -> tuple[bytes, tuple[str, ...]]:
+    """Build a compact stdin payload from the unlocked vault only.
+
+    The returned values tuple exists solely so the caller can detect and suppress a
+    misbehaving child's accidental output.  Values are never logged or persisted.
+    """
+    if vault is None:
+        from ..vault import Vault
+
+        vault = Vault()
+
+    credentials: dict[str, str] = {}
+    for key in OUTREACH_VAULT_KEYS:
+        try:
+            value = vault.get(key)
+        except Exception as exc:
+            raise OutreachCredentialError("outreach vault is locked or unavailable") from exc
+        if value is None:
+            continue
+        if not isinstance(value, str) or not value.strip():
+            raise OutreachCredentialError(f"invalid vault credential metadata for {key}")
+        if len(value.encode("utf-8")) > _MAX_CREDENTIAL_VALUE_BYTES:
+            raise OutreachCredentialError(f"invalid vault credential metadata for {key}")
+        credentials[key] = value
+
+    missing = [key for key in OUTREACH_REQUIRED_KEYS if key not in credentials]
+    if missing:
+        raise OutreachCredentialError(
+            "required vault credentials are unavailable: " + ", ".join(missing)
+        )
+
+    payload = json.dumps(
+        {
+            "protocol": OUTREACH_CREDENTIAL_PROTOCOL,
+            "version": OUTREACH_CREDENTIAL_VERSION,
+            "credentials": credentials,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return payload, tuple(credentials.values())
+
+
 def outreach_credentials_status(engine_root: Path | None = None) -> dict[str, Any]:
     """Safe status for CLI — never returns secret values."""
     root = engine_root or default_outreach_engine_root()
@@ -86,6 +138,12 @@ def outreach_credentials_status(engine_root: Path | None = None) -> dict[str, An
         "keys_configured": configured,
         "postal_address_set": vault_only.get("CANSPAM_POSTAL_ADDRESS", False),
         "brevo_smtp_ready": vault_only.get("BREVO_SMTP_KEY", False),
-        "execution_available": False,
-        "unavailable_reason": "External outreach transport lacks a secure credential channel.",
+        "execution_available": bool(root) and all(
+            vault_only.get(key, False) for key in OUTREACH_REQUIRED_KEYS
+        ),
+        "unavailable_reason": (
+            None
+            if bool(root) and all(vault_only.get(key, False) for key in OUTREACH_REQUIRED_KEYS)
+            else "Outreach engine path or required vault credentials are unavailable."
+        ),
     }
