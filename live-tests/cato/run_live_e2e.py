@@ -112,6 +112,16 @@ def validate_build_manifest(manifest_path: Path, executable: Path, head: str) ->
     actual_native_sha = sha256_file(executable)
     if native.get("sha256") != actual_native_sha or native.get("bytes") != executable.stat().st_size:
         raise AssertionError("Native executable does not match the exact-HEAD custody manifest")
+    sidecar = manifest.get("sidecar") or {}
+    sidecar_name = sidecar.get("path")
+    if not isinstance(sidecar_name, str) or Path(sidecar_name).name != sidecar_name:
+        raise AssertionError("Custody manifest has no safe staged-sidecar path")
+    sidecar_path = REPO / "desktop" / "src-tauri" / "binaries" / sidecar_name
+    if not sidecar_path.is_file():
+        raise AssertionError("Staged sidecar from the custody manifest is missing")
+    actual_sidecar_sha = sha256_file(sidecar_path)
+    if sidecar.get("sha256") != actual_sidecar_sha or sidecar.get("bytes") != sidecar_path.stat().st_size:
+        raise AssertionError("Staged sidecar does not match the exact-HEAD custody manifest")
     dist = manifest.get("dist")
     if not isinstance(dist, dict) or not dist:
         raise AssertionError("Custody manifest has no production-bundle hashes")
@@ -123,6 +133,7 @@ def validate_build_manifest(manifest_path: Path, executable: Path, head: str) ->
         "manifest": str(manifest_path),
         "source_sha": head,
         "native_sha256": actual_native_sha,
+        "sidecar_sha256": actual_sidecar_sha,
         "dist_file_count": len(dist),
     }
 
