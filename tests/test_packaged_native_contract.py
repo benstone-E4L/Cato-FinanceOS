@@ -136,6 +136,8 @@ def test_desktop_launcher_uses_only_a_transient_secure_password_handoff():
     launcher = _source("Launch-CatoDesktop.ps1")
 
     assert 'Read-Host "Cato vault master password" -AsSecureString' in launcher
+    assert 'Join-Path $dataDir "vault-password.dpapi"' in launcher
+    assert "ConvertTo-SecureString $protectedPassword" in launcher
     assert "SecureStringToBSTR" in launcher
     assert "ZeroFreeBSTR" in launcher
     assert "Remove-Item Env:\\CATO_VAULT_PASSWORD" in launcher

@@ -43,7 +43,13 @@ if ($matchingDaemon) {
     exit 0
 }
 
-$securePassword = Read-Host "Cato vault master password" -AsSecureString
+$dpapiPasswordPath = Join-Path $dataDir "vault-password.dpapi"
+if (Test-Path -LiteralPath $dpapiPasswordPath) {
+    $protectedPassword = (Get-Content -LiteralPath $dpapiPasswordPath -Raw).Trim()
+    $securePassword = ConvertTo-SecureString $protectedPassword
+} else {
+    $securePassword = Read-Host "Cato vault master password" -AsSecureString
+}
 $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
 try {
     $env:CATO_VAULT_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
@@ -51,4 +57,5 @@ try {
 } finally {
     Remove-Item Env:\CATO_VAULT_PASSWORD -ErrorAction SilentlyContinue
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+    $securePassword.Dispose()
 }
