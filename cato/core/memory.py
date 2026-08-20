@@ -20,11 +20,13 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 from rank_bm25 import BM25Okapi
-from sentence_transformers import SentenceTransformer
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 from ..platform import get_data_dir
 
@@ -220,6 +222,15 @@ class MemorySystem:
         """
         if self._embed_model is not None:
             return self._embed_model
+
+        # Importing sentence-transformers initializes its full ML dependency
+        # stack. Keep that cost on the semantic-search path; lightweight state
+        # cache reads must not pay it merely by importing MemorySystem.
+        try:
+            from sentence_transformers import SentenceTransformer
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Embedding dependency unavailable: %s", exc)
+            return None
 
         # --- resolve a Windows-safe cache directory ---------------------------
         if sys.platform == "win32":
