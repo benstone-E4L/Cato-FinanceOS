@@ -3,7 +3,7 @@ tests/test_genesis_tool.py — Tests for the Genesis Agents tool (task-02),
 including the t07-genesis-containment-in-cato hardening.
 
 Covers:
-- 20-agent registry (15 deployed, 5 pending)
+- 34-agent registry (29 deployed, 5 pending)
 - AP2 envelope construction + Ed25519 signature verification
 - Canonical-JSON signed bytes (tamper-evident)
 - GENESIS_TOOL_SCHEMA shape
@@ -41,6 +41,7 @@ import pytest
 from cato import vault_crypto
 from cato.tools.genesis import (
     AP2_ENVELOPE_VERSION,
+    FAIL_CLOSED_ACCOUNTING_ALLOWLIST,
     GENESIS_AGENTS,
     GENESIS_TOOL_SCHEMA,
     IMMUTABLE_DENIED_AGENTS,
@@ -176,13 +177,13 @@ def _new_tool(vault=None, config=None, session=None, skip_warmup=True) -> Genesi
 
 
 class TestRegistry:
-    def test_twenty_agents_total(self):
-        assert len(GENESIS_AGENTS) == 20
+    def test_registry_count(self):
+        assert len(GENESIS_AGENTS) == 34
 
-    def test_fifteen_deployed_five_pending(self):
+    def test_twenty_nine_deployed_five_pending(self):
         deployed = [m for m in GENESIS_AGENTS.values() if m.get("status") == "deployed"]
         pending = [m for m in GENESIS_AGENTS.values() if m.get("status") == "pending"]
-        assert len(deployed) == 15
+        assert len(deployed) == 29
         assert len(pending) == 5
 
     def test_known_deployed_slugs_present(self):
@@ -202,6 +203,20 @@ class TestRegistry:
             "genesis-analyst",
             "genesis-commerce",
             "genesis-billing",
+            "genesis-e4l-revenue",
+            "genesis-e4l-shopify",
+            "genesis-e4l-stripe",
+            "genesis-e4l-cash",
+            "genesis-e4l-ap",
+            "genesis-e4l-ar",
+            "genesis-e4l-cogs-cm",
+            "genesis-e4l-commissions",
+            "genesis-e4l-intercompany",
+            "genesis-e4l-close",
+            "genesis-e4l-journals",
+            "genesis-e4l-fs-integrity",
+            "genesis-e4l-controller",
+            "genesis-e4l-treasury",
         ]:
             assert slug in GENESIS_AGENTS, f"missing deployed slug {slug}"
             assert GENESIS_AGENTS[slug]["status"] == "deployed"
@@ -226,13 +241,25 @@ class TestRegistry:
     def test_list_agents_shape(self):
         agents = list_agents()
         assert isinstance(agents, list)
-        # 5 pending agents are now excluded by default; use include_pending=True to get all 20
-        assert len(agents) == 15
+        # 5 pending agents are now excluded by default; use include_pending=True to get all 34
+        assert len(agents) == 29
         for entry in agents:
             assert "slug" in entry
             assert "name" in entry
             assert "status" in entry
             assert entry["status"] == "deployed"  # pending agents excluded by list_agents() default
+
+    def test_e4l_specialists_are_grantable_and_not_money_denied(self):
+        assert "genesis-e4l-accounting" not in GENESIS_AGENTS
+        assert len(FAIL_CLOSED_ACCOUNTING_ALLOWLIST) == 14
+        default_allow = MockConfig().genesis_agent_allowlist
+        for slug in FAIL_CLOSED_ACCOUNTING_ALLOWLIST:
+            assert slug in GENESIS_AGENTS
+            assert GENESIS_AGENTS[slug]["status"] == "deployed"
+            assert slug not in MONEY_DOMAIN_AGENTS
+            assert slug not in IMMUTABLE_DENIED_AGENTS
+            assert slug in default_allow
+        assert FAIL_CLOSED_ACCOUNTING_ALLOWLIST.isdisjoint(MONEY_DOMAIN_AGENTS)
 
 
 # ---------------------------------------------------------------------------

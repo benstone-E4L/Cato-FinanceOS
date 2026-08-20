@@ -503,7 +503,7 @@ def genesis_pubkey() -> None:
 
 @genesis_cmd.command("list")
 def genesis_list() -> None:
-    """Print the 20-agent Genesis registry (slug, status, route, price)."""
+    """Print the Genesis registry (slug, status, route, price)."""
     agents = _genesis_list_agents()
 
     headers = ("slug", "status", "route", "price_usd")

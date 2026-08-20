@@ -3,17 +3,19 @@
 Sends signed AP2 envelopes to https://swarmsync-agents.onrender.com/agents/{slug}/run.
 Bound to Cato's vault Ed25519 keypair via cato.vault_crypto.
 
-The tool exposes 20 registered Genesis agents (15 deployed, 5 pending). Each
+The tool exposes the GENESIS_AGENTS registry (original marketplace slugs plus
+14 E4L accounting specialists). Each
 call builds a fresh AP2 envelope: payload + nonce + RFC3339 timestamp, signed
 with the vault's long-lived Ed25519 identity key, then POSTed to the agent's
 ``/agents/{slug}/run`` endpoint with the public key on a sidecar header.
 
 Public symbols:
-    GENESIS_AGENTS         -- 20-agent registry dict
+    GENESIS_AGENTS         -- registry dict
     GENESIS_TOOL_SCHEMA    -- tool registry schema for task-03 wiring
     AP2_ENVELOPE_VERSION   -- wire protocol version (1)
     MONEY_DOMAIN_AGENTS    -- hardcoded money-domain slugs
     IMMUTABLE_DENIED_AGENTS -- money-domain slugs plus deployment
+    FAIL_CLOSED_ACCOUNTING_ALLOWLIST -- 14 E4L specialist slugs Cato may grant
     build_envelope         -- pure function, builds + signs envelope
     list_agents            -- returns the registry as a flat list
     GenesisTool            -- the tool class (instance method ``execute``)
@@ -47,9 +49,10 @@ from cato import vault_crypto
 from cato.config import CatoConfig
 
 # ---------------------------------------------------------------------------
-# 20-agent registry: 15 deployed, 5 pending.
-# Keep this dict aligned with ~/.cato/skills/genesis-*/SKILL.md and
-# SwarmSync's swarmsync-agents service.
+# 34-agent registry: 29 deployed, 5 pending.
+# genesis-e4l-* are the only money-adjacent slugs Cato may grant for E4L books.
+# genesis-finance/billing/commerce/pricing stay on MONEY_DOMAIN_AGENTS.
+# genesis-e4l-accounting is REJECTED (one-hat) and must not reappear.
 # ---------------------------------------------------------------------------
 GENESIS_AGENTS: dict[str, dict[str, Any]] = {
     "genesis-meta":            {"name": "Genesis Meta Agent",      "route": "/orchestrate",            "price_usd": 100, "status": "deployed"},
@@ -72,6 +75,20 @@ GENESIS_AGENTS: dict[str, dict[str, Any]] = {
     "genesis-data-pipeline":      {"name": "Genesis Data Pipeline Agent","route": None, "price_usd": None, "status": "pending"},
     "genesis-workflow-automator": {"name": "Genesis Workflow Automator", "route": None, "price_usd": None, "status": "pending"},
     "genesis-ai-vision":          {"name": "Genesis AI Vision API",      "route": None, "price_usd": None, "status": "pending"},
+    "genesis-e4l-revenue":        {"name": "Genesis E4L Revenue",        "route": "/accounting/revenue", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-shopify":        {"name": "Genesis E4L Shopify",        "route": "/accounting/shopify", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-stripe":         {"name": "Genesis E4L Stripe",         "route": "/accounting/stripe", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-cash":           {"name": "Genesis E4L Cash",           "route": "/accounting/cash", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-ap":             {"name": "Genesis E4L AP",             "route": "/accounting/ap", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-ar":             {"name": "Genesis E4L AR",             "route": "/accounting/ar", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-cogs-cm":        {"name": "Genesis E4L COGS & CM",      "route": "/accounting/cogs-cm", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-commissions":    {"name": "Genesis E4L Commissions",    "route": "/accounting/commissions", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-intercompany":   {"name": "Genesis E4L Intercompany",   "route": "/accounting/intercompany", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-close":          {"name": "Genesis E4L Close",          "route": "/accounting/close", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-journals":       {"name": "Genesis E4L Journals",       "route": "/accounting/journals", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-fs-integrity":   {"name": "Genesis E4L FS Integrity",   "route": "/accounting/fs-integrity", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-controller":     {"name": "Genesis E4L Controller",     "route": "/accounting/controller", "price_usd": 200, "status": "deployed"},
+    "genesis-e4l-treasury":       {"name": "Genesis E4L Treasury",       "route": "/accounting/treasury", "price_usd": 200, "status": "deployed"},
 }
 
 AP2_ENVELOPE_VERSION = 1
@@ -101,6 +118,26 @@ MONEY_DOMAIN_AGENTS: frozenset[str] = frozenset({
     "genesis-pricing",
 })
 IMMUTABLE_DENIED_AGENTS: frozenset[str] = MONEY_DOMAIN_AGENTS | {"genesis-deploy"}
+
+# Fail-closed grant set for E4L accounting. Empty config.genesis_agent_allowlist
+# still denies every agent. These 14 slugs MAY appear on that allowlist.
+# They are NOT on MONEY_DOMAIN_AGENTS (that set is stub marketplace tools).
+FAIL_CLOSED_ACCOUNTING_ALLOWLIST: frozenset[str] = frozenset({
+    "genesis-e4l-revenue",
+    "genesis-e4l-shopify",
+    "genesis-e4l-stripe",
+    "genesis-e4l-cash",
+    "genesis-e4l-ap",
+    "genesis-e4l-ar",
+    "genesis-e4l-cogs-cm",
+    "genesis-e4l-commissions",
+    "genesis-e4l-intercompany",
+    "genesis-e4l-close",
+    "genesis-e4l-journals",
+    "genesis-e4l-fs-integrity",
+    "genesis-e4l-controller",
+    "genesis-e4l-treasury",
+})
 
 _QUEUED_JOB_STATES = frozenset({"QUEUED", "RUNNING", "PENDING", "PROCESSING"})
 _SUCCESS_JOB_STATES = frozenset({"DELIVERED", "DELIVERED_WITH_ARTIFACT_WARNING", "COMPLETED"})
@@ -929,7 +966,7 @@ def list_agents(include_pending: bool = False) -> list[dict[str, Any]]:
 
     Pending agents are excluded by default so callers only see agents that
     are actually reachable on SwarmSync. Pass ``include_pending=True`` to
-    get the full 20-agent registry (e.g. for admin tooling).
+    get the full 34-agent registry (e.g. for admin tooling).
     """
     result = []
     for slug, meta in GENESIS_AGENTS.items():
@@ -954,12 +991,12 @@ GENESIS_TOOL_SCHEMA: dict[str, Any] = {
     "function": {
         "name": "genesis",
         "description": (
-            "Call a hosted Genesis Agent on SwarmSync. The agent slug must be one of the 20 "
-            "registered Genesis agents (genesis-meta, genesis-builder, genesis-research, "
-            "genesis-deploy, genesis-qa, genesis-finance, genesis-marketing, genesis-content, "
-            "genesis-security, genesis-seo, genesis-support, genesis-email, genesis-analyst, "
-            "genesis-commerce, genesis-billing, genesis-legal, genesis-hr, genesis-data-pipeline, "
-            "genesis-workflow-automator, genesis-ai-vision). Returns the agent's response. "
+            "Call a hosted Genesis Agent on SwarmSync. The agent slug must be in "
+            "GENESIS_AGENTS. E4L books use the 14 genesis-e4l-* specialists "
+            "(revenue, shopify, stripe, cash, ap, ar, cogs-cm, commissions, "
+            "intercompany, close, journals, fs-integrity, controller, treasury). "
+            "Never genesis-finance/billing/commerce/pricing and never "
+            "genesis-e4l-accounting. Returns the agent's response. "
             "Agents not cleared for dispatch return a 'pending_deployment' error."
         ),
         "parameters": {
@@ -982,6 +1019,7 @@ __all__ = [
     "AP2_ENVELOPE_VERSION",
     "MONEY_DOMAIN_AGENTS",
     "IMMUTABLE_DENIED_AGENTS",
+    "FAIL_CLOSED_ACCOUNTING_ALLOWLIST",
     "GenesisTool",
     "build_envelope",
     "list_agents",
