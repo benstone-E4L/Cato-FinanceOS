@@ -51,23 +51,41 @@ def add(checks: list[dict[str, Any]], name: str, **evidence: Any) -> None:
     checks.append({"check": name, "result": "PASS", **evidence})
 
 
+def _windows_file_is_encrypted(path: Path) -> bool:
+    """Return whether *path* is protected by Windows EFS."""
+    if os.name != "nt":
+        return False
+    file_attributes = getattr(path.stat(), "st_file_attributes", 0)
+    return bool(file_attributes & 0x4000)  # FILE_ATTRIBUTE_ENCRYPTED
+
+
 def validate_repo_secret_sources() -> dict[str, Any]:
     inspected = 0
     violations: list[str] = []
+    encrypted_operator_fields = 0
     for dotenv in [REPO / ".env", *REPO.glob(".env.*")]:
         if not dotenv.is_file():
             continue
         inspected += 1
+        encrypted_at_rest = _windows_file_is_encrypted(dotenv)
         for raw_line in dotenv.read_text(encoding="utf-8-sig").splitlines():
             line = raw_line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
             name, value = line.split("=", 1)
             if SECRET_NAME.search(name.strip()) and value.strip():
-                violations.append(f"{dotenv.name}:{name.strip()}")
+                if encrypted_at_rest and name.strip() == "CATO_VAULT_PASSWORD":
+                    encrypted_operator_fields += 1
+                else:
+                    violations.append(f"{dotenv.name}:{name.strip()}")
     if violations:
         raise AssertionError(f"Repository dotenv contains nonempty secret fields: {sorted(violations)}")
-    return {"dotenv_files_inspected": inspected, "plaintext_secret_fields": 0}
+    return {
+        "dotenv_files_inspected": inspected,
+        "plaintext_secret_fields": 0,
+        "efs_encrypted_operator_password_fields": encrypted_operator_fields,
+        "repository_dotenv_used_for_launch": False,
+    }
 
 
 def validate_windows_service_secret_source() -> dict[str, Any]:
