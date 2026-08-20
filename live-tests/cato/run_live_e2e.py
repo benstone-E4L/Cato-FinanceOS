@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import time
@@ -166,10 +167,14 @@ async def websocket_auth_checks(port: int, token: str) -> dict[str, Any]:
     raise AssertionError("Authenticated WebSocket returned no health response")
 
 
-async def exercise_model(port: int, token: str) -> dict[str, Any]:
+async def exercise_model(port: int, token: str, routing_db: Path) -> dict[str, Any]:
     session_id = f"live-acceptance-{uuid.uuid4().hex[:12]}"
     uri = f"ws://127.0.0.1:{port}/ws"
     prompt = "Live acceptance check. Reply with exactly CATO_LIVE_OK and nothing else."
+    with sqlite3.connect(routing_db) as connection:
+        baseline_id = int(
+            connection.execute("SELECT COALESCE(MAX(id), 0) FROM routing_events").fetchone()[0]
+        )
     async with websockets.connect(
         uri,
         subprotocols=[f"cato-auth.{token}"],
@@ -193,10 +198,38 @@ async def exercise_model(port: int, token: str) -> dict[str, Any]:
                 response = str(message.get("text", ""))
                 if "CATO_LIVE_OK" not in response:
                     raise AssertionError("Live model response omitted the acceptance marker")
+                with sqlite3.connect(routing_db) as connection:
+                    route_event = connection.execute(
+                        """
+                        SELECT provider, success, routed_model, status, actual_cost, content_chars
+                        FROM routing_events
+                        WHERE id > ?
+                        ORDER BY id DESC
+                        LIMIT 1
+                        """,
+                        (baseline_id,),
+                    ).fetchone()
+                if route_event is None:
+                    raise AssertionError("Live model response has no new routing audit event")
+                provider, success, routed_model, status, actual_cost, content_chars = route_event
+                if provider != "anthropic" or success != 1 or status != "ok":
+                    raise AssertionError("Live model routing audit did not prove Anthropic success")
+                response_model = str(message.get("model") or "")
+                if response_model != routed_model:
+                    raise AssertionError(
+                        "Live response model metadata does not match the routing audit"
+                    )
+                if int(content_chars) != len(response):
+                    raise AssertionError("Live response length does not match the routing audit")
                 return {
                     "response_sha256": hashlib.sha256(response.encode("utf-8")).hexdigest(),
                     "response_bytes": len(response.encode("utf-8")),
-                    "model": str(message.get("model") or "not-reported"),
+                    "provider": provider,
+                    "model": routed_model,
+                    "routing_status": status,
+                    "routing_content_chars": content_chars,
+                    "actual_cost_usd": actual_cost,
+                    "model_metadata_matches": True,
                 }
     raise AssertionError("Live model route timed out")
 
@@ -294,7 +327,7 @@ async def live_checks(
         add(checks, "live_native_desktop_process", **desktop_evidence)
 
     if do_model:
-        model_evidence = await exercise_model(port, token)
+        model_evidence = await exercise_model(port, token, data_dir / "routing_log.sqlite3")
         add(checks, "live_direct_anthropic_round_trip", **model_evidence)
 
 

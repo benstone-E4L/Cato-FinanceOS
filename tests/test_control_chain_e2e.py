@@ -373,6 +373,9 @@ class TestOrderedControlChain:
         order: list[str] = []
         env = build_chain_env(tmp_path, monkeypatch)
         loop = env.loop
+        # The configured default is deliberately stale. Direct execution must
+        # report the model selected by model_policy, not this legacy label.
+        loop._cfg.default_model = "openai/gpt-4o-mini"
 
         # --- instrument steps 2-7: real methods, called for real -----------
         hook_sync(monkeypatch, loop._ctx, "build_system_prompt", order, "2_skill_loading")
@@ -455,6 +458,7 @@ class TestOrderedControlChain:
         # No INTENT/CONFIRMED for genesis yet — only the approval-hold DENIED.
         assert all_kinds(env.ledger_path) == ["DENIED"]
         assert text  # user got SOME response, not a hang
+        assert _model == "claude-sonnet-5"
 
         # --- Phase 2: a real operator approves, then execute_approved_tool -
         # This is the exact production path `POST /api/outbound/{id}/approve`

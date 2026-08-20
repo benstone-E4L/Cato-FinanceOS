@@ -2262,6 +2262,13 @@ class AgentLoop:
                     except Exception:
                         pass
 
+                # The direct path's deterministic policy owns model selection.
+                # Propagate the model it actually dispatched into transcript and
+                # gateway metadata; the legacy configured default may name a
+                # different provider and is not execution evidence.
+                if used_direct and routed_model_name != model:
+                    model = routed_model_name
+
                 _ensure_tool_call_ids(tool_calls, planning_turns)
                 await _aappend(tpath, {
                     "ts": _now(), "role": "assistant", "content": text,
