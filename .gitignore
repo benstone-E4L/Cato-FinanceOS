@@ -94,6 +94,8 @@ desktop/src-tauri/target/
 desktop/dist/
 desktop/node_modules/
 desktop/src-tauri/binaries/
+/.playwright-cli/
+/output/
 
 # Ralph Loop state directories
 Ralph Loop Desktop APP/
@@ -173,4 +175,3 @@ client_secret*.txt
 proof-artifacts/**/downloads/*.exe
 proof-artifacts/**/dist/*.exe
 proof-artifacts/**/*-setup.exe
-

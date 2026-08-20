@@ -37,12 +37,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, daemon
   return (
     <aside className="sidebar">
       <button className="sidebar-brand" onClick={() => onNavigate("work-inbox")} aria-label="Cato Work Inbox">
-        <img src={logoSrc} alt="" className="sidebar-logo" />
+        <span className="sidebar-logo-frame"><span className="sidebar-logo-glow" /><img src={logoSrc} alt="" className="sidebar-logo" /></span>
         <span className="sidebar-brand-copy"><strong>Cato</strong><small>E4Life FinanceOS</small></span>
       </button>
 
       <nav className="sidebar-nav" aria-label="Primary navigation">
-        <span className="sidebar-eyebrow">Workspace</span>
+        <span className="sidebar-eyebrow"><span>Sovereign operations</span><small>9 cores</small></span>
         <ul className="sidebar-group-list">
           {PRIMARY_NAV_ITEMS.map((item) => (
             <li key={item.id}>
@@ -56,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, daemon
       </nav>
 
       <div className="sidebar-footer">
-        <div className="sidebar-status"><span className={`status-dot status-${daemonStatus}`} /><span><strong>{statusLabel}</strong><small>Local, supervised agent</small></span></div>
+        <div className="sidebar-status"><span className={`status-dot status-${daemonStatus}`} /><span><strong>{statusLabel}</strong><small>Local, supervised runtime</small></span></div>
       </div>
     </aside>
   );

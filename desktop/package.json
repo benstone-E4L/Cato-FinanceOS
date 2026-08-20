@@ -12,6 +12,7 @@
     "test:chat-policy": "node --experimental-strip-types --test src/hooks/chatStreamPolicy.test.mjs",
     "test:no-green": "node --test scripts/no-green-palette.test.mjs",
     "test:work-inbox": "node --experimental-strip-types --test scripts/work-inbox-contract.test.mjs",
+    "test:work-inbox:browser": "python scripts/work_inbox_acceptance.py",
     "preview": "vite preview",
     "validate:frozen-sidecar": "python scripts/validate_frozen_bundle.py",
     "version:check": "python ../scripts/sync_version.py --check",

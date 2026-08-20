@@ -17,6 +17,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Sidebar, type View } from "./components/Sidebar";
+import { CommandTopbar } from "./components/CommandTopbar";
 import { InboxView } from "./views/InboxView";
 import type { ChatConnectionStatus } from "./hooks/useChatStream";
 import { WorkInboxView } from "./views/WorkInboxView";
@@ -231,11 +232,18 @@ function App() {
         )}
 
         {daemon.status === "ready" && (
-          <main className="app-main">
-            <ErrorBoundary>
-              {renderView(resolvedView, subTab, daemon, setView, setChatStatus)}
-            </ErrorBoundary>
-          </main>
+          <>
+            <CommandTopbar
+              activeView={resolvedView}
+              httpPort={daemon.httpPort}
+              onNavigate={setView}
+            />
+            <main className="app-main">
+              <ErrorBoundary>
+                {renderView(resolvedView, subTab, daemon, setView, setChatStatus)}
+              </ErrorBoundary>
+            </main>
+          </>
         )}
 
         {daemon.status === "error" && (

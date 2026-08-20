@@ -2,16 +2,9 @@
  * WorkInboxView — Cato's default landing page (CHUNK_6_WORK_INBOX, master
  * spec §10: "the Work Inbox IS the product").
  *
- * This chunk's scope is deliberately narrower than the full §10/Phase-F
- * acceptance test (see specs/06_CHUNK_6_WORK_INBOX.md's own Summary and
- * .ralph/guardrails.md's "Scope Exclusions — Do Not Build" /
- * "Surfaced conflict" note): it renders the fixed six card-state groups in
- * order, populated with whatever real data already exists in this repo
- * (pending Gmail draft approvals, FinanceOS status via Chunk 5's client),
- * and leaves groups with no real backing source honestly empty rather than
- * fabricating Gmail/Slack/Monday/Coordination-Ledger data that doesn't
- * exist here yet. That correlation work is Phase F's, in a separate,
- * out-of-scope workstream.
+ * It renders the six fixed card-state groups in order from real local data:
+ * pending Gmail draft approvals and the read-only FinanceOS control-room
+ * contract. Groups without an authoritative source remain explicitly empty.
  */
 import React, { useCallback, useEffect, useState } from "react";
 import type { View } from "../components/Sidebar";
@@ -44,8 +37,8 @@ function preview(text?: string | null, max = 140): string {
 }
 
 const GROUP_EMPTY_HINT: Record<WorkInboxGroupId, string> = {
-  needs_me: "No cross-system items need direct action yet — full correlation lands in a later phase.",
-  waiting: "No tracked follow-ups yet — the Coordination Ledger/waitpoints backend is a later phase.",
+  needs_me: "No sourced items need direct action.",
+  waiting: "No tracked follow-ups.",
   approvals: "Nothing waiting for your approval.",
   due_soon: "Nothing due soon.",
   fyi: "Nothing to summarize.",
@@ -93,12 +86,15 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
     waiting: [],
     approvals: drafts.map((d) => (
       <div className="work-inbox-card" key={`draft-${d.id}`}>
+        <span className="work-inbox-card-edge edge-gold" aria-hidden="true" />
+        <div className="work-inbox-card-body">
         <div className="work-inbox-card-header">
           <span className="work-inbox-card-title">{d.subject || "(no subject)"}</span>
           <span className="action-badge">Draft reply</span>
         </div>
         <div className="work-inbox-card-meta">{d.from_email || "Unknown sender"}</div>
         <div>{preview(d.snippet)}</div>
+        </div>
         <button className="btn-secondary-sm" onClick={() => onNavigate("approvals" as View)}>Review in Approvals →</button>
       </div>
     )),
@@ -106,6 +102,8 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
     fyi: finance
       ? [
           <div className="work-inbox-card" key="finance-card">
+            <span className={`work-inbox-card-edge ${isFinanceStale(finance) ? "edge-ember" : "edge-gold"}`} aria-hidden="true" />
+            <div className="work-inbox-card-body">
             <div className="work-inbox-card-header">
               <span className="work-inbox-card-title">FinanceOS status</span>
               {!isFinanceStale(finance) ? <span className="action-badge">Live</span> : <span className="work-inbox-card-stale">Stale</span>}
@@ -118,6 +116,7 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
             ) : (
               <div className="work-inbox-card-meta">FinanceOS is not connected yet.</div>
             )}
+            </div>
             <button className="btn-secondary-sm" onClick={() => onNavigate("finance" as View)}>Open Finance →</button>
           </div>,
         ]
@@ -128,7 +127,11 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
   return (
     <div className="page-view work-inbox-view">
       <div className="page-header">
-        <h1 className="page-title">Work Inbox</h1>
+        <div className="page-heading-copy">
+          <span className="page-kicker">Operator attention queue</span>
+          <h1 className="page-title">Work Inbox</h1>
+          <p>Verified items from Cato's connected local sources, grouped by decision state.</p>
+        </div>
         <div className="page-controls">
           <button className="btn-secondary" onClick={refresh}>Refresh</button>
         </div>
@@ -137,7 +140,7 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
       {error && <div className="page-error">{error}</div>}
 
       {WORK_INBOX_GROUPS.map((group) => (
-        <div className="work-inbox-group" key={group.id}>
+        <section className="work-inbox-group" key={group.id} data-work-inbox-group={group.id}>
           <div className="work-inbox-group-header">
             <span className="work-inbox-group-title">{group.label}</span>
             <span className="work-inbox-group-count">{groups[group.id].length}</span>
@@ -147,7 +150,7 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
           ) : (
             groups[group.id]
           )}
-        </div>
+        </section>
       ))}
     </div>
   );

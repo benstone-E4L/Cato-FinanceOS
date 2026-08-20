@@ -71,6 +71,9 @@ window.__TAURI_INTERNALS__ = {{
 </script>"""
         return web.Response(text=html.replace("<head>", f"<head>{shim}"), content_type="text/html")
 
+    async def favicon(_: web.Request) -> web.Response:
+        return web.Response(status=204)
+
     async def asset(request: web.Request) -> web.StreamResponse:
         relative = request.match_info["path"]
         target = (dist / "assets" / relative).resolve()
@@ -115,6 +118,7 @@ window.__TAURI_INTERNALS__ = {{
 
     outer = web.Application()
     outer.router.add_get("/", index)
+    outer.router.add_get("/favicon.ico", favicon)
     outer.router.add_get("/assets/{path:.*}", asset)
     outer.router.add_route("*", "/api/{path:.*}", proxy)
     outer.router.add_post("/acceptance/stop-finance", stop_finance)
