@@ -277,7 +277,7 @@ async def live_checks(
     add(checks, "encrypted_credential_storage", **storage)
 
     origin = f"http://127.0.0.1:{port}"
-    timeout = aiohttp.ClientTimeout(total=12)
+    timeout = aiohttp.ClientTimeout(total=30)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         status, health = await http_json(session, "GET", f"{origin}/health")
         if status != 200 or not isinstance(health, dict) or health.get("status") != "ok":
@@ -295,9 +295,11 @@ async def live_checks(
             raise AssertionError("Authenticated live inbox contract failed")
         add(checks, "valid_http_token_and_inbox", http_status=status, draft_count=len(inbox["email_drafts"]))
 
+        finance_started = time.monotonic()
         status, finance = await http_json(
             session, "GET", f"{origin}/api/finance-os/control-room", token=token
         )
+        finance_elapsed_ms = round((time.monotonic() - finance_started) * 1000)
         if status != 200 or not isinstance(finance, dict):
             raise AssertionError("Live FinanceOS control-room contract failed")
         if not isinstance(finance.get("connected"), bool) or not isinstance(finance.get("stale"), bool):
@@ -305,6 +307,8 @@ async def live_checks(
         if not finance["connected"]:
             if finance["stale"] is not True:
                 raise AssertionError("Disconnected FinanceOS state was not marked stale")
+        if finance_elapsed_ms > 6000:
+            raise AssertionError("Live FinanceOS fallback exceeded the desktop timeout budget")
         add(
             checks,
             "live_financeos_read_or_safe_fallback",
@@ -312,6 +316,7 @@ async def live_checks(
             connected=finance["connected"],
             stale=finance["stale"],
             cached_data_present=finance.get("data") is not None,
+            elapsed_ms=finance_elapsed_ms,
         )
 
         status, activity = await http_json(session, "GET", f"{origin}/api/activity")
@@ -416,7 +421,12 @@ def main() -> int:
         }
         exit_code = 0
     except Exception as exc:
-        payload = {"result": "FAIL", "error": str(exc), "checks": checks, "secret_values_recorded": False}
+        payload = {
+            "result": "FAIL",
+            "error": f"{type(exc).__name__}: {exc}",
+            "checks": checks,
+            "secret_values_recorded": False,
+        }
         exit_code = 1
 
     (output / "result.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
