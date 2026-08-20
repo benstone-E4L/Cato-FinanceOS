@@ -42,6 +42,21 @@ def _install_transport(monkeypatch: pytest.MonkeyPatch, responder):
 
 
 @pytest.mark.asyncio
+async def test_request_timeout_stays_inside_desktop_fallback_budget(monkeypatch):
+    observed_timeouts: list[float] = []
+
+    def responder(method, url, headers, body, timeout):
+        observed_timeouts.append(timeout)
+        return FinanceOSHttpResponse(status=200, body="{}")
+
+    _install_transport(monkeypatch, responder)
+    await server_module._fetch_finance_control_room()
+
+    assert observed_timeouts == [2.0, 2.0]
+    assert sum(observed_timeouts) < 6.0
+
+
+@pytest.mark.asyncio
 async def test_happy_path_live_data_renders_without_staleness_flag(monkeypatch):
     def responder(method, url, headers, body, timeout):
         if "integrations-health" in url:

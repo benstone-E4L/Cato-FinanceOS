@@ -117,6 +117,10 @@ async def _fetch_finance_os_health() -> dict[str, Any]:
 
 _FINANCE_CONTROL_ROOM_CACHE_NAMESPACE = "financeos"
 _FINANCE_CONTROL_ROOM_CACHE_KEY = "control_room"
+# Both read-only FinanceOS requests run sequentially. Keep their individual
+# network ceiling below the desktop's six-second route budget so an unavailable
+# local authority can reliably fall back to cached data before the UI aborts.
+_FINANCE_CONTROL_ROOM_REQUEST_TIMEOUT_SECONDS = 2.0
 
 
 def _finance_control_room_base_url() -> str:
@@ -155,7 +159,11 @@ async def _fetch_finance_control_room() -> dict[str, Any]:
         token = (get_vault().get("FINANCEOS_CAPABILITY_TOKEN") or "").strip() or None
     except Exception:
         token = None
-    client = FinanceOSClient(base_url, capability_token=token, timeout=4.0)
+    client = FinanceOSClient(
+        base_url,
+        capability_token=token,
+        timeout=_FINANCE_CONTROL_ROOM_REQUEST_TIMEOUT_SECONDS,
+    )
 
     def _fetch_sync() -> tuple[Any, Any]:
         control = client.request("GET", "/api/v1/control-room", mutating=False)
