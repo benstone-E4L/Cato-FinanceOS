@@ -158,8 +158,7 @@ Cato-2A/
 # Cato runtime identity files
 workspace_files/
 
-# Machine-specific launchers
-/Launch-CatoDesktop.ps1
+# The secure desktop launcher is tracked; only other machine-specific helpers stay ignored.
 install_autostart.py
 
 # Audit reports (judgment-call group)

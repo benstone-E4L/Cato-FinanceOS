@@ -81,11 +81,16 @@ def main() -> int:
         return 0
 
     try:
-        import PyInstaller  # noqa: F401
+        import PyInstaller
     except ImportError as exc:
         fail(
             "PyInstaller is required for release bundling. "
             "Install it first, for example with `python -m pip install pyinstaller`."
+        )
+    if PyInstaller.__version__ != "6.15.0":
+        fail(
+            "release custody requires PyInstaller 6.15.0 exactly; "
+            f"found {PyInstaller.__version__}. Install the pinned bundle dependencies."
         )
 
     cli_entry = repo_root / "cato" / "__main__.py"

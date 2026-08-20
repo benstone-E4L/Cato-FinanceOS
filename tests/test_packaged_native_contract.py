@@ -132,6 +132,17 @@ def test_legacy_service_installer_refuses_persistent_master_passwords():
     assert "Remove-ItemProperty" in installer
 
 
+def test_desktop_launcher_uses_only_a_transient_secure_password_handoff():
+    launcher = _source("Launch-CatoDesktop.ps1")
+
+    assert 'Read-Host "Cato vault master password" -AsSecureString' in launcher
+    assert "SecureStringToBSTR" in launcher
+    assert "ZeroFreeBSTR" in launcher
+    assert "Remove-Item Env:\\CATO_VAULT_PASSWORD" in launcher
+    assert ".env" not in launcher
+    assert "source_sha" in launcher
+
+
 def test_packaged_sidecar_uses_the_same_windows_profile_root_as_python():
     """Desktop port/token discovery must follow Python's APPDATA contract."""
     sidecar = _source("desktop/src-tauri/src/sidecar.rs")
