@@ -38,6 +38,7 @@ def main() -> int:
     native_path = desktop_dir / "src-tauri" / "src" / "lib.rs"
     sidecar_path = desktop_dir / "src-tauri" / "src" / "sidecar.rs"
     release_script_path = desktop_dir / "build_release.ps1"
+    version_script_path = repo_root / "scripts" / "sync_version.py"
     live_harness_path = repo_root / "live-tests" / "cato" / "run_live_e2e.py"
 
     package = json.loads((desktop_dir / "package.json").read_text(encoding="utf-8"))
@@ -91,6 +92,8 @@ def main() -> int:
     require("get_build_identity" in native, "native identity command is missing")
     require('.env("CATO_BUILD_SHA", super::NATIVE_BUILD_SHA)' in sidecar, "sidecar does not inherit native source SHA")
     require("write_build_manifest.py" in release_script, "local release omits custody manifest")
+    require(version_script_path.is_file(), "release version check script is missing")
+    require("sync_version.py --check" in release_script, "release build mutates or skips version custody")
     require("validate_build_manifest" in live_harness, "live acceptance omits manifest binding")
     require('health.get("source_sha") != expected_head' in live_harness, "live daemon is not bound to HEAD")
 

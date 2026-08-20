@@ -77,8 +77,7 @@ register_telegram_bridge_task.ps1
 start_telegram_bridge.ps1
 scripts/install_watchdog.ps1
 
-# Utility scripts (local dev only)
-scripts/sync_version.py
+# Version-custody tooling is tracked because release builds require it.
 # verify_python_build.py is tracked — required by Python Verify CI
 
 # Night-shift local session state (operator machine)

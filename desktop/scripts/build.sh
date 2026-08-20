@@ -20,8 +20,8 @@ echo "Mode: $MODE"
 echo "Desktop dir: $DESKTOP_DIR"
 echo ""
 
-echo "--- Syncing desktop manifests to the canonical Cato version ---"
-python "$REPO_ROOT/scripts/sync_version.py" --write
+echo "--- Checking desktop manifests against the canonical Cato version ---"
+python "$REPO_ROOT/scripts/sync_version.py" --check
 echo ""
 
 # ── Step 1: Freeze Python daemon (release only) ──

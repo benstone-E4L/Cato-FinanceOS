@@ -108,8 +108,8 @@ $env:VITE_CATO_BUILD_SHA = $sourceHead
 
 Write-Host "=== Cato Desktop Build ===" -ForegroundColor Cyan
 
-Write-Step "Syncing desktop manifests to the canonical Cato version..."
-python ..\scripts\sync_version.py --write
+Write-Step "Checking desktop manifests against the canonical Cato version..."
+python ..\scripts\sync_version.py --check
 if ($LASTEXITCODE -ne 0) {
     throw "version sync failed"
 }
