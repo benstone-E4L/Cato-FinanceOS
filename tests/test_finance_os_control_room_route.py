@@ -118,7 +118,10 @@ async def test_auth_failure_falls_back_to_stale_not_treated_as_no_data(monkeypat
 
 @pytest.mark.asyncio
 async def test_fully_unreachable_renders_stale_with_no_cache_and_no_crash(monkeypatch):
+    requested_urls: list[str] = []
+
     def unreachable_responder(method, url, headers, body, timeout):
+        requested_urls.append(url)
         return FinanceOSHttpResponse(status=0, body='{"error": "Connection refused"}')
 
     _install_transport(monkeypatch, unreachable_responder)
@@ -133,3 +136,5 @@ async def test_fully_unreachable_renders_stale_with_no_cache_and_no_crash(monkey
     assert payload["stale"] is True
     assert payload["data"] is None
     assert payload["cached_at"] is None
+    assert len(requested_urls) == 1
+    assert requested_urls[0].endswith("/api/v1/control-room")

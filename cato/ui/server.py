@@ -167,6 +167,11 @@ async def _fetch_finance_control_room() -> dict[str, Any]:
 
     def _fetch_sync() -> tuple[Any, Any]:
         control = client.request("GET", "/api/v1/control-room", mutating=False)
+        # A failed primary read is sufficient to select the stale-cache path.
+        # Do not spend a second network timeout probing supplemental health data
+        # that cannot make the combined live response usable.
+        if not control.ok:
+            return control, None
         health = client.request(
             "GET", "/api/v1/control-room/integrations-health", mutating=False
         )
@@ -177,7 +182,7 @@ async def _fetch_finance_control_room() -> dict[str, Any]:
 
     if not control_result.ok:
         raise RuntimeError(f"FinanceOS control-room returned HTTP {control_result.status}")
-    if not health_result.ok:
+    if health_result is None or not health_result.ok:
         raise RuntimeError(
             f"FinanceOS integrations-health returned HTTP {health_result.status}"
         )
