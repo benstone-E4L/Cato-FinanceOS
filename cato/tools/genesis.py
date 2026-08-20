@@ -75,20 +75,23 @@ GENESIS_AGENTS: dict[str, dict[str, Any]] = {
     "genesis-data-pipeline":      {"name": "Genesis Data Pipeline Agent","route": None, "price_usd": None, "status": "pending"},
     "genesis-workflow-automator": {"name": "Genesis Workflow Automator", "route": None, "price_usd": None, "status": "pending"},
     "genesis-ai-vision":          {"name": "Genesis AI Vision API",      "route": None, "price_usd": None, "status": "pending"},
-    "genesis-e4l-revenue":        {"name": "Genesis E4L Revenue",        "route": "/accounting/revenue", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-shopify":        {"name": "Genesis E4L Shopify",        "route": "/accounting/shopify", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-stripe":         {"name": "Genesis E4L Stripe",         "route": "/accounting/stripe", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-cash":           {"name": "Genesis E4L Cash",           "route": "/accounting/cash", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-ap":             {"name": "Genesis E4L AP",             "route": "/accounting/ap", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-ar":             {"name": "Genesis E4L AR",             "route": "/accounting/ar", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-cogs-cm":        {"name": "Genesis E4L COGS & CM",      "route": "/accounting/cogs-cm", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-commissions":    {"name": "Genesis E4L Commissions",    "route": "/accounting/commissions", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-intercompany":   {"name": "Genesis E4L Intercompany",   "route": "/accounting/intercompany", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-close":          {"name": "Genesis E4L Close",          "route": "/accounting/close", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-journals":       {"name": "Genesis E4L Journals",       "route": "/accounting/journals", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-fs-integrity":   {"name": "Genesis E4L FS Integrity",   "route": "/accounting/fs-integrity", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-controller":     {"name": "Genesis E4L Controller",     "route": "/accounting/controller", "price_usd": 200, "status": "deployed"},
-    "genesis-e4l-treasury":       {"name": "Genesis E4L Treasury",       "route": "/accounting/treasury", "price_usd": 200, "status": "deployed"},
+    # The public Genesis catalog currently proves deployment status for these
+    # slugs but publishes neither a route nor a price. Keep those unknowns null
+    # instead of inventing accounting endpoints or commercial terms.
+    "genesis-e4l-revenue":        {"name": "Genesis E4L Revenue",        "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-shopify":        {"name": "Genesis E4L Shopify",        "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-stripe":         {"name": "Genesis E4L Stripe",         "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-cash":           {"name": "Genesis E4L Cash",           "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-ap":             {"name": "Genesis E4L AP",             "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-ar":             {"name": "Genesis E4L AR",             "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-cogs-cm":        {"name": "Genesis E4L COGS & CM",      "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-commissions":    {"name": "Genesis E4L Commissions",    "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-intercompany":   {"name": "Genesis E4L Intercompany",   "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-close":          {"name": "Genesis E4L Close",          "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-journals":       {"name": "Genesis E4L Journals",       "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-fs-integrity":   {"name": "Genesis E4L FS Integrity",   "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-controller":     {"name": "Genesis E4L Controller",     "route": None, "price_usd": None, "status": "deployed"},
+    "genesis-e4l-treasury":       {"name": "Genesis E4L Treasury",       "route": None, "price_usd": None, "status": "deployed"},
 }
 
 AP2_ENVELOPE_VERSION = 1

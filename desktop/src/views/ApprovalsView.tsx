@@ -16,7 +16,6 @@
  * approvals happen and links to the separate loopback FinanceOS authority.
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { FINANCEOS_APPROVALS_URL } from "../workInboxContract";
 
 interface ApprovalsViewProps {
   httpPort: number;
@@ -46,19 +45,30 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({ httpPort }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [financeApprovalsUrl, setFinanceApprovalsUrl] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    const [inboxResult, financeResult] = await Promise.allSettled([
+        fetch(`${base}/api/inbox`),
+        fetch(`${base}/api/finance-os/control-room`, { signal: AbortSignal.timeout(6000) }),
+    ]);
     try {
-      const r = await fetch(`${base}/api/inbox`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const body = await r.json();
+      if (inboxResult.status === "rejected") throw inboxResult.reason;
+      const inboxResponse = inboxResult.value;
+      if (!inboxResponse.ok) throw new Error(`Inbox HTTP ${inboxResponse.status}`);
+      const body = await inboxResponse.json();
       setDrafts(Array.isArray(body?.email_drafts) ? body.email_drafts : []);
       setError(null);
     } catch (e) {
       setError(String(e));
-    } finally {
-      setLoading(false);
     }
+    if (financeResult.status === "fulfilled" && financeResult.value.ok) {
+      const financeBody = await financeResult.value.json() as { approval_url?: unknown };
+      setFinanceApprovalsUrl(
+        typeof financeBody.approval_url === "string" ? financeBody.approval_url : null,
+      );
+    }
+    setLoading(false);
   }, [base]);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -134,15 +144,19 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({ httpPort }) => {
           Cato never approves or writes to FinanceOS — that boundary is enforced at the client
           level, not just in this view. Finance approvals happen in FinanceOS/Airtable directly.
         </p>
-        <a
-          className="btn-secondary-sm external-approval-link"
-          href={FINANCEOS_APPROVALS_URL}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open FinanceOS approvals in a separate application"
-        >
-          Open FinanceOS approvals ↗
-        </a>
+        {financeApprovalsUrl ? (
+          <a
+            className="btn-secondary-sm external-approval-link"
+            href={financeApprovalsUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open FinanceOS approvals in a separate application"
+          >
+            Open FinanceOS approvals ↗
+          </a>
+        ) : (
+          <span className="empty-state">FinanceOS approval authority is unavailable.</span>
+        )}
       </div>
     </div>
   );

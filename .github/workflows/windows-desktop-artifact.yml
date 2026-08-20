@@ -18,6 +18,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       VITE_CATO_BUILD_SHA: ${{ github.sha }}
+      CATO_BUILD_SHA: ${{ github.sha }}
     steps:
       - name: Check out exact commit
         uses: actions/checkout@v4
@@ -56,6 +57,9 @@ jobs:
       - name: Build signed-independent NSIS installer
         working-directory: desktop
         run: npx tauri build --bundles nsis
+      - name: Write exact-HEAD custody manifest
+        working-directory: desktop
+        run: python scripts/write_build_manifest.py
       - name: Stage installer and checksums
         id: stage
         shell: pwsh

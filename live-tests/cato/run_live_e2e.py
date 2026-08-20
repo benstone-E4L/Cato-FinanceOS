@@ -27,6 +27,7 @@ import yaml
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 DEFAULT_EXE = REPO / "desktop" / "src-tauri" / "target" / "release" / "cato-desktop.exe"
+DEFAULT_MANIFEST = REPO / "desktop" / "src-tauri" / "target" / "release" / "cato-build-manifest.json"
 SECRET_NAME = re.compile(r"(?:api[_-]?key|token|password|secret|credential)", re.IGNORECASE)
 NON_SECRET_TOKEN_METADATA = {"token_budget", "context_budget_tokens", "max_output_tokens"}
 
@@ -48,6 +49,82 @@ def git(*args: str) -> str:
 
 def add(checks: list[dict[str, Any]], name: str, **evidence: Any) -> None:
     checks.append({"check": name, "result": "PASS", **evidence})
+
+
+def validate_repo_secret_sources() -> dict[str, Any]:
+    inspected = 0
+    violations: list[str] = []
+    for dotenv in [REPO / ".env", *REPO.glob(".env.*")]:
+        if not dotenv.is_file():
+            continue
+        inspected += 1
+        for raw_line in dotenv.read_text(encoding="utf-8-sig").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            name, value = line.split("=", 1)
+            if SECRET_NAME.search(name.strip()) and value.strip():
+                violations.append(f"{dotenv.name}:{name.strip()}")
+    if violations:
+        raise AssertionError(f"Repository dotenv contains nonempty secret fields: {sorted(violations)}")
+    return {"dotenv_files_inspected": inspected, "plaintext_secret_fields": 0}
+
+
+def validate_windows_service_secret_source() -> dict[str, Any]:
+    if os.name != "nt":
+        return {"windows_service_checked": False, "persisted_vault_password_fields": 0}
+    import winreg
+
+    try:
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Services\CatoDaemon",
+            0,
+            winreg.KEY_READ,
+        )
+    except FileNotFoundError:
+        return {"windows_service_checked": True, "persisted_vault_password_fields": 0}
+    try:
+        try:
+            environment, _ = winreg.QueryValueEx(key, "Environment")
+        except FileNotFoundError:
+            environment = []
+    finally:
+        winreg.CloseKey(key)
+    entries = [environment] if isinstance(environment, str) else list(environment or [])
+    count = sum(
+        1 for entry in entries
+        if str(entry).strip().upper().startswith("CATO_VAULT_PASSWORD=")
+    )
+    if count:
+        raise AssertionError("CatoDaemon registry persists the vault master password")
+    return {"windows_service_checked": True, "persisted_vault_password_fields": 0}
+
+
+def validate_build_manifest(manifest_path: Path, executable: Path, head: str) -> dict[str, Any]:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise AssertionError(f"Native custody manifest unavailable: {manifest_path}") from exc
+    if manifest.get("source_sha") != head:
+        raise AssertionError("Native custody manifest is not bound to current HEAD")
+    native = manifest.get("native") or {}
+    actual_native_sha = sha256_file(executable)
+    if native.get("sha256") != actual_native_sha or native.get("bytes") != executable.stat().st_size:
+        raise AssertionError("Native executable does not match the exact-HEAD custody manifest")
+    dist = manifest.get("dist")
+    if not isinstance(dist, dict) or not dist:
+        raise AssertionError("Custody manifest has no production-bundle hashes")
+    for relative, expected_sha in dist.items():
+        path = REPO / "desktop" / "dist" / str(relative)
+        if not path.is_file() or sha256_file(path) != expected_sha:
+            raise AssertionError(f"Production bundle differs from custody manifest: {relative}")
+    return {
+        "manifest": str(manifest_path),
+        "source_sha": head,
+        "native_sha256": actual_native_sha,
+        "dist_file_count": len(dist),
+    }
 
 
 def process_exists(pid: int) -> bool:
@@ -196,21 +273,28 @@ async def exercise_model(port: int, token: str, routing_db: Path) -> dict[str, A
                 raise AssertionError("Live model route returned an error frame")
             if message.get("type") == "response" and message.get("session_id") == session_id:
                 response = str(message.get("text", ""))
-                if "CATO_LIVE_OK" not in response:
-                    raise AssertionError("Live model response omitted the acceptance marker")
+                if response.strip() != "CATO_LIVE_OK":
+                    raise AssertionError("Live model response was not the exact acceptance marker")
                 with sqlite3.connect(routing_db) as connection:
-                    route_event = connection.execute(
+                    route_events = connection.execute(
                         """
                         SELECT provider, success, routed_model, status, actual_cost, content_chars
                         FROM routing_events
                         WHERE id > ?
-                        ORDER BY id DESC
-                        LIMIT 1
+                        ORDER BY id ASC
                         """,
                         (baseline_id,),
-                    ).fetchone()
-                if route_event is None:
+                    ).fetchall()
+                matching = [
+                    event for event in route_events
+                    if event[0] == "anthropic" and event[1] == 1 and event[3] == "ok"
+                    and int(event[5]) == len(response)
+                ]
+                if not matching:
                     raise AssertionError("Live model response has no new routing audit event")
+                if len(route_events) != 1 or len(matching) != 1:
+                    raise AssertionError("Live model routing receipt was not uniquely correlated")
+                route_event = matching[0]
                 provider, success, routed_model, status, actual_cost, content_chars = route_event
                 if provider != "anthropic" or success != 1 or status != "ok":
                     raise AssertionError("Live model routing audit did not prove Anthropic success")
@@ -269,6 +353,7 @@ async def live_checks(
     *,
     do_model: bool,
     launch_desktop: bool,
+    expected_head: str,
 ) -> None:
     port, pid, token = resolve_runtime(data_dir)
     add(checks, "operator_lifecycle_markers", port=port, pid=pid, token_length=len(token))
@@ -284,10 +369,21 @@ async def live_checks(
             raise AssertionError("Live daemon health contract failed")
         if health.get("ledger_recovery", {}).get("clean") is not True:
             raise AssertionError("Live daemon ledger recovery is not clean")
-        add(checks, "live_daemon_health", http_status=status, version=health.get("version"))
+        if health.get("source_sha") != expected_head:
+            raise AssertionError(
+                f"Running daemon source identity {health.get('source_sha')!r} does not match HEAD"
+            )
+        add(
+            checks,
+            "live_daemon_health",
+            http_status=status,
+            version=health.get("version"),
+            source_sha=health.get("source_sha"),
+        )
 
         status, _ = await http_json(session, "GET", f"{origin}/api/inbox", token="invalid")
-        assert status == 401, status
+        if status != 401:
+            raise AssertionError(f"Invalid HTTP token returned {status}, expected 401")
         add(checks, "invalid_http_token_refused", http_status=status)
 
         status, inbox = await http_json(session, "GET", f"{origin}/api/inbox", token=token)
@@ -341,6 +437,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=REPO / "output" / "live-cato")
     parser.add_argument("--data-dir", type=Path, default=Path(os.environ["APPDATA"]) / "cato")
     parser.add_argument("--desktop-exe", type=Path, default=DEFAULT_EXE)
+    parser.add_argument("--build-manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--exercise-model", action="store_true")
     parser.add_argument("--skip-work-inbox", action="store_true")
     parser.add_argument("--skip-desktop-launch", action="store_true")
@@ -360,15 +457,15 @@ def main() -> int:
             raise AssertionError("Exact-HEAD live acceptance requires a clean worktree")
         add(checks, "git_revision_binding", branch=branch, head=head, clean=not bool(dirty))
 
+        secret_source_evidence = validate_repo_secret_sources()
+        add(checks, "repository_plaintext_secret_gate", **secret_source_evidence)
+        service_secret_evidence = validate_windows_service_secret_source()
+        add(checks, "service_plaintext_secret_gate", **service_secret_evidence)
+
         if not executable.is_file() or executable.stat().st_size < 1024 * 1024:
             raise AssertionError(f"Native desktop executable is missing: {executable}")
-        add(
-            checks,
-            "native_artifact_custody",
-            executable=str(executable),
-            sha256=sha256_file(executable),
-            bytes=executable.stat().st_size,
-        )
+        custody = validate_build_manifest(args.build_manifest.resolve(), executable, head)
+        add(checks, "native_artifact_custody", executable=str(executable), **custody)
 
         if not args.skip_work_inbox:
             work_output = output / "work-inbox"
@@ -377,6 +474,8 @@ def main() -> int:
                     sys.executable,
                     str(REPO / "desktop" / "scripts" / "work_inbox_acceptance.py"),
                     "--skip-build",
+                    "--expected-head",
+                    head,
                     "--output",
                     str(work_output),
                 ],
@@ -388,7 +487,8 @@ def main() -> int:
             if completed.returncode != 0:
                 raise AssertionError("Rendered Work Inbox acceptance failed; inspect its result.json")
             work_result = json.loads((work_output / "result.json").read_text(encoding="utf-8"))
-            assert work_result.get("result") == "PASS", work_result
+            if work_result.get("result") != "PASS":
+                raise AssertionError(f"Work Inbox acceptance did not report PASS: {work_result}")
             add(
                 checks,
                 "complete_work_inbox_acceptance",
@@ -402,6 +502,7 @@ def main() -> int:
                 checks,
                 do_model=args.exercise_model,
                 launch_desktop=not args.skip_desktop_launch,
+                expected_head=head,
             )
         )
         post_head = git("rev-parse", "HEAD")

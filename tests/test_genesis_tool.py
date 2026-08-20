@@ -238,6 +238,12 @@ class TestRegistry:
                 assert meta.get("route") is None, f"pending {slug} has route"
                 assert meta.get("price_usd") is None, f"pending {slug} has price"
 
+    def test_e4l_catalog_unknown_route_and_price_are_not_invented(self):
+        for slug, meta in GENESIS_AGENTS.items():
+            if slug.startswith("genesis-e4l-"):
+                assert meta.get("route") is None, f"{slug} invented a route"
+                assert meta.get("price_usd") is None, f"{slug} invented a price"
+
     def test_list_agents_shape(self):
         agents = list_agents()
         assert isinstance(agents, list)

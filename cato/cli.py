@@ -401,6 +401,22 @@ def vault_delete(key: str) -> None:
     safe_print(f"Key '{key}' deleted from vault.")
 
 
+@vault_cmd.command("rekey")
+def vault_rekey() -> None:
+    """Rotate the vault master password without exposing credential values."""
+    vault_path = _CATO_DIR / "vault.enc"
+    if not vault_path.exists():
+        raise click.ClickException("Vault not initialised — run 'cato init' first.")
+    old_password = click.prompt("Current vault master password", hide_input=True)
+    new_password = click.prompt("New vault master password", hide_input=True, confirmation_prompt=True)
+    try:
+        Vault(vault_path=vault_path).rekey(old_password, new_password)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+    safe_print("Vault master password rotated; credential values were not displayed.")
+    safe_print("The temporary old-password recovery copy was removed after verification.")
+
+
 @vault_cmd.command("migrate-env")
 @click.option(
     "--env-file",

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from aiohttp.test_utils import AioHTTPTestCase
 
 from cato.ui.server import _redact_log_text, create_ui_app
@@ -18,6 +20,13 @@ class TestHeartbeatAuth(AioHTTPTestCase):
         assert resp.status == 200
         data = await resp.json()
         assert data["status"] == "ok"
+
+    async def test_health_exposes_immutable_full_source_identity(self):
+        response = await self.client.get("/health")
+        payload = await response.json()
+
+        assert response.status == 200
+        assert re.fullmatch(r"[0-9a-f]{40}", payload["source_sha"])
 
 
 def test_log_redaction_masks_obvious_secret_values():

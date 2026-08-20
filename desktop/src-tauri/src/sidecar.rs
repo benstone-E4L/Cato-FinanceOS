@@ -108,6 +108,9 @@ impl SidecarManager {
 
         let mut start_command =
             Self::sidecar_command(app)?.args(["start", "--channel", "webchat"]);
+        if super::NATIVE_BUILD_SHA != "development" {
+            start_command = start_command.env("CATO_BUILD_SHA", super::NATIVE_BUILD_SHA);
+        }
         if let Some(password) = vault_password {
             start_command = start_command.env("CATO_VAULT_PASSWORD", password);
         }

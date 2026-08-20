@@ -6,9 +6,64 @@ import json
 from types import SimpleNamespace
 
 import cato.agent_loop as agent_loop_mod
+from cato.anthropic_client import AnthropicAPIError, classify_status
 from cato.receipt import ReceiptWriter
 from cato.replay import ReplayEngine
 from tests.scheduler_gate_harness import build_scheduler_gate_env
+
+
+async def test_retry_exhaustion_never_escapes_direct_anthropic_policy(
+    tmp_path, monkeypatch,
+) -> None:
+    env = build_scheduler_gate_env(tmp_path, monkeypatch)
+    env.gateway._vault.set("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+    async def unavailable(*_args, **_kwargs):
+        raise AnthropicAPIError(classify_status(529), "test outage")
+
+    legacy_calls = 0
+
+    async def prohibited_legacy(*_args, **_kwargs):
+        nonlocal legacy_calls
+        legacy_calls += 1
+        return "unsafe fallback", []
+
+    monkeypatch.setattr(env.loop._router, "complete_message", unavailable)
+    monkeypatch.setattr(env.loop, "_stream_collect", prohibited_legacy)
+
+    final_text, _model, _agent = await env.loop.run(
+        "retry-fail-closed", "Return a short status", "cato",
+    )
+
+    assert "Anthropic API unavailable after bounded retries" in final_text
+    assert legacy_calls == 0
+
+
+async def test_unexpected_direct_failure_never_uses_legacy_transport(
+    tmp_path, monkeypatch,
+) -> None:
+    env = build_scheduler_gate_env(tmp_path, monkeypatch)
+    env.gateway._vault.set("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("unexpected")
+
+    legacy_calls = 0
+
+    async def prohibited_legacy(*_args, **_kwargs):
+        nonlocal legacy_calls
+        legacy_calls += 1
+        return "unsafe fallback", []
+
+    monkeypatch.setattr(env.loop._router, "complete_message", broken)
+    monkeypatch.setattr(env.loop, "_stream_collect", prohibited_legacy)
+
+    final_text, _model, _agent = await env.loop.run(
+        "unexpected-fail-closed", "Return a short status", "cato",
+    )
+
+    assert "Direct Anthropic routing failed" in final_text
+    assert legacy_calls == 0
 
 
 async def test_model_tool_call_produces_valid_audit_receipt_and_dry_replay(

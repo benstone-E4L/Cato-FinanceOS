@@ -33,7 +33,7 @@ export const AskE4LView: React.FC<AskE4LViewProps> = ({
   }, [initialTab]);
 
   return (
-    <div className="ask-e4l-view" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div className="ask-e4l-view" data-active-tab={tab} style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div className="tab-hub-strip" role="tablist" aria-label="Ask E4L" style={{ padding: "12px 24px 0" }}>
         <button role="tab" aria-selected={tab === "chat"} className={`tab-hub-tab${tab === "chat" ? " active" : ""}`} onClick={() => setTab("chat")}>
           Chat

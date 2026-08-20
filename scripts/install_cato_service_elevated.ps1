@@ -1,38 +1,37 @@
-# Run this from an ELEVATED PowerShell (Run as Administrator).
-# Installs CatoDaemon as a Windows service: delayed-auto start, auto-restart
-# on failure, depends on Tcpip, vault password stored only in the per-service
-# registry Environment value (never in a command line, argument, or tracked file).
+# Cato's encrypted vault requires an operator-supplied unlock secret for each
+# launch. A Windows service cannot prompt interactively, and persisting that
+# master password in .env or the service registry defeats the vault boundary.
+#
+# This legacy installer therefore fails closed. Use Launch-CatoDesktop.ps1 (or
+# a one-shot shell with CATO_VAULT_PASSWORD set only for that launch) until an
+# OS credential-broker implementation exists.
 
 $ErrorActionPreference = "Stop"
-$repo = "C:\Users\Work\Desktop\vault\projects\My Github\Cato"
-Set-Location $repo
 
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Error "Run this from an elevated (Administrator) PowerShell."
-    exit 1
+$regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\CatoDaemon"
+$hasPersistedSecret = $false
+if (Test-Path -LiteralPath $regPath) {
+    $serviceEnvironment = Get-ItemProperty `
+        -LiteralPath $regPath `
+        -Name Environment `
+        -ErrorAction SilentlyContinue
+    $hasPersistedSecret = $null -ne $serviceEnvironment.Environment
 }
 
-# Read CATO_VAULT_PASSWORD from .env without ever printing it.
-$envLine = Get-Content "$repo\.env" | Where-Object { $_ -match '^CATO_VAULT_PASSWORD=' }
-if (-not $envLine) { Write-Error "CATO_VAULT_PASSWORD not found in .env"; exit 1 }
-$pw = $envLine -replace '^CATO_VAULT_PASSWORD=', ''
-$env:CATO_VAULT_PASSWORD = $pw
+$message = @"
+Cato service installation is disabled because SCM startup cannot securely
+prompt for the encrypted-vault password. Use the desktop launcher instead.
+"@
+if ($hasPersistedSecret) {
+    $message += @"
 
-python cato_service.py install
-sc.exe config CatoDaemon start= delayed-auto
-sc.exe config CatoDaemon depend= Tcpip
-sc.exe failure CatoDaemon reset= 86400 actions= restart/5000/restart/5000/restart/30000
+SECURITY ACTION REQUIRED: an older CatoDaemon installation still has a
+persisted Environment value. From an elevated PowerShell, run:
+  Remove-ItemProperty -LiteralPath '$regPath' -Name Environment
+  Set-Service -Name CatoDaemon -StartupType Manual
+Then rotate the Cato vault master password.
+"@
+}
 
-# Store the vault password ONLY in the per-service registry Environment value
-# (HKLM, admin-only) — this is how SCM-launched processes receive it; it is
-# not a tracked file and not a command-line argument.
-New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\CatoDaemon" `
-    -Name "Environment" -PropertyType MultiString `
-    -Value @("CATO_VAULT_PASSWORD=$pw") -Force | Out-Null
-
-Remove-Item Env:\CATO_VAULT_PASSWORD
-$pw = $null
-
-Write-Output "Installed. Stop the manually-running daemon first (python -m cato stop), then:"
-Write-Output "  sc.exe start CatoDaemon"
-Write-Output "Verify: curl http://127.0.0.1:8080/health"
+Write-Error $message
+exit 1

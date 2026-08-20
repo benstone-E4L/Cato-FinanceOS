@@ -75,6 +75,3 @@ export type WorkInboxGroupId = (typeof WORK_INBOX_GROUPS)[number]["id"];
 export function isFinanceStale(payload: { connected: boolean; stale: boolean }): boolean {
   return payload.stale || !payload.connected;
 }
-
-// FinanceOS is a separate local authority. This link never performs an action in Cato.
-export const FINANCEOS_APPROVALS_URL = "http://127.0.0.1:3001";

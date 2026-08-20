@@ -61,7 +61,7 @@ export const TabHub: React.FC<TabHubProps> = ({ tabs, initialTabId, title, subti
           </button>
         ))}
       </div>
-      <div className="tab-hub-panel" role="tabpanel">
+      <div className="tab-hub-panel" role="tabpanel" data-active-tab={active?.id ?? ""}>
         {active?.render()}
       </div>
     </div>

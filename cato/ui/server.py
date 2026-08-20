@@ -131,6 +131,14 @@ def _finance_control_room_base_url() -> str:
     ).rstrip("/")
 
 
+def _finance_approval_url() -> str | None:
+    base_url = _finance_control_room_base_url()
+    parsed = urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in _LOCAL_REMOTES:
+        return None
+    return base_url
+
+
 async def _fetch_finance_control_room() -> dict[str, Any]:
     """GET FinanceOS's control-room + integrations-health endpoints, read-only.
 
@@ -165,7 +173,7 @@ async def _fetch_finance_control_room() -> dict[str, Any]:
         timeout=_FINANCE_CONTROL_ROOM_REQUEST_TIMEOUT_SECONDS,
     )
 
-    def _fetch_sync() -> tuple[Any, Any]:
+    def _fetch_sync() -> tuple[Any, Any | None]:
         control = client.request("GET", "/api/v1/control-room", mutating=False)
         # A failed primary read is sufficient to select the stale-cache path.
         # Do not spend a second network timeout probing supplemental health data
@@ -183,8 +191,9 @@ async def _fetch_finance_control_room() -> dict[str, Any]:
     if not control_result.ok:
         raise RuntimeError(f"FinanceOS control-room returned HTTP {control_result.status}")
     if health_result is None or not health_result.ok:
+        status = getattr(health_result, "status", "unavailable")
         raise RuntimeError(
-            f"FinanceOS integrations-health returned HTTP {health_result.status}"
+            f"FinanceOS integrations-health returned HTTP {status}"
         )
 
     control_data = control_result.parsed if isinstance(control_result.parsed, dict) else {}
@@ -222,12 +231,19 @@ async def _finance_control_room_payload() -> dict[str, Any]:
         except Exception:
             cached = None
         if cached is None:
-            return {"connected": False, "stale": True, "data": None, "cached_at": None}
+            return {
+                "connected": False,
+                "stale": True,
+                "data": None,
+                "cached_at": None,
+                "approval_url": _finance_approval_url(),
+            }
         return {
             "connected": False,
             "stale": True,
             "data": cached.get("value"),
             "cached_at": cached.get("cached_at"),
+            "approval_url": _finance_approval_url(),
         }
 
     loop = asyncio.get_running_loop()
@@ -240,7 +256,13 @@ async def _finance_control_room_payload() -> dict[str, Any]:
         )
     except Exception:
         logger.warning("Failed to cache FinanceOS control-room response", exc_info=True)
-    return {"connected": True, "stale": False, "data": data, "cached_at": None}
+    return {
+        "connected": True,
+        "stale": False,
+        "data": data,
+        "cached_at": None,
+        "approval_url": _finance_approval_url(),
+    }
 
 
 # Workspace identity files live here
@@ -257,7 +279,6 @@ def _workspace_dir() -> Path:
     except Exception:
         pass
     # Fallback: ~/.cato/workspace (mirrors config default)
-    from cato.platform import get_data_dir
     from cato.platform import get_data_dir
     fallback = get_data_dir() / "workspace"
     fallback.mkdir(parents=True, exist_ok=True)
@@ -928,6 +949,7 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
     async def health(request: web.Request) -> web.Response:
         """Return JSON health payload consumed by the UI health pill."""
         from cato import __version__
+        from cato.runtime_identity import runtime_source_sha
         sessions = len(gateway._lanes) if gateway is not None else 0
         uptime   = int(time.monotonic() - _START_TIME)
         mcp_runtime = request.app.get(_MCP_RUNTIME_KEY)
@@ -968,6 +990,7 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
         return web.json_response({
             "status":           "ok" if recovery_ok else "degraded",
             "version":          __version__,
+            "source_sha":       runtime_source_sha(),
             "sessions":         sessions,
             "uptime":           uptime,
             "ledger_recovery":  ledger_recovery,

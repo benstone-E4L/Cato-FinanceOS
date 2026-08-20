@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import json
 from pathlib import Path
 
 
@@ -93,6 +94,12 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="cato-pyinstaller-") as tmpdir:
         tmp = Path(tmpdir)
+        source_sha = os.environ.get("CATO_BUILD_SHA", "").strip().lower()
+        if len(source_sha) != 40 or any(ch not in "0123456789abcdef" for ch in source_sha):
+            fail("CATO_BUILD_SHA must be a full commit SHA for a release sidecar")
+        identity_path = tmp / "cato_build_identity.json"
+        identity_path.write_text(json.dumps({"source_sha": source_sha}), encoding="utf-8")
+        data_separator = ";" if sys.platform.startswith("win") else ":"
         cmd = [
             sys.executable,
             "-m",
@@ -102,6 +109,8 @@ def main() -> int:
             "--onefile",
             "--name",
             output_path.stem,
+            "--add-data",
+            f"{identity_path}{data_separator}.",
             "--distpath",
             str(binaries_dir),
             "--workpath",

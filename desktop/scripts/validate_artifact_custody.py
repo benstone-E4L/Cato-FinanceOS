@@ -35,6 +35,10 @@ def main() -> int:
     workflow_path = repo_root / ".github" / "workflows" / "windows-desktop-artifact.yml"
     identity_path = desktop_dir / "src" / "lib" / "buildIdentity.ts"
     diagnostics_path = desktop_dir / "src" / "views" / "DiagnosticsView.tsx"
+    native_path = desktop_dir / "src-tauri" / "src" / "lib.rs"
+    sidecar_path = desktop_dir / "src-tauri" / "src" / "sidecar.rs"
+    release_script_path = desktop_dir / "build_release.ps1"
+    live_harness_path = repo_root / "live-tests" / "cato" / "run_live_e2e.py"
 
     package = json.loads((desktop_dir / "package.json").read_text(encoding="utf-8"))
     tauri = json.loads((desktop_dir / "src-tauri" / "tauri.conf.json").read_text(encoding="utf-8"))
@@ -60,6 +64,7 @@ def main() -> int:
         "e4l-runtime-hardening",
         'python -m pip install ".[dev,bundle]"',
         "VITE_CATO_BUILD_SHA: ${{ github.sha }}",
+        "CATO_BUILD_SHA: ${{ github.sha }}",
         "VITE_CATO_BUILD_VERSION=$version",
         "npx tauri build --bundles nsis",
         "Get-FileHash -Algorithm SHA256",
@@ -75,6 +80,19 @@ def main() -> int:
     require("VITE_CATO_BUILD_SHA" in identity, "runtime SHA is not embedded")
     diagnostics = diagnostics_path.read_text(encoding="utf-8")
     require("BUILD_IDENTITY_LABEL" in diagnostics, "Diagnostics does not expose build identity")
+    require("get_build_identity" in diagnostics, "Diagnostics does not read native build identity")
+    require("Frontend/native build identity mismatch" in diagnostics, "identity mismatch is not fail-visible")
+
+    native = native_path.read_text(encoding="utf-8")
+    sidecar = sidecar_path.read_text(encoding="utf-8")
+    release_script = release_script_path.read_text(encoding="utf-8")
+    live_harness = live_harness_path.read_text(encoding="utf-8")
+    require('option_env!("CATO_BUILD_SHA")' in native, "native binary does not embed source SHA")
+    require("get_build_identity" in native, "native identity command is missing")
+    require('.env("CATO_BUILD_SHA", super::NATIVE_BUILD_SHA)' in sidecar, "sidecar does not inherit native source SHA")
+    require("write_build_manifest.py" in release_script, "local release omits custody manifest")
+    require("validate_build_manifest" in live_harness, "live acceptance omits manifest binding")
+    require('health.get("source_sha") != expected_head' in live_harness, "live daemon is not bound to HEAD")
 
     print(f"[artifact-custody] PASS: Windows artifact workflow, version {package['version']}, and runtime SHA surface validated")
     return 0

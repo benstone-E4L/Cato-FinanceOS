@@ -2152,9 +2152,11 @@ class AgentLoop:
 
                 force = planning_turns >= self._cfg.max_planning_turns
 
-                # Route every turn through the deterministic policy and call
-                # Anthropic directly.  Falls back to _stream_collect only when
-                # the direct path is unavailable or returns nothing usable.
+                # Route every production turn through the deterministic policy
+                # and call Anthropic directly.  The legacy stream path remains
+                # available only for explicit non-production/test callers that
+                # disable ``use_direct``; a direct-call failure must fail closed
+                # instead of escaping into another provider.
                 text = ""
                 tool_calls: list[ToolCall] = []
                 used_direct = False
@@ -2227,21 +2229,31 @@ class AgentLoop:
                             tool_calls = []
                             used_direct = True
                         except AnthropicAPIError as exc:
-                            if exc.classified.retry_class is RetryClass.NOT_RETRYABLE:
-                                logger.error("Anthropic rejected turn %d: %s", planning_turns, exc)
-                                text = f"⚠️ Anthropic API error ({exc.classified.error_type}). See daemon log."
-                                tool_calls = []
-                                used_direct = True
-                            else:
-                                logger.warning(
-                                    "Anthropic turn %d exhausted retries: %s — falling back to _stream_collect",
-                                    planning_turns, exc,
-                                )
+                            retry_note = (
+                                " after bounded retries"
+                                if exc.classified.retry_class is not RetryClass.NOT_RETRYABLE
+                                else ""
+                            )
+                            logger.error(
+                                "Anthropic turn %d failed%s: %s",
+                                planning_turns,
+                                retry_note,
+                                exc,
+                            )
+                            text = (
+                                f"⚠️ Anthropic API unavailable{retry_note} "
+                                f"({exc.classified.error_type}). See daemon log."
+                            )
+                            tool_calls = []
+                            used_direct = True
                         except Exception as exc:
-                            logger.warning(
-                                "Direct Anthropic turn %d failed: %s — falling back to _stream_collect",
+                            logger.exception(
+                                "Direct Anthropic turn %d failed closed: %s",
                                 planning_turns, exc,
                             )
+                            text = "⚠️ Direct Anthropic routing failed. See daemon log."
+                            tool_calls = []
+                            used_direct = True
 
                     if not used_direct:
                         logger.info("Using _stream_collect (turn=%d, direct=%s)", planning_turns, use_direct)

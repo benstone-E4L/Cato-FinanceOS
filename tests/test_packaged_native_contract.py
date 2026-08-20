@@ -123,6 +123,15 @@ def test_packaged_sidecar_never_reads_plaintext_env_files():
     assert "dotenv" not in sidecar.lower()
 
 
+def test_legacy_service_installer_refuses_persistent_master_passwords():
+    installer = _source("scripts/install_cato_service_elevated.ps1")
+
+    assert 'Get-Content "$repo\\.env"' not in installer
+    assert 'New-ItemProperty' not in installer
+    assert "service installation is disabled" in installer.lower()
+    assert "Remove-ItemProperty" in installer
+
+
 def test_packaged_sidecar_uses_the_same_windows_profile_root_as_python():
     """Desktop port/token discovery must follow Python's APPDATA contract."""
     sidecar = _source("desktop/src-tauri/src/sidecar.rs")

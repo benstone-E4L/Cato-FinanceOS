@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   DEFAULT_VIEW,
-  FINANCEOS_APPROVALS_URL,
   LEGACY_VIEW_REDIRECT,
   PRIMARY_NAV_ITEMS,
   WORK_INBOX_GROUPS,
@@ -12,6 +11,7 @@ import {
 } from "../src/workInboxContract.ts";
 
 const app = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
+const fetchAuth = await readFile(new URL("../src/lib/catoFetchAuth.ts", import.meta.url), "utf8");
 const sidebar = await readFile(new URL("../src/components/Sidebar.tsx", import.meta.url), "utf8");
 const inbox = await readFile(new URL("../src/views/WorkInboxView.tsx", import.meta.url), "utf8");
 const approvals = await readFile(new URL("../src/views/ApprovalsView.tsx", import.meta.url), "utf8");
@@ -76,8 +76,21 @@ test("FinanceOS stale payloads are visibly stale even if connected is true", () 
 
 test("approval destinations separate local and external authority", () => {
   assert.match(inbox, /onNavigate\("approvals"/);
-  assert.equal(FINANCEOS_APPROVALS_URL, "http://127.0.0.1:3001");
-  assert.match(approvals, /href=\{FINANCEOS_APPROVALS_URL\}/);
+  assert.match(approvals, /href=\{financeApprovalsUrl\}/);
+  assert.match(approvals, /api\/finance-os\/control-room/);
   assert.match(approvals, /target="_blank"/);
   assert.doesNotMatch(approvals, /finance[^\n]{0,80}(approve|dismiss)/i);
+});
+
+test("daemon token is scoped to the exact Cato origin", () => {
+  assert.match(app, /installCatoFetchAuth\(status\.daemon_token \?\? undefined, status\.http_port\)/);
+  assert.match(fetchAuth, /new URL\(rawUrl, pageUrl\)\.origin === daemonOrigin/);
+  assert.match(fetchAuth, /`http:\/\/127\.0\.0\.1:\$\{daemonPort\}`/);
+  assert.doesNotMatch(fetchAuth, /rawUrl\.startsWith\("http:\/\/127\.0\.0\.1:"\)/);
+});
+
+test("Work Inbox preserves prior Finance state when Cato route fails", () => {
+  assert.match(inbox, /if \(financeResult\.status === "fulfilled"\)/);
+  assert.match(inbox, /preserving the last-known FinanceOS card/);
+  assert.doesNotMatch(inbox, /setFinance\(financeResult\.status === "fulfilled"[^\n]+: null\)/);
 });

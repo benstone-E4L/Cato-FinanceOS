@@ -30,6 +30,7 @@ fn ensure_sidecar_placeholder() {
 }
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=CATO_BUILD_SHA");
     ensure_sidecar_placeholder();
     tauri_build::build()
 }

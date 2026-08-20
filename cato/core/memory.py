@@ -26,6 +26,7 @@ import numpy as np
 from rank_bm25 import BM25Okapi
 
 if TYPE_CHECKING:
+    from .distiller import DistillationResult
     from sentence_transformers import SentenceTransformer
 
 from ..platform import get_data_dir
@@ -199,6 +200,7 @@ class MemorySystem:
 
         # Lazy-load sentence transformer (heavy — only once per process)
         self._embed_model: Optional[SentenceTransformer] = None
+        self._embedding_unavailable = False
 
         # ANN index (hnswlib) — built lazily when chunk count > ANN_THRESHOLD
         self._ann_index: Optional[object] = None
@@ -222,6 +224,8 @@ class MemorySystem:
         """
         if self._embed_model is not None:
             return self._embed_model
+        if self._embedding_unavailable:
+            return None
 
         # Importing sentence-transformers initializes its full ML dependency
         # stack. Keep that cost on the semantic-search path; lightweight state
@@ -230,6 +234,7 @@ class MemorySystem:
             from sentence_transformers import SentenceTransformer
         except Exception as exc:  # noqa: BLE001
             logger.warning("Embedding dependency unavailable: %s", exc)
+            self._embedding_unavailable = True
             return None
 
         # --- resolve a Windows-safe cache directory ---------------------------
@@ -276,6 +281,7 @@ class MemorySystem:
             _MAX_ATTEMPTS, _MODEL_NAME, last_exc,
         )
         self._embed_model = None
+        self._embedding_unavailable = True
         return None
 
     # ------------------------------------------------------------------
@@ -887,9 +893,6 @@ class MemorySystem:
 
         Returns the SQLite rowid of the inserted row.
         """
-        # Import here to avoid circular dependency with distiller module
-        from .distiller import DistillationResult  # noqa: F401
-
         key_facts_json = json.dumps(result.key_facts)
         decisions_json = json.dumps(result.decisions)
         open_questions_json = json.dumps(result.open_questions)

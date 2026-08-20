@@ -528,6 +528,48 @@ class Vault:
         self._data = json.loads(plaintext.decode("utf-8"))
         self._loaded_key_count = len(self._data)
 
+    def rekey(self, old_password: str, new_password: str) -> None:
+        """Atomically re-encrypt an existing vault under a new master password.
+
+        The old vault is backed up before replacement and the new ciphertext is
+        verified before it becomes authoritative. Password values are never
+        written separately or logged.
+        """
+        if not self._path.exists():
+            raise VaultError(f"No vault found at {self._path}.")
+        if len(new_password) < 12:
+            raise VaultError("New vault password must be at least 12 characters.")
+        self.unlock(old_password, allow_create=False)
+        assert self._data is not None and self._key is not None
+        old_key = self._key
+        new_salt = secrets.token_bytes(_SALT_SIZE)
+        self._key = _derive_key(new_password, new_salt)
+        try:
+            self._save(new_salt)
+        except Exception:
+            self._key = old_key
+            raise
+        backup = self._path.with_name(f"{self._path.name}.lkg.bak")
+        try:
+            verifier = Vault(self._path)
+            verifier.unlock(new_password, allow_create=False)
+            if verifier.stored_mapping() != {
+                key: str(value)
+                for key, value in self._data.items()
+                if key != CANARY_KEY_NAME and value is not None and str(value).strip()
+            }:
+                raise VaultError("Rotated vault verification found a data mismatch.")
+        except Exception:
+            if backup.exists():
+                os.replace(backup, self._path)
+            self._key = old_key
+            raise
+        # This rolling backup is encrypted with the compromised old password.
+        # Once the replacement is independently verified it must not persist.
+        backup.unlink(missing_ok=True)
+        global _CACHED_VAULT_PASSWORD
+        _CACHED_VAULT_PASSWORD = new_password
+
 
 # ---------------------------------------------------------------------------
 # Module-level singleton

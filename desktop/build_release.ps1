@@ -95,6 +95,17 @@ $desktopDir = $PSScriptRoot
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $desktopDir "..")).Path
 Set-Location $desktopDir
 
+$sourceHead = (& git -C $repoRoot rev-parse HEAD).Trim().ToLowerInvariant()
+if ($LASTEXITCODE -ne 0 -or $sourceHead -notmatch "^[0-9a-f]{40}$") {
+    throw "Unable to resolve a full source HEAD for artifact custody."
+}
+$dirty = & git -C $repoRoot status --porcelain
+if ($dirty) {
+    throw "Exact-HEAD release builds require a clean worktree."
+}
+$env:CATO_BUILD_SHA = $sourceHead
+$env:VITE_CATO_BUILD_SHA = $sourceHead
+
 Write-Host "=== Cato Desktop Build ===" -ForegroundColor Cyan
 
 Write-Step "Syncing desktop manifests to the canonical Cato version..."
@@ -128,6 +139,11 @@ Write-Step "Building Tauri app..."
 npx tauri build
 if ($LASTEXITCODE -ne 0) {
     throw "tauri build failed"
+}
+
+python scripts\write_build_manifest.py
+if ($LASTEXITCODE -ne 0) {
+    throw "build custody manifest failed"
 }
 
 Write-Host "`n=== Build Complete ===" -ForegroundColor Green

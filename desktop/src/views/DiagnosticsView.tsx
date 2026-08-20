@@ -5,6 +5,7 @@
  * Each tab fetches its endpoint on first activation (lazy load).
  */
 import React, { useState, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { sendChatSocketPayload } from "../lib/chatTransport";
 import { BUILD_IDENTITY, BUILD_IDENTITY_LABEL } from "../lib/buildIdentity";
 
@@ -1071,6 +1072,16 @@ export function DiagnosticsView({ httpPort, wsPort, daemonToken }: DiagnosticsVi
   const [activeTab, setActiveTab] = useState<TabId>("swarmsync");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [nativeBuildSha, setNativeBuildSha] = useState<string>("unavailable");
+
+  React.useEffect(() => {
+    void invoke<{ source_sha: string }>("get_build_identity")
+      .then((identity) => setNativeBuildSha(identity.source_sha || "unavailable"))
+      .catch(() => setNativeBuildSha("unavailable"));
+  }, []);
+
+  const buildMismatch = BUILD_IDENTITY.sha !== "development" &&
+    nativeBuildSha !== "unavailable" && nativeBuildSha !== BUILD_IDENTITY.sha;
 
   const exportDiagnostics = async () => {
     setExporting(true);
@@ -1117,6 +1128,13 @@ export function DiagnosticsView({ httpPort, wsPort, daemonToken }: DiagnosticsVi
           >
             Build {BUILD_IDENTITY_LABEL}
           </div>
+          <div
+            aria-label="Native build identity"
+            style={{ color: buildMismatch ? "#fca5a5" : "var(--text-secondary, #aaa)", fontSize: "0.75rem", marginTop: "0.2rem" }}
+          >
+            Native {nativeBuildSha === "unavailable" ? "unavailable" : nativeBuildSha.slice(0, 8)}
+          </div>
+          {buildMismatch && <div className="page-error" role="alert">Frontend/native build identity mismatch.</div>}
         </div>
         <button className="btn-secondary" onClick={exportDiagnostics} disabled={exporting}>
           {exporting ? "Exporting..." : "Export Diagnostics"}

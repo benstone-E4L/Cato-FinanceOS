@@ -28,6 +28,7 @@ interface ControlRoomPayload {
   stale: boolean;
   data: { control_room?: Record<string, unknown>; integrations_health?: Record<string, unknown> } | null;
   cached_at: string | null;
+  approval_url: string | null;
 }
 
 function preview(text?: string | null, max = 140): string {
@@ -51,6 +52,7 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
   const [finance, setFinance] = useState<ControlRoomPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [financeError, setFinanceError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const [inboxResult, financeResult] = await Promise.allSettled([
@@ -69,7 +71,14 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
     } else {
       setError(String(inboxResult.reason));
     }
-    setFinance(financeResult.status === "fulfilled" ? (financeResult.value as ControlRoomPayload) : null);
+    if (financeResult.status === "fulfilled") {
+      setFinance(financeResult.value as ControlRoomPayload);
+      setFinanceError(null);
+    } else {
+      // Preserve the last known card. A Cato-route failure is materially
+      // different from FinanceOS's explicit stale payload and must be visible.
+      setFinanceError(String(financeResult.reason));
+    }
     setLoading(false);
   }, [base]);
 
@@ -130,7 +139,7 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
         <div className="page-heading-copy">
           <span className="page-kicker">Operator attention queue</span>
           <h1 className="page-title">Work Inbox</h1>
-          <p>Verified items from Cato's connected local sources, grouped by decision state.</p>
+          <p>Verified items from Cato's available local sources, grouped by decision state.</p>
         </div>
         <div className="page-controls">
           <button className="btn-secondary" onClick={refresh}>Refresh</button>
@@ -138,6 +147,11 @@ export const WorkInboxView: React.FC<WorkInboxViewProps> = ({ httpPort, onNaviga
       </div>
 
       {error && <div className="page-error">{error}</div>}
+      {financeError && (
+        <div className="page-error" role="status">
+          Cato Finance route unavailable; preserving the last-known FinanceOS card: {financeError}
+        </div>
+      )}
 
       {WORK_INBOX_GROUPS.map((group) => (
         <section className="work-inbox-group" key={group.id} data-work-inbox-group={group.id}>

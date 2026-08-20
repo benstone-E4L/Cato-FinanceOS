@@ -28,6 +28,25 @@ struct DaemonStatus {
     daemon_token: Option<String>,
 }
 
+#[derive(Clone, Serialize)]
+struct NativeBuildIdentity {
+    source_sha: &'static str,
+    version: &'static str,
+}
+
+pub(crate) const NATIVE_BUILD_SHA: &str = match option_env!("CATO_BUILD_SHA") {
+    Some(value) => value,
+    None => "development",
+};
+
+#[tauri::command]
+fn get_build_identity() -> NativeBuildIdentity {
+    NativeBuildIdentity {
+        source_sha: NATIVE_BUILD_SHA,
+        version: env!("CARGO_PKG_VERSION"),
+    }
+}
+
 /// Tauri command: get daemon status
 #[tauri::command]
 async fn get_daemon_status(state: tauri::State<'_, AppState>) -> Result<DaemonStatus, String> {
@@ -72,6 +91,7 @@ pub fn run() {
         // ── Commands ──
         .invoke_handler(tauri::generate_handler![
             get_daemon_status,
+            get_build_identity,
             restart_daemon,
         ])
         // ── Setup ──

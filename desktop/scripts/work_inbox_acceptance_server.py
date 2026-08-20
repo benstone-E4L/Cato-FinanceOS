@@ -65,6 +65,9 @@ window.__TAURI_INTERNALS__ = {{
     if (command === 'get_daemon_status') return {{
       running: true, http_port: {outer_port}, ws_port: {outer_port}, daemon_token: null
     }};
+    if (command === 'get_build_identity') return {{
+      source_sha: '{os.environ.get("CATO_EXPECTED_BUILD_SHA", "development")}', version: 'acceptance'
+    }};
     throw new Error('Unsupported acceptance command: ' + command);
   }}
 }};
@@ -113,6 +116,7 @@ window.__TAURI_INTERNALS__ = {{
                 "cato_port": cato_port,
                 "finance_route_status": finance_route_status,
                 "browser_finance_path": "registered_production_route",
+                "approval_url": f"http://127.0.0.1:{finance_port}",
             }
         )
 
