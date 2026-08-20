@@ -351,7 +351,11 @@ def main() -> int:
                 raise AssertionError("Rendered Work Inbox acceptance failed; inspect its result.json")
             work_result = json.loads((work_output / "result.json").read_text(encoding="utf-8"))
             assert work_result.get("result") == "PASS", work_result
-            add(checks, "complete_work_inbox_acceptance", checks=len(work_result.get("checks", [])))
+            add(
+                checks,
+                "complete_work_inbox_acceptance",
+                assertions=len(work_result.get("checks", [])),
+            )
 
         asyncio.run(
             live_checks(
