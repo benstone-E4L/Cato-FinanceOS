@@ -364,10 +364,10 @@ Read the error before assuming provider trouble.
 
 1. Rate limiting is the provider's, not Cato's. There is no local rate limiter to
    tune. Wait it out.
-2. Confirm `ANTHROPIC_API_KEY` is actually visible to the process. `cato start`
-   loads `.env` **from the current working directory** (`cato/cli.py:483-492`).
-   Started from the wrong directory, the daemon has no key and the failure looks
-   like an outage. This is a common self-inflicted version of this incident.
+2. Confirm the encrypted vault contains `ANTHROPIC_API_KEY` by key name only.
+   Production launch never reads repository `.env`; `Launch-CatoDesktop.ps1`
+   unlocks `%APPDATA%\cato\vault.enc` through the current user's DPAPI-protected
+   password handoff. Check the daemon's `[model-route]` error type, never the key value.
 3. Check spend before blaming the provider — a budget stop looks similar from the
    outside:
    ```
@@ -560,10 +560,11 @@ If you need to point at a different policy file, set `CATO_APPROVAL_POLICY`
 
 ### If the vault password is wrong
 
-You will find out when the vault fails to open. Note the current state: **no
-`vault.enc` exists anywhere**, so there is nothing to unlock, and
-`CATO_VAULT_PASSWORD`'s live value is published in two git-tracked files. See
-`RUNBOOK.md` §8 CRITICAL-3 before treating a vault problem as a routine incident.
+The current Work-profile vault is `%APPDATA%\cato\vault.enc`; its unlock password
+is protected for the current Windows user in
+`%APPDATA%\cato\vault-password.dpapi`. The repo `.env` copy is an EFS-encrypted,
+gitignored operator backup and is never a launch source. Use the desktop launcher;
+do not copy the password into a command line, service registry, log, or tracked file.
 
 ---
 

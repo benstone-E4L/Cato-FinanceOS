@@ -204,32 +204,20 @@ Do not present current proof bundles as cryptographically attributable. Set
 
 ---
 
-## 6. Vault preferred; plaintext `.env` is legacy fill-only
+## 6. Encrypted vault and Windows-only password custody
 
-`%APPDATA%\cato\vault.enc` under the Work profile is the durable credential
-store. Launch paths prefer vault values for operator secrets
-(`TELEGRAM_BOT_TOKEN`, `OPENROUTER_API_KEY`, …) and use repo-root `.env` only
-to fill keys still missing (`cato.vault_bootstrap`).
+`%APPDATA%\cato\vault.enc` under the Work profile is the durable AES-256-GCM
+credential store. Provider keys and tokens are loaded from it only. Production
+launch paths never read repository `.env`.
 
-An empty / placeholder `vault.enc` may still exist until
-`cato vault migrate-env` (or `cato init` + `cato vault set`) has been run with
-`CATO_VAULT_PASSWORD` set. The migrate path is implemented and unit-tested;
-live migration still requires the operator password (never print it).
+`Launch-CatoDesktop.ps1` decrypts `%APPDATA%\cato\vault-password.dpapi` for the
+current Windows user, passes the password to the daemon child only, then removes
+it from the desktop process environment. The repo `.env` is a gitignored,
+EFS-encrypted operator backup only; it is not a launch or migration source.
 
-Credentials that remain only in `.env` are still protected only by filesystem
-ACLs — and those ACLs are currently wrong in two distinct ways. The live
-`CATO_VAULT_PASSWORD` value is additionally present verbatim in two git-tracked
-files (rotate + purge — see `RUNBOOK.md` §8).
-
-**Outstanding operator actions** (full detail in `RUNBOOK.md` §8):
-
-1. `ACEMAGIC-WINDOW\CodexSandboxUsers` has `(OI)(CI)(RX)` on
-   `C:\Users\Work\Desktop`, inherited onto both `.env` files. Members:
-   `CodexSandboxOffline`, `CodexSandboxOnline`.
-2. `ACEMAGIC-WINDOW\Work` has `(OI)(CI)(F)` on the entire `C:\Users\benst`
-   profile, reaching `conduit_identity.key` and `cato.db`.
-3. Rotate `CATO_VAULT_PASSWORD`, purge it from git-tracked docs, then:
-   `python -m cato vault migrate-env` (values never echoed).
+The DPAPI file is tied to this Windows user/profile. A profile loss therefore
+requires the separately saved operator recovery copy. Never persist the password
+in a service registry entry, command line, tracked document, or log.
 
 ---
 

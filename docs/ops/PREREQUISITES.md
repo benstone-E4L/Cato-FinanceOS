@@ -111,35 +111,19 @@ Genesis runs on Render free tier: 30s proxy timeout; warm latency up to ~15s on
 
 ---
 
-## 6. Credentials — `Cato\.env`
+## 6. Credentials — encrypted launch architecture
 
-Path: `C:\Users\Work\Desktop\vault\projects\My Github\Cato\.env`
-Gitignored: yes (verified, `.gitignore:11`).
-Loaded by: `cato start`, from the **current working directory**. Start the daemon
-from the repo root or none of these are visible to it.
-
-14 keys, verified present by name:
-
-| Variable | Purpose | Required? |
+| Item | Path / source | Requirement |
 |---|---|---|
-| `CATO_VAULT_PASSWORD` | Unlocks `vault.enc`. **See `RUNBOOK.md` §8 CRITICAL-3 — the live value is published in two git-tracked files and no vault exists.** | Required once a vault exists |
-| `ANTHROPIC_API_KEY` | Model calls. Cato routes direct to Anthropic. | **Required** — no model work without it |
-| `SWARMSYNC_API_KEY` | SwarmSync platform API. Removed from the model path; still used for platform calls. | Optional |
-| `GENESIS_AGENTS_SWARMSYNC_API_KEY` | Genesis-side SwarmSync key. | Optional |
-| `GMAIL_ADDRESS` | Gmail adapter identity. | Optional — Gmail adapter only |
-| `GMAIL_CLIENT_ID` | Gmail OAuth client. | Optional — Gmail adapter only |
-| `GMAIL_CLIENT_SECRET` | Gmail OAuth client secret. | Optional — Gmail adapter only |
-| `GMAIL_REDIRECT_URI` | Gmail OAuth redirect. | Optional — Gmail adapter only |
-| `GMAIL_REFRESH_TOKEN` | Gmail OAuth refresh token. | Optional — Gmail adapter only |
-| `CATODESKTOP_BOT_TOKEN` | Telegram bot token. | Optional — `--channel telegram` only |
-| `CATODESKTOP_BOT_USERNAME` | Telegram bot username. | Optional — `--channel telegram` only |
-| `TELEGRAM_CHAT_ID` | Telegram destination chat. | Optional — `--channel telegram` only |
-| `GITHUB_FOXFIREPOETS_TOKEN` | GitHub API token for the `cato github` commands. | Optional |
-| `conduit_enabled` | Enables the Conduit browser engine (per-action billing). Also settable per-run with `cato start --browser conduit`. | Optional |
+| Provider credentials | `%APPDATA%\cato\vault.enc` | Encrypted AES-256-GCM store; `ANTHROPIC_API_KEY` is required for model work. |
+| Vault unlock handoff | `%APPDATA%\cato\vault-password.dpapi` | Windows DPAPI, current user only; consumed by `Launch-CatoDesktop.ps1`. |
+| Operator recovery copy | Separately saved by the operator | Required for Windows-profile loss or rekey recovery. |
+| Repository `.env` | Repo root, gitignored and Windows EFS-encrypted | Backup only. Production launch never reads it. |
 
-Adapter registration is best-effort: `cato start` logs a warning and continues if
-the Telegram or Gmail adapter fails to register. A missing optional credential
-degrades a channel; it does not stop the daemon.
+Use `Launch-CatoDesktop.ps1` or the desktop shortcut. Do not place provider keys
+in `config.yaml`, pass the vault password on a command line, or persist it in a
+Windows service registry entry. Adapter registration is best-effort: a missing
+optional vault key degrades that channel without stopping the daemon.
 
 ---
 
@@ -241,18 +225,10 @@ call sites only. Its `cato.db` has no `ledger_records` table.
 
 ---
 
-## 10. Filesystem permissions — currently wrong
+## 10. Filesystem permissions and recovery custody
 
-Three critical items are **open**. They are documented in full, with the exact
-verification commands and the exact remediation commands, in `RUNBOOK.md` §8.
-Summary:
-
-1. `ACEMAGIC-WINDOW\CodexSandboxUsers` has `(OI)(CI)(RX)` on `C:\Users\Work\Desktop`,
-   inherited onto both `.env` files. Members: `CodexSandboxOffline`, `CodexSandboxOnline`.
-2. `ACEMAGIC-WINDOW\Work` has `(OI)(CI)(F)` on the entire `C:\Users\benst` profile,
-   reaching `conduit_identity.key` and `cato.db`.
-3. `CATO_VAULT_PASSWORD`'s live value is present verbatim in two git-tracked files
-   (`CLAUDE.md`, `PROJECT_BLACKBOX_AUDIT.md`), and no `vault.enc` exists — so every
-   credential is plaintext in `.env`, protected only by (1) and (2).
-
-**Close all three before starting the daemon with real credentials.**
+The active Cato repo `.env` is EFS-encrypted for the Work account and gitignored;
+the launch password is also held in the Work-profile DPAPI file. Those protections
+do not replace an offline operator recovery copy: EFS and DPAPI are both tied to
+the Windows account/profile. Re-verify EFS with `cipher /C .env` and never weaken
+the file ACL or add the file to Git.

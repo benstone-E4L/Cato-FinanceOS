@@ -105,6 +105,37 @@ async def test_forced_final_turn_stays_on_direct_anthropic_without_tools(
     assert tools == []
 
 
+async def test_empty_direct_response_never_uses_legacy_transport(
+    tmp_path, monkeypatch,
+) -> None:
+    env = build_scheduler_gate_env(tmp_path, monkeypatch)
+    env.gateway._vault.set("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+    async def complete_message(*_args, **_kwargs):
+        return (
+            "test-model",
+            {"content": "", "tool_calls": []},
+            SimpleNamespace(log_line=lambda: "test route"),
+        )
+
+    legacy_calls = 0
+
+    async def prohibited_legacy(*_args, **_kwargs):
+        nonlocal legacy_calls
+        legacy_calls += 1
+        return "unsafe fallback", []
+
+    monkeypatch.setattr(env.loop._router, "complete_message", complete_message)
+    monkeypatch.setattr(env.loop, "_stream_collect", prohibited_legacy)
+
+    final_text, _model, _agent = await env.loop.run(
+        "empty-direct", "Return a short status", "cato",
+    )
+
+    assert "Anthropic returned an empty response" in final_text
+    assert legacy_calls == 0
+
+
 async def test_model_tool_call_produces_valid_audit_receipt_and_dry_replay(
     tmp_path, monkeypatch,
 ) -> None:

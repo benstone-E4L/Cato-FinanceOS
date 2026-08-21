@@ -55,7 +55,11 @@ async def run(dist: Path, outer_port: int) -> None:
     cato_app = await cato_server.create_ui_app(None)
     cato_runner, cato_port = await _start_site(cato_app, "127.0.0.1", 0)
     session = ClientSession()
-    state = {"finance_runner": finance_runner, "finance_running": True}
+    state = {
+        "finance_runner": finance_runner,
+        "finance_running": True,
+        "cato_finance_mode": "normal",
+    }
 
     async def index(_: web.Request) -> web.Response:
         html = (dist / "index.html").read_text(encoding="utf-8")
@@ -87,6 +91,11 @@ window.__TAURI_INTERNALS__ = {{
 
     async def proxy(request: web.Request) -> web.Response:
         upstream_path = f"/api/{request.match_info['path']}"
+        if upstream_path == "/api/finance-os/control-room":
+            if state["cato_finance_mode"] == "error":
+                return web.json_response({"error": "acceptance route failure"}, status=502)
+            if state["cato_finance_mode"] == "malformed":
+                return web.Response(text="{malformed", content_type="application/json")
         if request.query_string:
             upstream_path = f"{upstream_path}?{request.query_string}"
         target = f"http://127.0.0.1:{cato_port}{upstream_path}"
@@ -101,6 +110,13 @@ window.__TAURI_INTERNALS__ = {{
             await state["finance_runner"].cleanup()
             state["finance_running"] = False
         return web.json_response({"finance_running": False})
+
+    async def set_cato_finance_mode(request: web.Request) -> web.Response:
+        mode = request.match_info["mode"]
+        if mode not in {"normal", "error", "malformed"}:
+            raise web.HTTPBadRequest(text="unsupported acceptance mode")
+        state["cato_finance_mode"] = mode
+        return web.json_response({"cato_finance_mode": mode})
 
     async def status(_: web.Request) -> web.Response:
         async with session.get(
@@ -126,6 +142,7 @@ window.__TAURI_INTERNALS__ = {{
     outer.router.add_get("/assets/{path:.*}", asset)
     outer.router.add_route("*", "/api/{path:.*}", proxy)
     outer.router.add_post("/acceptance/stop-finance", stop_finance)
+    outer.router.add_post("/acceptance/cato-finance/{mode}", set_cato_finance_mode)
     outer.router.add_get("/acceptance/status", status)
     outer_runner, _ = await _start_site(outer, "127.0.0.1", outer_port)
 

@@ -110,6 +110,13 @@ def stop_finance(origin: str) -> None:
     require(payload == {"finance_running": False}, f"unexpected Finance stop payload: {payload}")
 
 
+def set_cato_finance_mode(origin: str, mode: str) -> None:
+    request = Request(f"{origin}/acceptance/cato-finance/{mode}", method="POST")
+    with urlopen(request, timeout=5) as response:
+        payload = json.loads(response.read())
+    require(payload == {"cato_finance_mode": mode}, f"unexpected Cato Finance mode: {payload}")
+
+
 def wait_for_finance_state(page: Page, state: str, timeout_ms: int = 35_000) -> None:
     deadline = time.monotonic() + timeout_ms / 1000
     while time.monotonic() < deadline:
@@ -196,6 +203,23 @@ def run_acceptance(page: Page, origin: str, output: Path, expected_head: str) ->
     page.screenshot(path=str(output / "work-inbox-stale.png"), full_page=True)
     checks.append({"check": "financeos_outage_cached_stale_no_crash", "result": "PASS"})
 
+    set_cato_finance_mode(origin, "error")
+    page.get_by_role("button", name="Refresh").click()
+    page.get_by_text(
+        "Cato Finance route unavailable; preserving the last-known FinanceOS card:",
+        exact=False,
+    ).wait_for()
+    require(page.get_by_text("Close status: acceptance-ready", exact=False).is_visible(), "route failure removed cached Finance card")
+    require(page.get_by_text("Stale", exact=True).is_visible(), "route failure removed stale marker")
+    checks.append({"check": "cato_finance_route_failure_preserves_rendered_card", "result": "PASS"})
+
+    set_cato_finance_mode(origin, "malformed")
+    page.get_by_role("button", name="Approvals Drafts & Monday updates").click()
+    page.get_by_role("heading", name="Approvals", exact=True).wait_for()
+    page.get_by_text("FinanceOS approval authority is unavailable.", exact=True).wait_for()
+    require(page.locator(".view-loading").count() == 0, "malformed Finance JSON left Approvals loading")
+    checks.append({"check": "malformed_finance_json_fails_visible_without_spinner", "result": "PASS"})
+
     return checks
 
 
@@ -246,6 +270,8 @@ def main() -> int:
     expected_degradations: list[str] = []
     generic_503_console: list[str] = []
     response_503s: list[str] = []
+    generic_502_console: list[str] = []
+    response_502s: list[str] = []
     payload: dict[str, object]
     exit_code = 1
     try:
@@ -262,6 +288,9 @@ def main() -> int:
                 if "503 (Service Unavailable)" in text:
                     generic_503_console.append(text)
                     return
+                if "502 (Bad Gateway)" in text:
+                    generic_502_console.append(text)
+                    return
                 if (
                     ("WebSocket connection to" in text and "/ws" in text and "404" in text)
                     or text == "[useChatStream] WebSocket error"
@@ -274,8 +303,13 @@ def main() -> int:
             page.on("pageerror", lambda error: console_failures.append(str(error)))
             page.on(
                 "response",
-                lambda response: response_503s.append(response.url)
-                if response.status == 503 else None,
+                lambda response: (
+                    response_503s.append(response.url)
+                    if response.status == 503
+                    else response_502s.append(response.url)
+                    if response.status == 502
+                    else None
+                ),
             )
             checks = run_acceptance(page, origin, output, expected_head)
             context.close()
@@ -284,6 +318,10 @@ def main() -> int:
         require(
             len(generic_503_console) == len(response_503s),
             f"unattributed 503 console errors: console={len(generic_503_console)} responses={response_503s}",
+        )
+        require(
+            len(generic_502_console) == len(response_502s),
+            f"unattributed 502 console errors: console={len(generic_502_console)} responses={response_502s}",
         )
         allowed_fixture_503_paths = {
             # Populated only for routes whose fixture dependency is explicitly
@@ -295,6 +333,11 @@ def main() -> int:
             if urlparse(url).path not in allowed_fixture_503_paths
         ]
         require(unexpected_503s == [], f"unexpected HTTP 503 responses: {unexpected_503s}")
+        unexpected_502s = [
+            url for url in response_502s
+            if urlparse(url).path != "/api/finance-os/control-room"
+        ]
+        require(unexpected_502s == [], f"unexpected HTTP 502 responses: {unexpected_502s}")
         payload = {
             "result": "PASS",
             "production_bundle": str(DESKTOP / "dist"),
@@ -306,6 +349,7 @@ def main() -> int:
             "console_failures": console_failures,
             "expected_fixture_degradations": expected_degradations,
             "expected_fixture_503s": response_503s,
+            "expected_route_failure_502s": response_502s,
         }
         exit_code = 0
     except Exception as exc:

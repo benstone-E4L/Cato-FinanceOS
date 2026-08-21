@@ -2225,8 +2225,9 @@ class AgentLoop:
                                 routed_model, len(text), len(tool_calls),
                                 [tc.name for tc in tool_calls] if tool_calls else "[]",
                             )
-                            if text or tool_calls:
-                                used_direct = True
+                            used_direct = True
+                            if not text and not tool_calls:
+                                text = "⚠️ Anthropic returned an empty response. See daemon log."
                         except (CostGateExceeded, EscalationExhausted) as exc:
                             # Fail loud. A blocked cost gate or an exhausted
                             # escalation is a policy decision, not a transient

@@ -189,8 +189,21 @@ def test_daemon_health_requires_a_cato_lifecycle_port_marker():
 
     assert "fn refresh_ports_from_disk(&mut self) -> bool" in sidecar
     assert "if !self.refresh_ports_from_disk() {\n            return false;\n        }" in sidecar
-    assert "if self.refresh_ports_from_disk() {" in sidecar
+    assert "self.refresh_ports_from_disk() && self.check_http_health().await" in sidecar
     assert "self.ws_port = http_port;\n        true" in sidecar
+
+
+def test_desktop_rejects_a_healthy_daemon_from_another_revision():
+    sidecar = _source("desktop/src-tauri/src/sidecar.rs")
+
+    assert 'health.get("source_sha")' in sidecar
+    assert "Self::health_matches_expected_build(&health, super::NATIVE_BUILD_SHA)" in sidecar
+    assert 'expected_sha == "development"' in sidecar
+    wait_fn = re.search(
+        r"async fn wait_for_health\((?P<body>.*?)\n    \}", sidecar, re.DOTALL
+    )
+    assert wait_fn
+    assert "self.check_http_health().await" in wait_fn.group("body")
 
 
 def test_missing_bundled_sidecar_is_fail_visible():

@@ -20,6 +20,16 @@ pub struct SidecarManager {
 }
 
 impl SidecarManager {
+    fn health_matches_expected_build(health: &serde_json::Value, expected_sha: &str) -> bool {
+        matches!(
+            health.get("status").and_then(|value| value.as_str()),
+            Some("ok" | "degraded")
+        )
+            && (expected_sha == "development"
+                || health.get("source_sha").and_then(|value| value.as_str())
+                    == Some(expected_sha))
+    }
+
     pub fn new(http_port: u16, ws_port: u16) -> Self {
         Self {
             child: None,
@@ -64,14 +74,25 @@ impl SidecarManager {
         self.check_http_health().await
     }
 
-    /// Return true if the daemon health endpoint responds with HTTP 200.
+    /// Return true only when the daemon health endpoint identifies the same
+    /// source revision embedded in this desktop build.
     async fn check_http_health(&self) -> bool {
         let url = format!("http://127.0.0.1:{}/health", self.http_port);
         let client = reqwest::Client::new();
-        matches!(
-            client.get(&url).timeout(std::time::Duration::from_millis(800)).send().await,
-            Ok(resp) if resp.status().is_success()
-        )
+        let response = match client
+            .get(&url)
+            .timeout(std::time::Duration::from_millis(800))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => response,
+            _ => return false,
+        };
+        let health: serde_json::Value = match response.json().await {
+            Ok(health) => health,
+            Err(_) => return false,
+        };
+        Self::health_matches_expected_build(&health, super::NATIVE_BUILD_SHA)
     }
 
     /// Start the Cato daemon as a bundled child process.
@@ -152,7 +173,6 @@ impl SidecarManager {
         &mut self,
         timeout_secs: u64,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let client = reqwest::Client::new();
         let deadline = tokio::time::Instant::now() + Duration::from_secs(timeout_secs);
 
         loop {
@@ -160,12 +180,8 @@ impl SidecarManager {
                 return Err("Cato daemon health check timed out".into());
             }
 
-            if self.refresh_ports_from_disk() {
-                let url = format!("http://127.0.0.1:{}/health", self.http_port);
-                match client.get(&url).timeout(Duration::from_secs(2)).send().await {
-                    Ok(resp) if resp.status().is_success() => return Ok(()),
-                    _ => {}
-                }
+            if self.refresh_ports_from_disk() && self.check_http_health().await {
+                return Ok(());
             }
 
             sleep(Duration::from_millis(500)).await;
@@ -250,6 +266,33 @@ impl SidecarManager {
                 "Bundled Cato executable is unavailable: {error}. Reinstall the desktop app."
             )
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SidecarManager;
+    use serde_json::json;
+
+    #[test]
+    fn health_requires_status_and_exact_embedded_revision() {
+        let expected = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        assert!(SidecarManager::health_matches_expected_build(
+            &json!({"status": "ok", "source_sha": expected}),
+            expected,
+        ));
+        assert!(SidecarManager::health_matches_expected_build(
+            &json!({"status": "degraded", "source_sha": expected}),
+            expected,
+        ));
+        assert!(!SidecarManager::health_matches_expected_build(
+            &json!({"status": "ok", "source_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}),
+            expected,
+        ));
+        assert!(!SidecarManager::health_matches_expected_build(
+            &json!({"status": "error", "source_sha": expected}),
+            expected,
+        ));
     }
 }
 

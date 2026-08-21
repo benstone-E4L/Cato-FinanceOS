@@ -48,27 +48,36 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({ httpPort }) => {
   const [financeApprovalsUrl, setFinanceApprovalsUrl] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const [inboxResult, financeResult] = await Promise.allSettled([
+    try {
+      const [inboxResult, financeResult] = await Promise.allSettled([
         fetch(`${base}/api/inbox`),
         fetch(`${base}/api/finance-os/control-room`, { signal: AbortSignal.timeout(6000) }),
-    ]);
-    try {
-      if (inboxResult.status === "rejected") throw inboxResult.reason;
-      const inboxResponse = inboxResult.value;
-      if (!inboxResponse.ok) throw new Error(`Inbox HTTP ${inboxResponse.status}`);
-      const body = await inboxResponse.json();
-      setDrafts(Array.isArray(body?.email_drafts) ? body.email_drafts : []);
-      setError(null);
-    } catch (e) {
-      setError(String(e));
+      ]);
+      try {
+        if (inboxResult.status === "rejected") throw inboxResult.reason;
+        const inboxResponse = inboxResult.value;
+        if (!inboxResponse.ok) throw new Error(`Inbox HTTP ${inboxResponse.status}`);
+        const body = await inboxResponse.json();
+        setDrafts(Array.isArray(body?.email_drafts) ? body.email_drafts : []);
+        setError(null);
+      } catch (e) {
+        setError(String(e));
+      }
+      try {
+        if (financeResult.status === "rejected") throw financeResult.reason;
+        if (!financeResult.value.ok) {
+          throw new Error(`Finance HTTP ${financeResult.value.status}`);
+        }
+        const financeBody = await financeResult.value.json() as { approval_url?: unknown };
+        setFinanceApprovalsUrl(
+          typeof financeBody.approval_url === "string" ? financeBody.approval_url : null,
+        );
+      } catch {
+        setFinanceApprovalsUrl(null);
+      }
+    } finally {
+      setLoading(false);
     }
-    if (financeResult.status === "fulfilled" && financeResult.value.ok) {
-      const financeBody = await financeResult.value.json() as { approval_url?: unknown };
-      setFinanceApprovalsUrl(
-        typeof financeBody.approval_url === "string" ? financeBody.approval_url : null,
-      );
-    }
-    setLoading(false);
   }, [base]);
 
   useEffect(() => { refresh(); }, [refresh]);

@@ -115,21 +115,19 @@ must make an explicit decision here before the daemon does anything useful.
 > No match → trap present, §4 applies as written. Match → the deferral fix is
 > present; re-read `cato/safety.py::check_and_confirm` before relying on §4.
 
-### Fact 4: Credentials — vault is preferred; plaintext .env is legacy fill-only
+### Fact 4: Credentials — encrypted vault only; repo `.env` is backup only
 
 `%APPDATA%\cato\vault.enc` is the durable credential store. Launch paths
 (`cato start`, `cato_svc_runner.py`, `cato_service.py`, and the start/launch
 scripts) call `cato.vault_bootstrap.bootstrap_launch_credentials`:
 
-1. Require `CATO_VAULT_PASSWORD` in the environment (fail closed if unset).
-2. Fill missing keys from repo-root `.env` (never overwrites existing env).
-3. Unlock `vault.enc` and **prefer vault values** for operator secrets
-   (`TELEGRAM_BOT_TOKEN`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, …).
+1. Obtain `CATO_VAULT_PASSWORD` only as a transient child-process handoff.
+2. Unlock `%APPDATA%\cato\vault.enc` and load provider credentials into memory.
+3. Remove the unlock password from the long-lived process environment.
 
-`.env` remains a migration/legacy fill source — not the only path. ACL issues
-on plaintext `.env` files are still tracked in Section 8; migrate secrets into
-the vault, then rotate. See **§8 CRITICAL-3 remediation** for the one-command
-migrate path (`cato vault migrate-env`).
+On this workstation, `Launch-CatoDesktop.ps1` gets the password from the
+current-user DPAPI file. Repository `.env` is never read by launch bootstrap. Its
+EFS-encrypted copy is operator backup custody only.
 
 ---
 
@@ -156,12 +154,13 @@ integration itself is **not built**; see `LIMITATIONS.md`.
 |---|---|---|
 | Config | `%APPDATA%\cato\config.yaml` | Present under Work as of 2026-08-06 filesystem check; re-verify with `cato status`. |
 | Audit + ledger DB | `%APPDATA%\cato\cato.db` | SQLite. `audit_log`, `ledger_records`, `delegation_tokens`. |
-| Vault | `%APPDATA%\cato\vault.enc` | Encrypted AES-256-GCM store. Launch prefers vault over `.env`. |
+| Vault | `%APPDATA%\cato\vault.enc` | Encrypted AES-256-GCM provider-credential store. |
+| Vault-password handoff | `%APPDATA%\cato\vault-password.dpapi` | Current-user DPAPI; decrypted only by the desktop launcher. |
 | PID / port files | `%APPDATA%\cato\cato.pid`, `cato.port` | Written by `cato start`, removed by `cato stop`. |
 | Emergency STOP file | `%APPDATA%\cato\STOP` | Create this file to halt all gated dispatch. |
 | Workspace | `%APPDATA%\cato\workspace` | Per `cato status`. |
 | Legacy home tree | `%USERPROFILE%\.cato\` | Written by the 46 `Path.home()` call sites. |
-| Secrets (Cato) | `C:\Users\Work\Desktop\vault\projects\My Github\Cato\.env` | Gitignored (verified: `.gitignore:11`). |
+| Operator backup (Cato) | `C:\Users\Work\Desktop\vault\projects\My Github\Cato\.env` | Gitignored and EFS-encrypted; never a launch source. |
 | Secrets (Genesis) | `C:\Users\Work\Desktop\vault\projects\My Github\Genesis Agents\.env` | |
 | Approval policy | `C:\Users\Work\Desktop\vault\projects\My Github\Cato\docs\approval-policy.yaml` | Override path with `CATO_APPROVAL_POLICY`. |
 
@@ -260,10 +259,9 @@ Options, all verified present in `cato/cli.py:472`:
 
 What `cato start` does, read from source:
 
-1. Requires `CATO_VAULT_PASSWORD`. Runs vault bootstrap: `.env` fills missing
-   keys only, then `%APPDATA%\cato\vault.enc` overrides operator secrets when
-   present (`cato.vault_bootstrap.bootstrap_launch_credentials`). Secret values
-   are never printed — only key names / counts.
+1. Requires a transient `CATO_VAULT_PASSWORD` handoff and unlocks
+   `%APPDATA%\cato\vault.enc`. Repository `.env` is not read. Secret values are
+   never printed.
 2. Loads `CatoConfig`.
 3. Refuses to start if `cato.pid` names a live process — it prints
    `Cato already running (PID N). Use 'cato stop' first.`
@@ -272,18 +270,9 @@ What `cato start` does, read from source:
 
 Foreground process. It does not daemonise itself.
 
-**One-command .env → vault migrate** (values never echoed):
-
-```
-set CATO_VAULT_PASSWORD=<your-strong-password>
-python -m cato vault migrate-env
-python -m cato vault list
-```
-
-Optional dry-run: `python -m cato vault migrate-env --dry-run`.
-Overwrite keys already in the vault: add `--overwrite`.
-Confirm `vault.enc` grew (`%APPDATA%\cato\vault.enc` size) and `cato vault list`
-shows key names only.
+Use the desktop shortcut or `Launch-CatoDesktop.ps1`; it performs the DPAPI
+handoff without exposing the password on the command line. `cato vault list` may
+be used to confirm key names only.
 
 ### 3.5 Confirm it is up
 
@@ -303,8 +292,8 @@ That HTTP check is the only startup proof that is not self-reported by the CLI �
 
 `start_daemon.ps1`, `launch_daemon.ps1`, `start_cato.bat`, `cato_service.py`,
 and `cato_svc_runner.py` resolve the repo root from their own location (no
-hardcoded Administrator path) and require `CATO_VAULT_PASSWORD`. They all go
-through vault bootstrap (vault preferred, `.env` fill-only). Before using a
+hardcoded Administrator path) and require a transient `CATO_VAULT_PASSWORD`.
+They never read repository `.env`. Before using a
 scheduled-task / SYSTEM wrapper, confirm which Windows account it will run as —
 a different user silently picks a different `%APPDATA%\cato` tree (Fact 2).
 Prefer `cato start` until you have verified the wrapper account.
@@ -553,47 +542,16 @@ Do this from an elevated shell that is **not** running as `Work`, or you may loc
 yourself out of the path you are standing in. Confirm `benst` can still log in
 and reach its own profile before you walk away.
 
-### CRITICAL-3 — `CATO_VAULT_PASSWORD` is a published value; migrate into vault.enc
+### CRITICAL-3 — closed: encrypted vault and recoverable password custody
 
-Two independent problems, one root cause.
+The Work profile now has a populated AES-256-GCM `vault.enc`. Its current unlock
+password is stored in the current-user DPAPI file and was separately saved by the
+operator. The gitignored repo `.env` copy is protected with Windows EFS and is not
+used for launch. The Windows service registry contains no persisted vault password.
 
-**3a.** The live value of `CATO_VAULT_PASSWORD` in `Cato\.env` appears verbatim in
-**two git-tracked files** in this repository. Verified by comparing the `.env`
-value against every tracked file without printing it:
-
-```
-TRACKED FILES CONTAINING THE LIVE VAULT PASSWORD: 2
-CLAUDE.md
-PROJECT_BLACKBOX_AUDIT.md
-```
-
-`PROJECT_BLACKBOX_AUDIT.md:23` even describes it as a known problem. The value is
-13 characters. Anyone with repository access has the vault password.
-
-**3b.** `%APPDATA%\cato\vault.enc` may exist as an empty/placeholder blob under
-the Work profile. Launch now prefers vault-stored operator secrets over
-plaintext `.env`. Runner scripts fail closed when `CATO_VAULT_PASSWORD` is unset.
-
-**Remediation, in this order:**
-
-1. Fix CRITICAL-1 and CRITICAL-2 first. Rotating secrets into a filesystem two
-   other accounts can read accomplishes nothing.
-2. Rotate `CATO_VAULT_PASSWORD` to a new high-entropy value. Do not reuse it
-   anywhere.
-3. Purge the old value from `CLAUDE.md` and `PROJECT_BLACKBOX_AUDIT.md`, and
-   treat it as compromised in git history — a plain edit does not remove it from
-   past commits.
-4. Migrate credentials off plaintext (**one command; values never echoed**):
-   ```
-   set CATO_VAULT_PASSWORD=<your-strong-password>
-   python -m cato vault migrate-env
-   python -m cato vault list
-   ```
-   Confirm: `vault.enc` size grows, `cato vault list` shows key names only, and
-   `cato doctor` stops reporting `Vault NOT FOUND`. Interactive alternative:
-   `python -m cato init` then `python -m cato vault set <KEY_NAME>`.
-5. Rotate every other credential in `PREREQUISITES.md`. They have been readable
-   by the sandbox accounts for an unknown period.
+Do not reverse this closure by placing the password in a tracked document, service
+registry value, command line, or log. Do not delete or modify operator credentials
+in `.env`; any future rekey must preserve recoverability and be operator-directed.
 
 ---
 
