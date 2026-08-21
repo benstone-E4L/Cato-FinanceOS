@@ -151,7 +151,7 @@ def run_acceptance(page: Page, origin: str, output: Path, expected_head: str) ->
     page.screenshot(path=str(output / "work-inbox-live.png"), full_page=True)
     checks.append({"check": "financeos_live_card", "result": "PASS"})
 
-    page.get_by_role("button", name="Approvals Drafts & Monday updates").click()
+    page.get_by_role("button", name="Approvals Local drafts; Monday reserved").click()
     page.get_by_role("heading", name="Approvals", exact=True).wait_for()
     finance_link = page.get_by_role("link", name="Open FinanceOS approvals in a separate application")
     with urlopen(f"{origin}/acceptance/status", timeout=5) as response:
@@ -161,7 +161,10 @@ def run_acceptance(page: Page, origin: str, output: Path, expected_head: str) ->
         "Finance approval link did not use the daemon-configured authority",
     )
     require(finance_link.get_attribute("target") == "_blank", "Finance approval link must open separately")
-    require(page.get_by_text("Finance approvals are never handled here", exact=True).is_visible(), "approval boundary copy missing")
+    require(
+        page.get_by_text("Finance approvals are not handled by this surface", exact=True).is_visible(),
+        "approval boundary copy missing",
+    )
     checks.append({"check": "approval_authority_boundary", "result": "PASS"})
 
     for legacy, destination in LEGACY_DESTINATIONS.items():
@@ -214,7 +217,7 @@ def run_acceptance(page: Page, origin: str, output: Path, expected_head: str) ->
     checks.append({"check": "cato_finance_route_failure_preserves_rendered_card", "result": "PASS"})
 
     set_cato_finance_mode(origin, "malformed")
-    page.get_by_role("button", name="Approvals Drafts & Monday updates").click()
+    page.get_by_role("button", name="Approvals Local drafts; Monday reserved").click()
     page.get_by_role("heading", name="Approvals", exact=True).wait_for()
     page.get_by_text("FinanceOS approval authority is unavailable.", exact=True).wait_for()
     require(page.locator(".view-loading").count() == 0, "malformed Finance JSON left Approvals loading")
