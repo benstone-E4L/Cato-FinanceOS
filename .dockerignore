@@ -1,0 +1,28 @@
+# Deployment build (deploy/azure/deploy-azure.ps1) runs `az acr build` with
+# the REPO ROOT as context, but this repo also carries years of docs,
+# .git history, node_modules-style caches, and .env -- none of which should
+# ever be uploaded to a remote build service. Allowlist only what the image
+# actually needs.
+*
+
+!pyproject.toml
+!README.md
+!cato/
+!cato/**
+!deploy/
+!deploy/azure/
+!deploy/azure/Dockerfile
+!deploy/azure/entrypoint.py
+!deploy/azure/container-config.template.yaml
+!deploy/azure/.build-context/
+!deploy/azure/.build-context/**
+
+# Never include these even if a broader rule above would otherwise catch them.
+# Anchored to repo root so they do NOT shadow the intentionally-staged
+# deploy/azure/.build-context/vault.enc copy allowlisted above.
+/.env
+/.env.*
+/vault.enc
+*.dpapi
+**/__pycache__/
+**/*.pyc
