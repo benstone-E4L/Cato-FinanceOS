@@ -1,0 +1,121 @@
+# Container-appropriate Cato config.yaml -- staged verbatim into the image
+# by deploy-azure.ps1 as /home/appuser/.cato/config.yaml.
+#
+# This is a Linux-container adaptation of Ben's live desktop
+# %APPDATA%\cato\config.yaml, NOT a copy of it. Differences, and why:
+#
+#   - pipeline_root_dir / workspace_dir: rewritten to /home/appuser/.cato/...
+#     (the Windows paths in the desktop config do not exist in this image).
+#   - vault_knowledge_root: left empty. The desktop config points at
+#     C:\Users\Work\Desktop\vault, Ben's local machine -- that tree is not
+#     replicated into this container. Any Cato behaviour that reads business
+#     knowledge from that path will find nothing here. Flagged, not silently
+#     papered over -- see the deploy report for this gap.
+#   - telegram_enabled / whatsapp_enabled: left false. Wiring either channel
+#     into the container needs its own Key Vault secret (bot token) and is
+#     out of scope for this deploy -- webchat + MCP only, per the mission.
+#   - No secret VALUES appear anywhere in this file, same as the desktop
+#     config -- credentials live only in vault.enc, unlocked by
+#     CATO_VAULT_PASSWORD at process start (see entrypoint.py).
+#
+# Everything else (genesis_endpoint, budget caps, safety_mode, mcp settings,
+# model routing) is carried over unchanged from the live desktop config as of
+# 2026-08-20/21.
+
+agent_name: cato
+audit_enabled: true
+auto_approved_tools:
+- memory.search
+- memory.federated
+- memory_search
+- memory_read
+- web.search
+- web.code
+- web.news
+- web_search
+- academic.arxiv
+- academic.semantic_scholar
+- academic.pubmed
+- graph.query
+- graph.related
+- github.issue_list
+- github.pr_list
+- integration.status
+- conduit.crawl
+- conduit.monitor
+- conduit_navigate
+- conduit_extract
+- get_time
+- get_config
+- list_files
+- read_file
+budget_forecast_enabled: true
+claude_auth_dir: ''
+cli_session_cwd: ''
+codex_api_key_env: OPENAI_API_KEY
+conduit_budget_per_session: 100
+conduit_crawl_delay_sec: 1.0
+conduit_crawl_max_delay_sec: 60.0
+conduit_enabled: false
+conduit_extract_max_chars: 20000
+context_budget_tokens: 7000
+daily_cap: 50.0
+default_model: openai/gpt-4o-mini
+enabled_models:
+- claude
+- codex
+- gemini
+gateway_task_timeout_s: 600.0
+gemini_api_key_env: GEMINI_API_KEY
+genesis_agent_allowlist:
+- genesis-e4l-revenue
+- genesis-e4l-shopify
+- genesis-e4l-stripe
+- genesis-e4l-cash
+- genesis-e4l-ap
+- genesis-e4l-ar
+- genesis-e4l-cogs-cm
+- genesis-e4l-commissions
+- genesis-e4l-intercompany
+- genesis-e4l-close
+- genesis-e4l-journals
+- genesis-e4l-fs-integrity
+- genesis-e4l-controller
+- genesis-e4l-treasury
+genesis_agent_denylist: []
+genesis_enabled: true
+genesis_endpoint: https://swarmsync-agents.onrender.com
+genesis_timeout_s: 120.0
+interactive_cli_enabled: true
+live_outreach_enabled: false
+log_level: INFO
+max_output_tokens: 16384
+max_planning_turns: 6
+mcp_enabled: true
+mcp_host: 127.0.0.1
+mcp_mount_path: /mcp
+mcp_port: 8765
+monthly_cap: 100.0
+night_shift_policy_path: ''
+pipeline_root_dir: /home/appuser/.cato/businesses
+powershell_full_mode: false
+pty_default_cols: 80
+pty_default_rows: 24
+pty_idle_timeout_sec: 0
+safety_mode: strict
+search_rerank_enabled: false
+searxng_url: ''
+selector_healing_enabled: false
+session_cap: 999.0
+strict_approval: false
+subagent_coding_backend: codex
+subagent_enabled: false
+swarmsync_api_url: https://api.swarmsync.ai/v1/chat/completions
+swarmsync_enabled: true
+telegram_bot_token: ''
+telegram_enabled: false
+unattended_mode: false
+vault_knowledge_root: ''
+webchat_port: 8080
+whatsapp_enabled: false
+workspace_dir: /home/appuser/.cato/workspace

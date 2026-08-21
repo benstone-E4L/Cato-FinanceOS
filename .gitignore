@@ -15,6 +15,7 @@ venv/
 *.sqlite
 *.db
 vault.enc
+deploy/azure/.build-context/
 *.log
 .pytest_cache/
 .pytest_cache_tmp/
