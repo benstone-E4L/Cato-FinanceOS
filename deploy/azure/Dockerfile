@@ -16,7 +16,9 @@ FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8080
+    PORT=8080 \
+    PIP_NO_COLOR=1 \
+    PIP_PROGRESS_BAR=off
 
 WORKDIR /build
 COPY pyproject.toml README.md ./

@@ -154,10 +154,18 @@ function Deploy {
   $exists = $false
   try { Invoke-Az containerapp show -g $ResourceGroup -n $App --output none; $exists = $true } catch { $exists = $false }
 
+  # The Container Apps FQDN is deterministic (<app>.<environment default
+  # domain>), so it's knowable before the app is created -- needed so the
+  # daemon's Host-header allowlist (entrypoint.py -> CATO_CONTAINER_ALLOWED_HOST
+  # -> cato/ui/server.py) can be set on first create, not just on update.
+  $defaultDomain = Invoke-Az containerapp env show -g $ResourceGroup -n $Environment --query "properties.defaultDomain" --output tsv
+  $expectedFqdn = "$App.$defaultDomain"
+
   $envVars = @(
     "CATO_KEYVAULT_URL=$VaultUrl",
     "AZURE_CLIENT_ID=$script:IdentityClientId",
     "CATO_VAULT_PASSWORD_SECRET_NAME=cato-vault-password",
+    "CATO_INGRESS_FQDN=$expectedFqdn",
     "PORT=8080"
   )
 

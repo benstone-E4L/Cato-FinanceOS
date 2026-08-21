@@ -56,6 +56,24 @@ def _fetch_vault_password() -> str:
 def main() -> None:
     if "CATO_VAULT_PASSWORD" not in os.environ:
         os.environ["CATO_VAULT_PASSWORD"] = _fetch_vault_password()
+
+    # Container Apps ingress runs outside the container's network namespace,
+    # so it can only reach a socket bound to all interfaces. The daemon
+    # defaults to loopback-only (127.0.0.1) for local desktop security;
+    # this container-only override switches the bind address without
+    # touching that default. See cato/cli.py `cato start`.
+    os.environ.setdefault("CATO_WEBCHAT_BIND_HOST", "0.0.0.0")
+
+    # The daemon's DNS-rebinding guard rejects any request whose Host
+    # header isn't a loopback name (see cato/ui/server.py). Behind Container
+    # Apps ingress, the Host header is the public FQDN, so it must be added
+    # to the allowlist explicitly. CATO_INGRESS_FQDN is set by
+    # deploy-azure.ps1 / the container-config template to the app's actual
+    # *.azurecontainerapps.io hostname.
+    ingress_fqdn = os.environ.get("CATO_INGRESS_FQDN", "").strip()
+    if ingress_fqdn:
+        os.environ.setdefault("CATO_CONTAINER_ALLOWED_HOST", ingress_fqdn)
+
     print("CATO_VAULT_PASSWORD resolved (value not logged). Starting daemon...")
     os.execvp("cato", ["cato", "start", "--channel", "webchat"])
 

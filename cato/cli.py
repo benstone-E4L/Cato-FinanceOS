@@ -862,17 +862,25 @@ def _run_daemon(config: CatoConfig, agent: str, channel: str) -> None:
         runner = web.AppRunner(app)
         await runner.setup()
         port = getattr(cfg, "webchat_port", None) or getattr(cfg, "port", None) or 8080
+        # Local desktop default stays loopback-only (127.0.0.1) for security --
+        # a desktop daemon should never accept external connections by
+        # default. Container deployments (Azure Container Apps ingress runs
+        # outside the container's network namespace and cannot reach
+        # loopback) set CATO_WEBCHAT_BIND_HOST=0.0.0.0 via the container
+        # entrypoint only; this env var does not exist in the default/local
+        # config path.
+        bind_host = os.environ.get("CATO_WEBCHAT_BIND_HOST", "127.0.0.1")
         _site, actual_port = await _bind_http_site_with_fallback(
             runner,
-            "127.0.0.1",
+            bind_host,
             port,
             max_attempts=5,
             retry_delay=1.0,
             log=log,
             allow_port_shift=False,
         )
-        log.info(f"Web UI at http://127.0.0.1:{actual_port}")
-        safe_print(f"Cato daemon running on http://127.0.0.1:{actual_port}. Press Ctrl-C to stop.")
+        log.info(f"Web UI at http://{bind_host}:{actual_port}")
+        safe_print(f"Cato daemon running on http://{bind_host}:{actual_port}. Press Ctrl-C to stop.")
         safe_print("Open the web dashboard with 'cato dashboard' (it carries a daemon credential).")
         # Write the actual bound port to a file so other tools (watchdog, UI) can discover it
         try:

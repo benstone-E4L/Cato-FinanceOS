@@ -658,6 +658,17 @@ def _valid_dashboard_session(session: str) -> bool:
 # any handler.
 _ALLOWED_HOST_NAMES = {"127.0.0.1", "localhost", "::1", "[::1]", "tauri.localhost"}
 
+# Container-only escape hatch: a reverse-proxy deployment (e.g. Azure
+# Container Apps ingress) forwards the *public* Host header straight
+# through to the app, which will never be a loopback name. Local desktop
+# installs never set this, so the loopback-only default above is
+# unchanged for them. Set to the exact public hostname Container Apps
+# ingress uses (no scheme, no port) -- e.g.
+# "cato-orchestrator.orangedune-dad71fcc.westus2.azurecontainerapps.io".
+_CONTAINER_ALLOWED_HOST = os.environ.get("CATO_CONTAINER_ALLOWED_HOST", "").strip().lower()
+if _CONTAINER_ALLOWED_HOST:
+    _ALLOWED_HOST_NAMES = _ALLOWED_HOST_NAMES | {_CONTAINER_ALLOWED_HOST}
+
 
 def _host_header_allowed(host_header: str) -> bool:
     """True when the Host header names this machine's loopback or Tauri."""
