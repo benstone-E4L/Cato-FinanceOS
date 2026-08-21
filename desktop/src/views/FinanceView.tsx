@@ -124,7 +124,7 @@ export const FinanceView: React.FC<FinanceViewProps> = ({ httpPort }) => {
             <div className="dash-card">
               <div className="dash-card-label">Xero write gate</div>
               <div className="dash-card-value">{writeGateEnabled === undefined ? "—" : writeGateEnabled ? "Enabled" : "Protected"}</div>
-              <div className="dash-card-sub">Cato never writes to FinanceOS or Xero</div>
+              <div className="dash-card-sub">This view is GET-only; no mutation is wired here</div>
             </div>
           </div>
 

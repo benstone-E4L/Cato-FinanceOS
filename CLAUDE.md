@@ -7,7 +7,7 @@
 > Superseded 2026-08-03 by explicit owner decision (task t10). The previous rule
 > ("Cato routes ALL LLM calls through SwarmSync. Full stop.") is void.
 
-* **Credential:** `ANTHROPIC_API_KEY` — in the root `.env` and in the vault. This is
+* **Credential:** `ANTHROPIC_API_KEY` — in the encrypted vault only. This is
   the only credential the model-execution path needs. Never read, print, or log its value.
 * **Model selection is policy, not prompt.** `cato/model_policy.py` is the single
   source of truth. `route(TaskDescriptor) -> RoutingDecision` is the ONLY sanctioned
@@ -92,22 +92,22 @@ CODE COMPLETE
 * Tauri v2 desktop app (`desktop/`) — React 19 + TypeScript + Rust sidecar
 * SQLite memory, YAML config, AES-256-GCM encrypted vault
 * **Ports: HTTP 8080, WS 8081** (canonical defaults)
-* Live install: `pip install -e .` at `C:\\Users\\Administrator\\Desktop\\Cato`
+* Proven local checkout: `C:\\Users\\Work\\Desktop\\vault\\projects\\My Github\\Cato`
 
 ## DAEMON CONFIGURATION
 
 * Config: `%APPDATA%\\cato\\config.yaml`
-* Default model: `openai/gpt-4o-mini`
+* `default_model` is a legacy display/budget label; execution is selected only by `cato/model_policy.py`
 * **workspace\_dir**: defaults to `%APPDATA%\\cato\\workspace` on Windows, `\~/.cato/workspace` on macOS/Linux (critical for identity files)
 * **ANTHROPIC\_API\_KEY** — required for all LLM calls (direct Anthropic API). If missing, Cato returns a user-visible error rather than silently failing. `swarmsync\_enabled` is inert for model execution (see ROUTING above).
-* Vault: `%APPDATA%\\cato\\vault.enc` — stores `OPENROUTER\_API\_KEY`, `TELEGRAM\_BOT\_TOKEN`, `SWARMSYNC\_API\_KEY`
-* Vault password: `CATO\_VAULT\_PASSWORD=mypassword123` (**example only — always choose a unique, strong password in real installs**)
+* Vault: `%APPDATA%\\cato\\vault.enc` — stores all operator API keys and tokens, including `ANTHROPIC\_API\_KEY`
+* Vault unlock: the desktop uses the current-user DPAPI handoff at `%APPDATA%\\cato\\vault-password.dpapi`; repository `.env` is never a launch source
 * Run daemon: `CATO\_VAULT\_PASSWORD=<your-strong-password> python cato\_svc\_runner.py`
 * Health check: `curl http://localhost:8080/health`
 
 ## TELEGRAM INTEGRATION (2026-03-09)
 
-* **Status**: ENABLED and bidirectional
+* **Status**: Configured locally; no current exact-HEAD live bidirectional trace is claimed
 * **Bot token**: Stored in encrypted vault as `TELEGRAM\_BOT\_TOKEN` (NOT in config.yaml)
 * config.yaml has `telegram\_bot\_token: ''` and `telegram\_enabled: 'true'`
 * Messages flow: Telegram → TelegramAdapter → gateway.ingest() → WebSocket broadcast → desktop app
@@ -200,4 +200,3 @@ Fan-out to Claude/Codex/Gemini/Cursor in parallel (60s timeout each):
 * Alex audit: `CATO\_ALEX\_AUDIT.md` (repo root)
 * Kraken verdict: `CATO\_KRAKEN\_VERDICT.md` (repo root)
 * Historical verdicts: `KRAKEN\_VERDICT\_\*.md`
-

@@ -474,90 +474,40 @@ async def _collect_doctor_output() -> dict[str, Any]:
 
 
 async def _build_routing_status_payload(gateway: Optional[Any], *, live_test: bool = True) -> dict[str, Any]:
-    """Build the /api/routing/status payload without depending on an aiohttp request."""
+    """Report the direct model path without making a diagnostic provider call."""
     if gateway is None:
         return {"error": "gateway not ready"}
 
     cfg = gateway._cfg
     vault = gateway._vault
 
+    from cato.model_policy import MODEL_REGISTRY, Provider
     from cato.routing_log import get_routing_log_path
-    from cato.swarmsync import swarmsync_key_status
 
-    key_status = swarmsync_key_status(vault)
-    raw_swarm_key = None
-    if key_status["present"]:
-        from cato.swarmsync import get_swarmsync_api_key
-        raw_swarm_key, _ = get_swarmsync_api_key(vault)
-    openrouter_key = vault.get("OPENROUTER_API_KEY") if vault else None
+    anthropic_key_present = bool(vault and vault.get("ANTHROPIC_API_KEY"))
+    policy_models = sorted(
+        model_id
+        for model_id, spec in MODEL_REGISTRY.items()
+        if spec.provider is Provider.ANTHROPIC
+    )
 
     status = {
-        "swarmsync_enabled": getattr(cfg, "swarmsync_enabled", False),
-        "swarmsync_api_url": getattr(cfg, "swarmsync_api_url", ""),
-        "default_model": getattr(cfg, "default_model", ""),
-        "swarm_key_present": bool(key_status["present"]),
-        "swarm_key_source": key_status["source"],
-        "swarm_key_prefix": key_status["prefix"],
-        "swarm_key_needs_normalization": key_status["needs_normalization"],
-        "openrouter_key_present": bool(openrouter_key),
-        "will_use_swarmsync": bool(getattr(cfg, "swarmsync_enabled", False) and key_status["present"]),
+        "model_provider": "anthropic",
+        "policy_source": "cato/model_policy.py",
+        "policy_model_ids": policy_models,
+        "anthropic_key_present": anthropic_key_present,
+        "model_path_ready": anthropic_key_present,
+        "swarmsync_in_model_path": False,
+        "swarmsync_non_model_integrations_enabled": bool(
+            getattr(cfg, "swarmsync_enabled", False)
+        ),
+        "network_probe_performed": False,
         "persistent_routing_log": str(get_routing_log_path()),
+        "live_test": {
+            "skipped": True,
+            "reason": "Diagnostics never dispatch a billable model request or probe a non-model SwarmSync integration.",
+        },
     }
-
-    if not live_test:
-        status["live_test"] = {"skipped": True, "reason": "diagnostics export avoids live network calls"}
-        return status
-
-    if status["will_use_swarmsync"]:
-        try:
-            import socket as _socket
-            import aiohttp as _aiohttp
-            payload = {
-                "model": "auto",
-                "messages": [{"role": "user", "content": "hi"}],
-                "stream": False,
-                "swarmsync": {"complexity_score": 0.2, "history_length": 1},
-            }
-            headers = {
-                "Authorization": f"Bearer {raw_swarm_key}",
-                "Content-Type": "application/json",
-            }
-            # Use ThreadedResolver (OS DNS) — aiohttp's default async resolver
-            # (aiodns/c-ares) fails to contact DNS servers on Windows.
-            _connector = _aiohttp.TCPConnector(
-                family=_socket.AF_INET,
-                resolver=_aiohttp.ThreadedResolver(),
-            )
-            async with _aiohttp.ClientSession(connector=_connector) as s:
-                async with s.post(
-                    status["swarmsync_api_url"],
-                    json=payload,
-                    headers=headers,
-                    timeout=_aiohttp.ClientTimeout(total=15),
-                ) as r:
-                    if r.status in (200, 201):
-                        data = await r.json()
-                        ss = data.get("swarmsync", {})
-                        status["live_test"] = {
-                            "http_status": r.status,
-                            "routed_model": ss.get("routed_model", data.get("model", "")),
-                            "routing_reason": ss.get("routing_reason", ""),
-                            "tier": ss.get("tier", ""),
-                            "complexity_score": ss.get("complexity_score"),
-                        }
-                    else:
-                        body = await r.text()
-                        status["live_test"] = {
-                            "http_status": r.status,
-                            "error": body[:200],
-                            "fix": "Verify SWARMSYNC_API_KEY in the Cato vault and SwarmSync service availability.",
-                        }
-        except Exception as exc:
-            status["live_test"] = {
-                "error": str(exc),
-                "fix": "Check network access, swarmsync_api_url, and the SWARMSYNC_API_KEY vault entry.",
-            }
-
     return status
 
 
@@ -2137,11 +2087,11 @@ async def create_ui_app(gateway: Optional[Any] = None) -> web.Application:
             return web.json_response({}, status=500)
 
     # ------------------------------------------------------------------ #
-    # Routing status — shows what SwarmSync is doing                      #
+    # Routing status — direct Anthropic policy identity                   #
     # ------------------------------------------------------------------ #
 
     async def routing_status(request: web.Request) -> web.Response:
-        """GET /api/routing/status — show SwarmSync config and test a live routing call."""
+        """GET /api/routing/status — report the direct model path without dispatch."""
         payload = await _build_routing_status_payload(gateway, live_test=True)
         if gateway is None:
             return web.json_response(payload, status=503)

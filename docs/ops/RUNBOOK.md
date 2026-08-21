@@ -37,17 +37,14 @@ clone — record actual HEAD with `git log --oneline -1`.
 
 ## 0. Read this first — four facts that change how you operate
 
-### Fact 1: Do not assume the daemon is live-proven from old dates alone
+### Fact 1: Runtime proof is exact-revision evidence, not a permanent status
 
-**Re-checked 2026-08-06:** `C:\Users\benst\.cato\cato.db` is **ABSENT** (earlier
-notes cited last-write 2026-06-14 15:25:18 on that path — not re-verifiable).
-Work `%APPDATA%\cato` shows Aug 2026 filesystem activity (`cato.db`,
-`daemon.token`, `config.yaml` mtimes on 2026-08-05). That is **not** the same as
-a watched green `/health` or a proven model call — see `LIMITATIONS.md` §1.
-
-Every startup instruction in Section 3 is therefore **UNVERIFIED** unless you
-observe it yourself. The commands exist (verified — see `VERIFICATION.md`);
-treat the first start you have not watched as an experiment.
+The last promoted operator proof at `4199d19` observed a green `/health`, bound
+the daemon and desktop process images to the custody manifest, completed the
+rendered Work Inbox checks, and made a real direct-Anthropic call. That proof is
+valid only for those exact artifacts. After any source change, rebuild, restart,
+and rerun the bounded package in `VERIFICATION.md`; never infer currency from
+old file dates or an old PASS.
 
 ### Fact 2: Which Windows account you launch as decides which state tree is used
 
@@ -176,22 +173,20 @@ Verified output on the Work account:
   Config:   C:\Users\Work\AppData\Roaming\cato\config.yaml
   Workspace: C:\Users\Work\AppData\Roaming\cato\workspace
   Daemon:  STOPPED
-  Model:   openai/gpt-4o-mini
+  Model:   claude-sonnet-5
   Safety:  strict
 ```
 
-Note the `Model:` line reads `openai/gpt-4o-mini`. That is the `CatoConfig`
-dataclass default (`cato/config.py:83`), not what the agent loop actually routes
-to. Real routing is deterministic and Anthropic-direct — see Section 7.
+The `Model:` line is a legacy display/budget label, not an execution override.
+Real routing is deterministic and Anthropic-direct — see Section 7.
 
 ---
 
-## 3. Startup — UNVERIFIED
+## 3. Startup — exact local path previously proven
 
-> **The daemon has not been started during this remediation cycle. Everything in
-> this section is derived from reading `cato/cli.py`, not from observing a
-> running system.** The commands are confirmed to exist and to be spelled
-> correctly. Their runtime behaviour is not confirmed.
+The Work-account launch path was proven at exact commit `4199d19`. Repeat the
+identity-bound checks in `VERIFICATION.md` for the current HEAD; a successful
+old launch does not certify a rebuilt artifact.
 
 ### 3.1 Decide which account you are starting as
 

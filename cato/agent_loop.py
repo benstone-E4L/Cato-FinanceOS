@@ -2264,8 +2264,14 @@ class AgentLoop:
                             used_direct = True
 
                     if not used_direct:
-                        logger.info("Using _stream_collect (turn=%d, direct=%s)", planning_turns, use_direct)
-                        text, tool_calls = await self._stream_collect(messages, model, force)
+                        logger.error(
+                            "Direct Anthropic routing is unavailable (turn=%d, direct=%s); "
+                            "refusing legacy provider fallback",
+                            planning_turns,
+                            use_direct,
+                        )
+                        text = "⚠️ Direct Anthropic routing unavailable. See daemon log."
+                        tool_calls = []
                 finally:
                     # Surface a single llm_token chunk with the assistant text
                     # so the frontend can render the model's "thinking" even
@@ -3226,7 +3232,8 @@ class AgentLoop:
     async def _stream_collect(
         self, messages: list[dict], model: str, force_text: bool = False
     ) -> tuple[str, list[ToolCall]]:
-        """Stream from router; return (text, tool_calls) with retry on error."""
+        """Compatibility collector that still uses direct Anthropic policy."""
+        del model
         # Build tool definitions from the registry so the model can do
         # structured tool calling (OpenAI function-calling format).
         # Sanitize dotted names (web.search → web_search) for OpenAI compat.
@@ -3237,14 +3244,37 @@ class AgentLoop:
         delay = _RETRY_BASE_DELAY
         for attempt in range(_MAX_RETRIES):
             try:
-                chunks: list[str] = []
-                structured_tool_calls: list[dict[str, Any]] = []
-                async for chunk in self._router.complete(messages, model, tools=tools, stream=True):
-                    if isinstance(chunk, str):
-                        chunks.append(chunk)
-                    elif isinstance(chunk, dict):
-                        structured_tool_calls.extend(chunk.get("tool_calls") or [])
-                full = "".join(chunks)
+                input_chars = sum(
+                    len(str(item.get("content") or ""))
+                    for item in messages
+                    if isinstance(item, dict)
+                )
+                descriptor = TaskDescriptor(
+                    task_type=TaskType.GENERAL_TOOL_USE,
+                    input_tokens=max(1, input_chars // _CHARS_PER_TOKEN),
+                    max_output_tokens=int(getattr(self._cfg, "max_output_tokens", 16_384)),
+                    requires_tools=bool(tools),
+                    requires_interleaved_thinking=bool(tools),
+                    cost_ceiling_usd=float(getattr(
+                        self._cfg, "per_call_cost_ceiling_usd", 2.50
+                    )),
+                    task_key="compatibility-collector",
+                )
+                api_messages = _sanitize_messages_for_api(messages)
+                system = next(
+                    (item.get("content", "") for item in api_messages
+                     if item.get("role") == "system"),
+                    "",
+                )
+                convo = [item for item in api_messages if item.get("role") != "system"]
+                _model_id, response, _decision = await self._router.complete_message(
+                    convo,
+                    descriptor,
+                    system=system or None,
+                    tools=_anthropic_tool_defs(tools),
+                )
+                full = str(response.get("content") or "")
+                structured_tool_calls = response.get("tool_calls") or []
                 calls: list[ToolCall] = []
                 if not force_text:
                     if structured_tool_calls:

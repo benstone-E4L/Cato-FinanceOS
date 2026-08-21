@@ -169,12 +169,25 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ httpPort }) => {
 
           <div className="section-title">Chat Model</div>
           <div className="form-row">
-            <label>SwarmSync Enabled</label>
+            <label>Execution Provider</label>
+            <span>Anthropic API (direct)</span>
+          </div>
+          <div className="form-row">
+            <label>Selection Policy</label>
+            <span>cato/model_policy.py</span>
+          </div>
+
+          <div className="section-title">SwarmSync Integrations (Not Chat)</div>
+          <p className="settings-help">
+            These settings are retained for Genesis, the integration registry, and site-services only. They never route Cato model messages.
+          </p>
+          <div className="form-row">
+            <label>Non-model Integrations Enabled</label>
             <input type="checkbox" checked={Boolean(config.swarmsync_enabled)}
               onChange={(e) => setField("swarmsync_enabled", e.target.checked)} />
           </div>
           <div className="form-row">
-            <label>SwarmSync API URL</label>
+            <label>Integration API URL</label>
             <input className="form-input form-input-wide" value={String(config.swarmsync_api_url ?? "")}
               onChange={(e) => setField("swarmsync_api_url", e.target.value)} />
           </div>

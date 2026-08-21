@@ -70,7 +70,6 @@ class Provider(Enum):
     """Which API a model is called through."""
 
     ANTHROPIC = "anthropic"
-    OPENAI = "openai"
 
 
 class ThinkingMode(Enum):
@@ -102,8 +101,7 @@ class ModelSpec:
     thinking_mode: ThinkingMode
     supports_interleaved_thinking: bool
     rate_limit_note: str = ""
-    #: Which API this model is called through.  Anthropic models are the
-    #: default and the only provider ever used above HAIKU/SONNET tier.
+    #: Model execution is direct Anthropic only.
     provider: Provider = Provider.ANTHROPIC
 
     def price_at(self, when: date) -> PriceBand:
@@ -165,66 +163,6 @@ MODEL_REGISTRY: dict[str, ModelSpec] = {
         supports_interleaved_thinking=True,
         rate_limit_note="~4x tighter rate limits than Opus 5",
     ),
-    # --- OpenAI candidates -------------------------------------------------
-    # HAIKU/SONNET: cheap/mechanical and routine tool-driven work.
-    # OPUS: opened up 2026-08-05 per explicit owner decision -- o3 is a real
-    # current-generation OpenAI reasoning flagship, genuinely cheaper than
-    # Opus 5, so it now competes for HIGH/CRITICAL-risk financial reasoning,
-    # audit synthesis, and ledger-posting decisions (see TIER_CANDIDATES).
-    # This is a real behavior change, not a formality: o3 will win the cost
-    # comparison against Opus 5 at essentially any realistic token ratio, so
-    # whenever OPENAI_API_KEY is configured, OPUS-tier work now defaults to
-    # o3, not Claude Opus 5, unless available_providers excludes OpenAI.
-    # FABLE has no viable candidate added: the only OpenAI reasoning flagship
-    # above o3 is o1-pro at $150/$600 per MTok -- ~30x MORE expensive than
-    # Fable 5's $10/$50, and Fable's creative-writing positioning has no
-    # OpenAI equivalent anyway. Nothing to add there, not a policy carve-out.
-    # thinking_mode/supports_interleaved_thinking are Anthropic-only concepts;
-    # values here are placeholders, never read for a Provider.OPENAI model
-    # (build_openai_request_payload() does not consult them).
-    # Pricing verified via aimodelcalc.com / devtk.ai / pricepertoken.com,
-    # checked 2026-08-05 -- reverify against platform.openai.com/pricing
-    # before relying on this for high-volume cost decisions; OpenAI can
-    # change prices without notice.
-    "gpt-4o-mini": ModelSpec(
-        model_id="gpt-4o-mini",
-        tier=ModelTier.HAIKU,
-        context_window=128_000,
-        max_output_tokens=16_384,
-        prices=(PriceBand(date(2000, 1, 1), 0.15, 0.60),),
-        supports_effort=False,
-        thinking_mode=ThinkingMode.BUDGET_TOKENS,
-        supports_interleaved_thinking=False,
-        provider=Provider.OPENAI,
-    ),
-    "gpt-4o": ModelSpec(
-        model_id="gpt-4o",
-        tier=ModelTier.SONNET,
-        context_window=128_000,
-        max_output_tokens=16_384,
-        prices=(PriceBand(date(2000, 1, 1), 2.50, 10.00),),
-        supports_effort=False,
-        thinking_mode=ThinkingMode.BUDGET_TOKENS,
-        supports_interleaved_thinking=False,
-        provider=Provider.OPENAI,
-    ),
-    "o3": ModelSpec(
-        model_id="o3",
-        tier=ModelTier.OPUS,
-        context_window=200_000,
-        max_output_tokens=100_000,
-        prices=(PriceBand(date(2000, 1, 1), 2.00, 8.00),),
-        supports_effort=False,
-        thinking_mode=ThinkingMode.BUDGET_TOKENS,
-        supports_interleaved_thinking=False,
-        provider=Provider.OPENAI,
-        rate_limit_note=(
-            "OPUS-tier cost-arbitrage candidate, opened 2026-08-05 per explicit "
-            "owner decision. o3 is OpenAI's own reasoning model (extended "
-            "chain-of-thought, native function calling); context/output figures "
-            "are best-known specs, reverify before relying on them for edge cases."
-        ),
-    ),
 }
 
 #: Retired — must never be selected.  Retired 2026-08-05.
@@ -240,24 +178,12 @@ TIER_TO_MODEL: dict[ModelTier, str] = {
     ModelTier.FABLE: "claude-fable-5",
 }
 
-#: Ordered per-tier candidates across providers.  First entry is the
-#: Anthropic default: used when no cheaper available candidate exists, when
-#: costs tie, or when only Anthropic is configured.  Cost-based selection
-#: (see ``select_cheapest_candidate``) picks the cheapest AVAILABLE candidate
-#: for the tier RISK_FLOOR/TASK_BASE_TIER already decided -- it never changes
-#: which tier is required, only which same-tier model executes it.
-#:
-#: OPUS is cost-arbitraged as of 2026-08-05 per explicit owner decision: o3
-#: is cheaper than Opus 5 at essentially any realistic token ratio, so
-#: HIGH/CRITICAL-risk financial reasoning, audit synthesis, and ledger-
-#: posting decisions now default to o3 whenever OPENAI_API_KEY is configured.
-#: FABLE stays single-candidate -- not a policy carve-out, just no viable
-#: OpenAI alternative exists (the only reasoning flagship above o3, o1-pro,
-#: costs ~30x more than Fable 5 and still has no creative-writing match).
+#: Direct-Anthropic candidates.  Stored credentials for any other provider do
+#: not participate in model selection.
 TIER_CANDIDATES: dict[ModelTier, tuple[str, ...]] = {
-    ModelTier.HAIKU: ("claude-haiku-4-5", "gpt-4o-mini"),
-    ModelTier.SONNET: ("claude-sonnet-5", "gpt-4o"),
-    ModelTier.OPUS: ("claude-opus-5", "o3"),
+    ModelTier.HAIKU: ("claude-haiku-4-5",),
+    ModelTier.SONNET: ("claude-sonnet-5",),
+    ModelTier.OPUS: ("claude-opus-5",),
     ModelTier.FABLE: ("claude-fable-5",),
 }
 
@@ -273,28 +199,13 @@ def select_cheapest_candidate(
     max_output_tokens: int,
     when: Optional[date] = None,
 ) -> str:
-    """Return the cheapest candidate model_id for ``tier`` that is actually
-    available, by real projected worst-case cost -- never by guessing.
+    """Return the direct-Anthropic model pinned for ``tier``.
 
-    Ties (including "only one candidate is available") resolve to the first
-    entry in ``TIER_CANDIDATES[tier]``, which is always the Anthropic default.
-    Anthropic is assumed always available in practice (CLAUDE.md: required
-    for all LLM calls); if ``available_providers`` somehow excludes it too,
-    this still returns the tier's first candidate rather than raising, since
-    ``route()`` must always produce a decision.
+    ``available_providers`` remains in the signature for compatibility with
+    existing callers, but it cannot broaden the provider set.
     """
-    candidates = TIER_CANDIDATES[tier]
-    viable = [
-        model_id for model_id in candidates
-        if MODEL_REGISTRY[model_id].provider in available_providers
-    ] or [candidates[0]]
-    best = candidates[0] if candidates[0] in viable else viable[0]
-    best_cost = project_worst_case_cost(best, input_tokens, max_output_tokens, when)
-    for model_id in viable[1:]:
-        cost = project_worst_case_cost(model_id, input_tokens, max_output_tokens, when)
-        if cost < best_cost:
-            best, best_cost = model_id, cost
-    return best
+    del available_providers, input_tokens, max_output_tokens, when
+    return TIER_CANDIDATES[tier][0]
 
 
 # ---------------------------------------------------------------------------
@@ -314,6 +225,7 @@ class TaskType(Enum):
     RECONCILIATION_ANALYSIS = "reconciliation_analysis"
     GENERAL_TOOL_USE = "general_tool_use"
     DRAFT_CORRESPONDENCE = "draft_correspondence"
+    SESSION_COMPACTION = "session_compaction"
 
     # High-stakes reasoning
     FINANCIAL_REASONING = "financial_reasoning"
@@ -350,6 +262,7 @@ TASK_BASE_TIER: dict[TaskType, ModelTier] = {
     TaskType.RECONCILIATION_ANALYSIS: ModelTier.SONNET,
     TaskType.GENERAL_TOOL_USE: ModelTier.SONNET,
     TaskType.DRAFT_CORRESPONDENCE: ModelTier.SONNET,
+    TaskType.SESSION_COMPACTION: ModelTier.SONNET,
     TaskType.FINANCIAL_REASONING: ModelTier.OPUS,
     TaskType.POLICY_INTERPRETATION: ModelTier.OPUS,
     TaskType.AUDIT_SYNTHESIS: ModelTier.OPUS,
@@ -367,6 +280,7 @@ TASK_EFFORT: dict[TaskType, str] = {
     TaskType.RECONCILIATION_ANALYSIS: "medium",
     TaskType.GENERAL_TOOL_USE: "medium",
     TaskType.DRAFT_CORRESPONDENCE: "medium",
+    TaskType.SESSION_COMPACTION: "medium",
     TaskType.FINANCIAL_REASONING: "high",
     TaskType.POLICY_INTERPRETATION: "high",
     TaskType.AUDIT_SYNTHESIS: "high",
@@ -780,13 +694,9 @@ def route(
     Deterministic: same descriptor in, same decision out.  Takes no model
     parameter, accepts no override, and consults nothing the model emitted.
 
-    ``available_providers`` is an ENVIRONMENT fact (which API keys are
-    currently configured), computed by the caller before dispatch -- never
-    something a model can influence. Defaulting to Anthropic-only preserves
-    prior behavior for any caller that does not pass it. Within the tier
-    RISK_FLOOR/TASK_BASE_TIER already require, the cheapest available
-    same-tier candidate is selected (see ``select_cheapest_candidate``) --
-    this never lowers the required tier for cost reasons.
+    ``available_providers`` remains only for call compatibility. It cannot
+    broaden execution beyond Anthropic; unrelated stored credentials are
+    deliberately ignored.
 
     Raises :class:`CostGateExceeded` when the projected worst-case cost breaches
     the ceiling — dispatch is blocked, the model is never downgraded to fit.
@@ -878,16 +788,12 @@ def route(
         effort = _max_effort(
             TASK_EFFORT[descriptor.task_type], RISK_MIN_EFFORT[risk]
         )
-    elif spec.provider is Provider.ANTHROPIC:
+    else:
         # Haiku uses the older thinking:{type:"enabled",budget_tokens:N} shape
         # and rejects output_config.effort outright.
         constraints.append("haiku:no_effort_param")
         thinking_budget = max(1024, min(descriptor.max_output_tokens // 2,
                                         spec.max_output_tokens - 1))
-    else:
-        # OpenAI models: no effort/thinking concept at all. thinking_budget
-        # stays None; build_openai_request_payload() never reads it.
-        constraints.append("openai:no_effort_or_thinking_param")
 
     max_out = min(descriptor.max_output_tokens, spec.max_output_tokens)
 
@@ -1064,17 +970,11 @@ def build_openai_request_payload(
     tools: Optional[list[dict]] = None,
     stream: bool = False,
 ) -> dict[str, Any]:
-    """Build an OpenAI Chat Completions API body for ``decision``.
+    """Build a legacy OpenAI Chat Completions body.
 
-    Only ever called when ``decision.provider is Provider.OPENAI`` --
-    callers must check this before invoking (mirrors how build_request_payload
-    is Anthropic-only). OpenAI's tool-call schema is already the shape Cato
-    uses internally (cato.tools.genesis.GENESIS_TOOL_SCHEMA and
-    agent_loop._BUILTIN_SCHEMAS are both OpenAI function-calling format), so
-    ``tools`` passes through unchanged -- no Anthropic-style conversion here.
-    Unlike the Anthropic path, Chat Completions has no separate ``system``
-    parameter: a system prompt must already be a ``{"role": "system", ...}``
-    entry in ``messages`` before this is called.
+    This compatibility helper is not a sanctioned production model path. The
+    production router never calls it; new model-execution callers must use
+    ``build_request_payload`` through ``ModelRouter.complete_message``.
     """
     payload: dict[str, Any] = {
         "model": decision.model_id,

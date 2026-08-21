@@ -36,12 +36,13 @@ variable; the launching account decides which state tree is used.
 | Item | Path | Version |
 |---|---|---|
 | System Python | `C:\Users\benst\AppData\Local\Programs\Python\Python312\python.exe` | 3.12.10 |
-| **Cato venv — the only interpreter for Cato work** | `C:\Users\Work\Desktop\vault\projects\My Github\Cato\.venv\Scripts\python.exe` | Create per `VERIFICATION.md` §1 if missing (**UNVERIFIED** at this path as of 2026-08-06; former Desktop “GitHub” clone path is gone) |
+| Verified test interpreter | `C:\Python313\python.exe` | Python 3.13; used for the current focused/full test workflow |
 
 `pyproject.toml` declares `requires-python = ">=3.11"`.
 
-**Use the venv interpreter for every Cato command in these documents.** The
-system Python does not have Cato's dependencies installed.
+Use a Python 3.11+ interpreter with the project and dev dependencies installed.
+On this workstation `python` currently resolves to the verified Python 3.13
+environment. If a `.venv` is created later, record and use its exact path.
 
 Genesis has **no `.venv`** (verified: absent from `Genesis Agents\`). Genesis'
 containment tests run under Cato's venv — verified, 48 passed in 0.39s. See

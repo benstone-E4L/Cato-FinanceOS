@@ -74,10 +74,9 @@ def test_tool_result_message_uses_tool_role_and_call_id():
 @pytest.mark.asyncio
 async def test_stream_collect_preserves_structured_streamed_tool_calls():
     class FakeRouter:
-        async def complete(self, messages, model, tools=None, stream=True):
-            yield "checking"
-            yield {
-                "type": "tool_calls",
+        async def complete_message(self, messages, descriptor, **kwargs):
+            return "claude-sonnet-5", {
+                "content": "checking",
                 "tool_calls": [{
                     "id": "call_1",
                     "type": "function",
@@ -86,10 +85,14 @@ async def test_stream_collect_preserves_structured_streamed_tool_calls():
                         "arguments": '{"query": "cato"}',
                     },
                 }],
-            }
+            }, object()
 
     loop = AgentLoop.__new__(AgentLoop)
     loop._router = FakeRouter()
+    loop._cfg = type("Config", (), {
+        "max_output_tokens": 16_384,
+        "per_call_cost_ceiling_usd": 2.50,
+    })()
 
     text, calls = await loop._stream_collect([], "test-model")
 

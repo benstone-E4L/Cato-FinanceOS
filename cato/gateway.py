@@ -39,6 +39,32 @@ logger = logging.getLogger(__name__)
 _CATO_DIR      = get_data_dir()
 _LANE_QUEUE_MAX = 64
 
+
+async def _direct_compaction_call(
+    router: Any,
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    session_id: str,
+) -> str:
+    """Run compaction through the same direct-Anthropic policy as chat."""
+    from .model_policy import TaskDescriptor, TaskType
+
+    descriptor = TaskDescriptor(
+        task_type=TaskType.SESSION_COMPACTION,
+        input_tokens=max(1, (len(system_prompt) + len(user_prompt)) // 4),
+        max_output_tokens=4_096,
+        requires_tools=False,
+        task_key=f"session-compaction:{session_id}",
+    )
+    _model_id, message, _decision = await router.complete_message(
+        [{"role": "user", "content": user_prompt}],
+        descriptor,
+        system=system_prompt,
+        tools=None,
+    )
+    return str(message.get("content") or "")
+
 # ---------------------------------------------------------------------------
 # Skill-install source validation (see Gateway._install_skill_from_url)
 # ---------------------------------------------------------------------------
@@ -641,24 +667,20 @@ class Gateway:
             )
             return
 
-        # Wrap the router as the simple llm_call(system_prompt, user_prompt, model)
-        # callable the compactor expects.  Stream the response and concatenate.
+        # Wrap the router as the simple llm_call callable the compactor expects.
+        # Its legacy model argument is deliberately ignored: compaction uses the
+        # same direct-Anthropic policy gate as every other production model call.
         agent_loop = self._agent_loop
 
         async def _llm_wrapper(*, system_prompt: str, user_prompt: str,
                                model: str | None = None) -> str:
-            llm_messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt},
-            ]
-            chosen_model = model or self._cfg.default_model
-            chunks: list[str] = []
-            async for chunk in agent_loop._router.complete(
-                llm_messages, chosen_model, tools=None, stream=True,
-            ):
-                if isinstance(chunk, str):
-                    chunks.append(chunk)
-            return "".join(chunks)
+            del model
+            return await _direct_compaction_call(
+                agent_loop._router,
+                system=system_prompt,
+                user_prompt=user_prompt,
+                session_id=session_id,
+            )
 
         await self._broadcast_activity(True, session_id, "compacting history")
         try:

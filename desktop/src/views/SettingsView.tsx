@@ -294,13 +294,18 @@ export function SettingsView({ httpPort }: SettingsViewProps) {
             <div className="tab-pane">
               <h2>General Settings</h2>
               <div className="setting-group">
-                <label>Default Model</label>
+                <label>Legacy Model Label</label>
                 <input
                   type="text"
                   value={defaultModel}
                   onChange={e => setDefaultModel(e.target.value)}
-                  placeholder="e.g., openai/gpt-4o-mini"
+                  placeholder="claude-sonnet-5"
+                  disabled
                 />
+                <p className="hint">
+                  Display and budget metadata only. Cato selects pinned Anthropic models through
+                  cato/model_policy.py; this field cannot redirect execution.
+                </p>
               </div>
               <button onClick={handleSaveConfig} className="button-primary">
                 Save Settings

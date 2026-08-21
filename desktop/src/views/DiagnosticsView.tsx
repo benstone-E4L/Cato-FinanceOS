@@ -15,28 +15,26 @@ interface DiagnosticsViewProps {
   daemonToken?: string;
 }
 
-type TabId = "swarmsync" | "tiers" | "contradictions" | "decisions" | "anomalies" | "corrections" | "disagreements" | "epistemic" | "context" | "retrieval" | "habits";
+type TabId = "routing" | "tiers" | "contradictions" | "decisions" | "anomalies" | "corrections" | "disagreements" | "epistemic" | "context" | "retrieval" | "habits";
 
 // ---------------------------------------------------------------------------
-// SwarmSync Tab
+// Direct model-routing tab
 // ---------------------------------------------------------------------------
 
 interface RoutingLiveTest {
-  http_status?: number;
-  routed_model?: string;
-  routing_reason?: string;
-  tier?: string;
-  complexity_score?: number;
-  error?: string;
+  skipped?: boolean;
+  reason?: string;
 }
 
 interface RoutingStatus {
-  swarmsync_enabled?: boolean;
-  swarmsync_api_url?: string;
-  default_model?: string;
-  swarm_key_present?: boolean;
-  openrouter_key_present?: boolean;
-  will_use_swarmsync?: boolean;
+  model_provider?: string;
+  policy_source?: string;
+  policy_model_ids?: string[];
+  anthropic_key_present?: boolean;
+  model_path_ready?: boolean;
+  swarmsync_in_model_path?: boolean;
+  swarmsync_non_model_integrations_enabled?: boolean;
+  network_probe_performed?: boolean;
   live_test?: RoutingLiveTest;
   error?: string;
 }
@@ -101,7 +99,13 @@ async function runFirstMessageSelfTest(httpPort: number, wsPort: number, daemonT
     if (routingJson.error) {
       return { status: "fail", reason: `Routing diagnostics reported: ${routingJson.error}`, details };
     }
-    details.push(`Routing diagnostics loaded; will_use_swarmsync=${Boolean(routingJson.will_use_swarmsync)}.`);
+    if (routingJson.model_provider !== "anthropic" || routingJson.swarmsync_in_model_path !== false) {
+      return { status: "fail", reason: "Routing diagnostics did not report the direct Anthropic path.", details };
+    }
+    if (!routingJson.model_path_ready) {
+      return { status: "fail", reason: "Direct Anthropic path is missing its encrypted-vault credential.", details };
+    }
+    details.push(`Routing diagnostics loaded; provider=${routingJson.model_provider}, policy=${routingJson.policy_source}.`);
   } catch (e) {
     return { status: "fail", reason: `Routing diagnostics request failed: ${String(e)}`, details };
   }
@@ -185,7 +189,7 @@ async function runFirstMessageSelfTest(httpPort: number, wsPort: number, daemonT
   });
 }
 
-function SwarmSyncTab({ httpPort, wsPort, daemonToken }: { httpPort: number; wsPort?: number; daemonToken?: string }) {
+function RoutingTab({ httpPort, wsPort, daemonToken }: { httpPort: number; wsPort?: number; daemonToken?: string }) {
   const [data, setData] = useState<RoutingStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -218,16 +222,22 @@ function SwarmSyncTab({ httpPort, wsPort, daemonToken }: { httpPort: number; wsP
     }
   }, [httpPort, wsPort, daemonToken]);
 
-  const live = data?.live_test;
-  const hasFailure = Boolean(error || data?.error || live?.error || data?.will_use_swarmsync === false);
+  const hasFailure = Boolean(
+    error ||
+    data?.error ||
+    data?.model_provider !== "anthropic" ||
+    data?.model_path_ready === false ||
+    data?.swarmsync_in_model_path !== false ||
+    data?.network_probe_performed === true
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
         <div>
-          <h3 style={{ fontSize: "0.95rem", marginBottom: 4 }}>SwarmSync Live Status</h3>
+          <h3 style={{ fontSize: "0.95rem", marginBottom: 4 }}>Model Routing Status</h3>
           <p style={{ color: "var(--text-secondary, #aaa)", fontSize: "0.82rem" }}>
-            Pulled from /api/routing/status with a live routing probe when SwarmSync is enabled.
+            Direct Anthropic readiness and deterministic policy identity from /api/routing/status. Diagnostics never dispatches a billable model call.
           </p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -251,19 +261,20 @@ function SwarmSyncTab({ httpPort, wsPort, daemonToken }: { httpPort: number; wsP
           padding: "1rem",
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-            <strong style={{ fontSize: "0.9rem" }}>Routing Readiness</strong>
+            <strong style={{ fontSize: "0.9rem" }}>Direct Model Path</strong>
             <span style={statusBadgeStyle(!hasFailure)}>
               {!hasFailure ? "Ready" : "Attention"}
             </span>
           </div>
-          <FieldRow label="SwarmSync key" value={boolLabel(data.swarm_key_present)} tone={data.swarm_key_present ? "ok" : "error"} />
-          <FieldRow label="OpenRouter key" value={boolLabel(data.openrouter_key_present)} tone={data.openrouter_key_present ? "ok" : undefined} />
-          <FieldRow label="SwarmSync enabled" value={enabledLabel(data.swarmsync_enabled)} tone={data.swarmsync_enabled ? "ok" : "warn"} />
-          <FieldRow label="Will use SwarmSync" value={enabledLabel(data.will_use_swarmsync)} tone={data.will_use_swarmsync ? "ok" : "error"} />
-          <FieldRow label="Live routed model" value={live?.routed_model || data.default_model} tone={live?.routed_model ? "ok" : undefined} />
-          <FieldRow label="Routing reason" value={live?.routing_reason || live?.error || data.error || "No live routing reason reported"} tone={live?.error || data.error ? "error" : undefined} />
-          <FieldRow label="Tier" value={live?.tier || "-"} />
-          <FieldRow label="Failure state" value={live?.error || data.error || (data.will_use_swarmsync ? "None" : "SwarmSync will not be used")} tone={hasFailure ? "error" : "ok"} />
+          <FieldRow label="Execution provider" value={data.model_provider || "-"} tone={data.model_provider === "anthropic" ? "ok" : "error"} />
+          <FieldRow label="Policy source" value={data.policy_source || "-"} tone={data.policy_source ? "ok" : "error"} />
+          <FieldRow label="Anthropic key" value={boolLabel(data.anthropic_key_present)} tone={data.anthropic_key_present ? "ok" : "error"} />
+          <FieldRow label="Model path ready" value={enabledLabel(data.model_path_ready)} tone={data.model_path_ready ? "ok" : "error"} />
+          <FieldRow label="Policy models" value={(data.policy_model_ids || []).join(", ") || "-"} />
+          <FieldRow label="SwarmSync in model path" value={enabledLabel(data.swarmsync_in_model_path)} tone={data.swarmsync_in_model_path === false ? "ok" : "error"} />
+          <FieldRow label="SwarmSync non-model integrations" value={enabledLabel(data.swarmsync_non_model_integrations_enabled)} />
+          <FieldRow label="Diagnostic network probe" value={enabledLabel(data.network_probe_performed)} tone={data.network_probe_performed ? "error" : "ok"} />
+          <FieldRow label="Failure state" value={data.error || (hasFailure ? "Routing identity or credential check failed" : "None")} tone={hasFailure ? "error" : "ok"} />
         </div>
       )}
 
@@ -1050,7 +1061,7 @@ function HabitsTab({ httpPort }: { httpPort: number }) {
 // ---------------------------------------------------------------------------
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "swarmsync",      label: "SwarmSync" },
+  { id: "routing",        label: "Model Routing" },
   { id: "tiers",          label: "Query Tiers" },
   { id: "contradictions", label: "Contradictions" },
   { id: "decisions",      label: "Decisions" },
@@ -1069,7 +1080,7 @@ function diagnosticsFilename(header: string | null): string {
 }
 
 export function DiagnosticsView({ httpPort, wsPort, daemonToken }: DiagnosticsViewProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("swarmsync");
+  const [activeTab, setActiveTab] = useState<TabId>("routing");
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [nativeBuildSha, setNativeBuildSha] = useState<string>("unavailable");
@@ -1171,7 +1182,7 @@ export function DiagnosticsView({ httpPort, wsPort, daemonToken }: DiagnosticsVi
 
       {/* Tab content — always mounted so lazy fetch fires on first activation */}
       <div style={tabContentStyle}>
-        {activeTab === "swarmsync"      && <SwarmSyncTab      httpPort={httpPort} wsPort={wsPort} daemonToken={daemonToken} />}
+        {activeTab === "routing"        && <RoutingTab        httpPort={httpPort} wsPort={wsPort} daemonToken={daemonToken} />}
         {activeTab === "tiers"          && <QueryTiersTab      httpPort={httpPort} />}
         {activeTab === "contradictions" && <ContradictionsTab  httpPort={httpPort} />}
         {activeTab === "decisions"      && <DecisionsTab       httpPort={httpPort} />}

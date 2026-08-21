@@ -148,10 +148,10 @@ export const ApprovalsView: React.FC<ApprovalsViewProps> = ({ httpPort }) => {
       </div>
 
       <div className="coming-soon-panel">
-        <strong>Finance approvals are never handled here</strong>
+        <strong>Finance approvals are not handled by this surface</strong>
         <p>
-          Cato never approves or writes to FinanceOS — that boundary is enforced at the client
-          level, not just in this view. Finance approvals happen in FinanceOS/Airtable directly.
+          This installed Approvals view issues GET-only control-room requests and has no finance
+          mutation wired into it. Finance approvals happen in FinanceOS/Airtable directly.
         </p>
         {financeApprovalsUrl ? (
           <a

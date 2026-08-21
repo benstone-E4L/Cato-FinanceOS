@@ -1,12 +1,9 @@
 """
 cato/openai_client.py — Direct OpenAI Chat Completions API client.
 
-Sibling to anthropic_client.py, with the same retry-contract discipline.
-Used ONLY for models model_policy.py has placed in a Provider.OPENAI slot in
-TIER_CANDIDATES (currently gpt-4o-mini at HAIKU tier, gpt-4o at SONNET tier) --
-i.e. only for the cost-arbitrage cases model_policy.select_cheapest_candidate
-has already decided are cost-optimal AND available. Model selection is NOT
-made here, same discipline as anthropic_client.py.
+Legacy compatibility client retained for isolated tooling/tests. It is not in
+Cato's sanctioned production model path: model_policy contains Anthropic-only
+candidates and ModelRouter.complete_message never dispatches this client.
 
 RETRY CONTRACT (mirrors anthropic_client.py's structure)
 ---------------------------------------------------------
@@ -161,8 +158,7 @@ Transport = Callable[
 
 
 class OpenAIDirectClient:
-    """Executes a :class:`RoutingDecision` (Provider.OPENAI models only)
-    against the OpenAI Chat Completions API."""
+    """Legacy OpenAI client; not a sanctioned production execution path."""
 
     def __init__(
         self,

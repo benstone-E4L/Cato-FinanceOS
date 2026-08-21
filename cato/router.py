@@ -25,7 +25,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncIterator, Optional, Tuple
+from typing import Any, AsyncIterator, Optional
 
 import aiohttp
 
@@ -34,13 +34,8 @@ from cato.anthropic_client import (
     AnthropicDirectClient,
     CallResult,
 )
-from cato.openai_client import (
-    OpenAIAPIError,
-    OpenAIDirectClient,
-)
+from cato.openai_client import OpenAIDirectClient
 from cato.model_policy import (
-    CostGateExceeded,
-    EscalationExhausted,
     MAX_ESCALATIONS,
     Provider,
     RoutingDecision,
@@ -363,7 +358,7 @@ class ModelRouter:
     def __init__(
         self,
         vault: Any,
-        preferred_model: str = "openai/gpt-4o-mini",
+        preferred_model: str = "claude-sonnet-5",
         blocked_models: Optional[list[str]] = None,
         max_output_tokens: int = 16384,
         anthropic_client: Optional[AnthropicDirectClient] = None,
@@ -390,10 +385,8 @@ class ModelRouter:
 
         # Direct Anthropic client — the active model-execution path.
         self._anthropic = anthropic_client or AnthropicDirectClient(vault=vault)
-        # Direct OpenAI client — only ever dispatched to when model_policy's
-        # cost-based selection picked an OpenAI model (HAIKU/SONNET tier only;
-        # see model_policy.TIER_CANDIDATES). Constructed unconditionally like
-        # the Anthropic client; has_credentials() gates whether it's ever used.
+        # Retained only as an injectable negative-test/legacy dependency.
+        # complete_message never dispatches it.
         self._openai = openai_client or OpenAIDirectClient(vault=vault)
 
         # Circuit breaker state for the legacy multi-provider streaming path.
@@ -493,34 +486,19 @@ class ModelRouter:
 
         Returns ``(model_id, openai_style_assistant_message, decision)``.
         """
-        # Environment fact, not a model-influenced choice: which provider
-        # keys are actually configured right now. Computed once per call —
-        # escalation within one call keeps the same availability snapshot.
-        available: frozenset[Provider] = frozenset(
-            {Provider.ANTHROPIC}
-            | ({Provider.OPENAI} if self._openai.has_credentials() else set())
-        )
+        # Model execution is direct Anthropic only. Other credentials may be
+        # retained for unrelated integrations but can never broaden routing.
+        available: frozenset[Provider] = frozenset({Provider.ANTHROPIC})
         current = descriptor
         while True:
             decision = route(current, when=when, available_providers=available)
             record = self._decision_log_base(decision)
             try:
-                if decision.provider is Provider.OPENAI:
-                    openai_messages = messages
-                    if system and not any(
-                        m.get("role") == "system" for m in messages
-                    ):
-                        openai_messages = [{"role": "system", "content": system}, *messages]
-                    result = await self._openai.call(
-                        decision, openai_messages, tools=tools,
-                        idempotency_key=idempotency_key,
-                    )
-                else:
-                    result = await self._anthropic.call(
-                        decision, messages, system=system, tools=tools,
-                        idempotency_key=idempotency_key,
-                    )
-            except (AnthropicAPIError, OpenAIAPIError) as exc:
+                result = await self._anthropic.call(
+                    decision, messages, system=system, tools=tools,
+                    idempotency_key=idempotency_key,
+                )
+            except AnthropicAPIError as exc:
                 _record_routing_decision({
                     **record,
                     "success": False,
@@ -533,16 +511,7 @@ class ModelRouter:
             if trigger is None and validator is not None:
                 trigger = validator(result)
 
-            if decision.provider is Provider.OPENAI:
-                # OpenAI's own message shape already matches what Cato uses
-                # internally (content + optional tool_calls with JSON-string
-                # arguments) — just ensure `content` is a string, never None
-                # (OpenAI omits/nulls it on tool-call-only responses).
-                message = dict(result.message)
-                if message.get("content") is None:
-                    message["content"] = ""
-            else:
-                message = _anthropic_message_to_openai(result)
+            message = _anthropic_message_to_openai(result)
             _record_routing_decision({
                 **record,
                 "success": trigger is None,

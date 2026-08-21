@@ -1,6 +1,6 @@
 /**
- * AuthKeysView — SwarmSync key, CLI OAuth status panel, Vault key management.
- * All data is live from /api/vault/keys, /api/config.
+ * AuthKeysView — model/integration credentials, CLI status, and vault management.
+ * All data is live from daemon APIs.
  */
 import React, { useState, useEffect, useCallback } from "react";
 
@@ -10,8 +10,9 @@ interface AuthKeysViewProps {
 
 // Which vault keys go here and what they're for
 const VAULT_KEY_META: Record<string, string> = {
-  OPENROUTER_API_KEY:  "OpenRouter API key — chat via OpenRouter (sk-or-…)",
-  SWARMSYNC_API_KEY:   "SwarmSync routing key — alternative chat backend (sk-ss-…)",
+  ANTHROPIC_API_KEY:   "Anthropic API key — Cato's direct model-execution credential",
+  OPENROUTER_API_KEY:  "OpenRouter API key — retained for non-production/legacy integrations",
+  SWARMSYNC_API_KEY:   "SwarmSync key — optional non-model integrations only",
   TELEGRAM_BOT_TOKEN:  "Telegram bot token — Cato's Telegram interface",
   brave_api_key:       "Brave web search",
   exa_api_key:         "Exa semantic search",
@@ -36,15 +37,14 @@ interface CliToolStatus {
 export const AuthKeysView: React.FC<AuthKeysViewProps> = ({ httpPort }) => {
   const base = `http://127.0.0.1:${httpPort}`;
   const [vaultKeys, setVaultKeys] = useState<string[]>([]);
-  const [config, setConfig] = useState<Record<string, unknown>>({});
   const [cliStatus, setCliStatus] = useState<Record<string, CliToolStatus>>({});
   const [restartingCli, setRestartingCli] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // OpenRouter key entry
-  const [orKey, setOrKey] = useState("");
-  const [orSaving, setOrSaving] = useState(false);
-  const [orMsg, setOrMsg] = useState("");
+  // Direct Anthropic model credential
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [anthropicSaving, setAnthropicSaving] = useState(false);
+  const [anthropicMsg, setAnthropicMsg] = useState("");
   // SwarmSync key entry
   const [ssKey, setSsKey] = useState("");
   const [ssSaving, setSsSaving] = useState(false);
@@ -58,13 +58,11 @@ export const AuthKeysView: React.FC<AuthKeysViewProps> = ({ httpPort }) => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [kr, cr, cs] = await Promise.all([
+      const [kr, cs] = await Promise.all([
         fetch(`${base}/api/vault/keys`).then((r) => r.json()),
-        fetch(`${base}/api/config`).then((r) => r.json()),
         fetch(`${base}/api/cli/status`).then((r) => r.json()).catch(() => ({})),
       ]);
       setVaultKeys(kr as string[]);
-      setConfig(cr as Record<string, unknown>);
       setCliStatus(cs as Record<string, CliToolStatus>);
     } catch {
       // silently ignore; show whatever we have
@@ -155,7 +153,7 @@ export const AuthKeysView: React.FC<AuthKeysViewProps> = ({ httpPort }) => {
     await fetchData();
   };
 
-  const hasOpenRouter  = vaultKeys.includes("OPENROUTER_API_KEY");
+  const hasAnthropic   = vaultKeys.includes("ANTHROPIC_API_KEY");
   const hasSwarmSync   = vaultKeys.includes("SWARMSYNC_API_KEY");
 
   if (loading) return <div className="view-loading"><div className="app-loading-spinner" /></div>;
@@ -168,42 +166,43 @@ export const AuthKeysView: React.FC<AuthKeysViewProps> = ({ httpPort }) => {
       </div>
 
       <div className="info-note">
-        Chat routes through <strong>OpenRouter</strong> or <strong>SwarmSync</strong>.
+        Chat and compaction call <strong>Anthropic directly</strong> under deterministic policy.
+        Other stored provider keys do not participate in model execution.
         Coding agents (Codex, Cursor) use local sessions — no API keys required.
       </div>
 
-      {/* OpenRouter Key */}
+      {/* Anthropic Key */}
       <div className="section-block">
         <div className="section-title">
-          OpenRouter API Key
-          {hasOpenRouter
+          Anthropic API Key
+          {hasAnthropic
             ? <span className="badge-blue">Configured</span>
             : <span className="badge-red">Missing</span>}
         </div>
         <div className="section-desc">
-          Routes chat to any LLM (MiniMax, GPT-4o, Claude, etc.) via openrouter.ai (sk-or-…).
+          The only credential used by Cato's model-execution path. Stored in the encrypted vault.
         </div>
         <div className="form-row">
           <input
             type="password"
             className="form-input form-input-wide"
-            placeholder="sk-or-..."
-            value={orKey}
-            onChange={(e) => setOrKey(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && saveVaultKey("OPENROUTER_API_KEY", orKey, setOrMsg, setOrSaving, () => setOrKey(""))}
+            placeholder="Anthropic API key"
+            value={anthropicKey}
+            onChange={(e) => setAnthropicKey(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && saveVaultKey("ANTHROPIC_API_KEY", anthropicKey, setAnthropicMsg, setAnthropicSaving, () => setAnthropicKey(""))}
           />
           <button
             className="btn-primary"
-            onClick={() => saveVaultKey("OPENROUTER_API_KEY", orKey, setOrMsg, setOrSaving, () => setOrKey(""))}
-            disabled={orSaving || !orKey.trim()}
+            onClick={() => saveVaultKey("ANTHROPIC_API_KEY", anthropicKey, setAnthropicMsg, setAnthropicSaving, () => setAnthropicKey(""))}
+            disabled={anthropicSaving || !anthropicKey.trim()}
           >
-            {orSaving ? "Saving…" : "Save"}
+            {anthropicSaving ? "Saving…" : "Save"}
           </button>
-          {orMsg && <span className="save-msg">{orMsg}</span>}
+          {anthropicMsg && <span className="save-msg">{anthropicMsg}</span>}
         </div>
         <div className="form-row" style={{ marginTop: 8 }}>
-          <label>Current Model</label>
-          <code className="code-cell">{String(config.default_model ?? "openai/gpt-4o-mini")}</code>
+          <label>Selection policy</label>
+          <code className="code-cell">cato/model_policy.py (direct Anthropic)</code>
         </div>
       </div>
 
@@ -216,7 +215,8 @@ export const AuthKeysView: React.FC<AuthKeysViewProps> = ({ httpPort }) => {
             : <span className="badge-gray">Optional</span>}
         </div>
         <div className="section-desc">
-          Alternative chat routing via SwarmSync (sk-ss-…). Picks the best model automatically.
+          Optional credential for Genesis, the integration registry, and site-services bridge.
+          It is never used for chat or model selection.
         </div>
         <div className="form-row">
           <input

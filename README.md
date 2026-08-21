@@ -4,9 +4,11 @@
 
 **A local-first Python agent daemon with explicit budget controls and inspectable source.**
 
-> **Verification status:** this repository is under active hardening. The current
-> evidence is local/offline; no signed installer, production deployment, live
-> Xero write, or complete packaged-app run has been proven. Read
+> **Verification status:** exact-HEAD operator-workstation acceptance has proven
+> the packaged desktop and adjacent daemon, Work Inbox, encrypted credential
+> custody, safe FinanceOS fallback, and a live direct Anthropic round trip. No
+> public deployment, signed release publication, or live FinanceOS write is
+> claimed. Read
 > [Known Limitations](docs/ops/LIMITATIONS.md) and
 > [Verification](docs/ops/VERIFICATION.md) before relying on it for financial or
 > security-sensitive work.
@@ -56,7 +58,7 @@ cato init
 The wizard asks for:
 - Monthly and session budget caps (defaults: $20 / $1)
 - A vault master password (used to encrypt all API keys with AES-256-GCM)
-- Whether to enable Telegram, WhatsApp, or SwarmSync routing
+- Whether to enable Telegram, WhatsApp, or optional non-model integrations
 
 ### Start the daemon
 
@@ -111,11 +113,13 @@ After migration, run `cato doctor` to audit token budgets and `cato init` to con
 
 ---
 
-## Powered by SwarmSync Routing
+## Direct Anthropic Model Routing
 
-[SwarmSync](https://swarmsync.ai) is an intelligent model router that selects the cheapest model capable of handling each task — without you having to think about it.
+Cato calls the Anthropic API directly. `cato/model_policy.py` is the single
+source of truth for model selection; prompts and tool arguments cannot override
+it. SwarmSync is not in the model-execution path.
 
-### Enabling SwarmSync
+### Optional SwarmSync integrations
 
 ```yaml
 # config.yaml (Windows: %APPDATA%\cato; macOS/Linux: ~/.cato)
@@ -123,19 +127,9 @@ swarmsync_enabled: true
 swarmsync_api_url: https://api.swarmsync.ai/v1/chat/completions
 ```
 
-Or enable interactively during `cato init`.
-
-> **Note:** When `swarmsync_enabled: true`, message content is routed through the SwarmSync API.
-
-### How it works
-
-1. Before each LLM call, Cato sends the task description to the SwarmSync router
-2. The router scores each of the 16 supported models against the task complexity
-3. The cheapest capable model is selected automatically
-4. The selected model's actual cost is tracked in your budget as normal
-5. Routing itself costs $0.00
-
-When SwarmSync is disabled (the default), Cato uses `default_model` from config.yaml for every call.
+These settings are retained only for Genesis, the integration registry, and the
+site-services bridge. Enabling them does not send Cato chat messages through
+SwarmSync and does not change model selection.
 
 ---
 
@@ -242,28 +236,10 @@ for that session. Verify signing configuration before calling a receipt signed.
 
 ## Model Support
 
-All 16 models across 6 providers, with per-call cost tracking:
-
-| Model | Provider | Input $/M | Output $/M |
-|-------|----------|-----------|------------|
-| claude-opus-4-6 | Anthropic | $15.00 | $75.00 |
-| claude-sonnet-4-6 | Anthropic | $3.00 | $15.00 |
-| claude-haiku-4-5 | Anthropic | $0.80 | $4.00 |
-| gpt-4o | OpenAI | $2.50 | $10.00 |
-| gpt-4o-mini | OpenAI | $0.15 | $0.60 |
-| o3-mini | OpenAI | $1.10 | $4.40 |
-| gemini-2.0-pro | Google | $1.25 | $5.00 |
-| gemini-2.0-flash | Google | $0.10 | $0.40 |
-| gemini-2.0-flash-lite | Google | $0.075 | $0.30 |
-| deepseek-v3 | DeepSeek | $0.27 | $1.10 |
-| deepseek-r1 | DeepSeek | $0.55 | $2.19 |
-| groq-llama-3.3-70b | Groq | $0.59 | $0.79 |
-| mistral-small | Mistral | $0.10 | $0.30 |
-| minimax-2.5 | MiniMax | $0.20 | $1.00 |
-| kimi-k2.5 | Moonshot | $0.15 | $0.60 |
-| swarmsync-router | SwarmSync | $0.00 | $0.00 |
-
-Also supports **OpenRouter** (`OPENROUTER_API_KEY`) for access to 300+ models through a single key — a popular choice for former OpenClaw / MoltBot users who want multi-provider access without managing separate keys.
+The Cato model-execution path uses pinned Anthropic model snapshots selected by
+`cato/model_policy.py`. The policy owns model choice, bounded escalation, call
+shape, and cost ceilings. `ANTHROPIC_API_KEY` is the only credential required by
+this path and belongs in the encrypted vault.
 
 ---
 
@@ -320,11 +296,11 @@ No orchestration magic. No hidden event loops. Read it in a coffee break.
   User message
        |
        v
-+------+--------+      +-----------+      +----------+
-| Telegram /    |      |  Gateway  |      | SwarmSync|
-| WhatsApp /    +----->|  (auth +  +----->|  Router  |
-| WebChat       |      |  routing) |      | (opt-in) |
-+---------------+      +-----+-----+      +----------+
++------+--------+      +-----------+
+| Telegram /    |      |  Gateway  |
+| WhatsApp /    +----->|  (auth +  |
+| WebChat       |      | delivery) |
++---------------+      +-----+-----+
                               |
                               v
                     +---------+--------+
@@ -338,33 +314,22 @@ No orchestration magic. No hidden event loops. Read it in a coffee break.
                               v
                     +---------+--------+
                     |    Agent Loop     |
-                    |  plan → execute  |
-                    |  → reflect → done|
-                    +---------+--------+
-                              |
-               +--------------+-----------+
-               |              |           |
-               v              v           v
-          +--------+    +---------+  +--------+
-          |  Shell  |    | Browser |  |  File  |
-          |  tool   |    | Conduit |  |  tool  |
-          +--------+    +---------+  +--------+
-               |              |           |
-               +------+-------+-----------+
-                      |
-                      v
-              +--------------+
-              |    Memory     |
-              | SQLite+BM25  |
-              | +embeddings  |
-              +--------------+
-                      |
-                      v
-              +--------------+
-              | Budget Guard  |
-              | session+month |
-              | hard caps     |
-              +--------------+
+                    | plan / tools /    |
+                    | reflect / respond |
+                    +----+---------+----+
+                         |         |
+              model call |         | allowlisted actions
+                         v         v
+              +----------+--+   +--+----------------+
+              | Model Policy |   | Shell / Browser / |
+              | cost + risk  |   | File / Integrations|
+              +------+-------+   +----------+---------+
+                     |                      |
+                     v                      v
+              +------+-------+       +------+-------+
+              | Anthropic API |       | Memory +     |
+              | direct only   |       | Budget Guard |
+              +--------------+       +--------------+
 ```
 
 ---
@@ -430,7 +395,7 @@ All config lives in the Cato data directory (Windows: `%APPDATA%\cato\config.yam
 
 ```yaml
 agent_name: cato
-default_model: claude-sonnet-4-6
+default_model: claude-sonnet-5  # legacy display/config field; policy owns execution
 monthly_cap: 20.0
 session_cap: 1.0
 conduit_enabled: true
@@ -478,4 +443,4 @@ If you found this repo searching for:
 
 ---
 
-*Powered by [SwarmSync](https://swarmsync.ai) intelligent model routing.*
+*Cato model execution uses the direct Anthropic API under deterministic policy.*

@@ -2,10 +2,10 @@
 
 export const PRIMARY_NAV_ITEMS = [
   { id: "work-inbox", label: "Work Inbox", hint: "What needs your attention" },
-  { id: "waiting-followups", label: "Waiting/Follow-ups", hint: "Timers, owners, overdue first" },
-  { id: "approvals", label: "Approvals", hint: "Drafts & Monday updates" },
-  { id: "calendar", label: "Calendar", hint: "Today & next meetings" },
-  { id: "company-tasks", label: "Company Tasks", hint: "Monday board (read-only)" },
+  { id: "waiting-followups", label: "Waiting/Follow-ups", hint: "Reserved — not yet available" },
+  { id: "approvals", label: "Approvals", hint: "Local drafts; Monday reserved" },
+  { id: "calendar", label: "Calendar", hint: "Reserved — not yet available" },
+  { id: "company-tasks", label: "Company Tasks", hint: "Monday view not yet available" },
   { id: "finance", label: "Finance", hint: "FinanceOS control room (read-only)" },
   { id: "ask-e4l", label: "Ask E4L", hint: "Vault-grounded chat + memory" },
   { id: "activity-automations", label: "Activity/Automations", hint: "Audit, cron, sessions, budget" },

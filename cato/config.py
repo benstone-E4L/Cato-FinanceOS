@@ -80,7 +80,9 @@ class CatoConfig:
     agent_name: str = "cato"
 
     # Model selection (fallback slug — SwarmSync overrides this when enabled)
-    default_model: str = "openai/gpt-4o-mini"
+    # Legacy display/budget label only. Executable model selection is owned by
+    # cato/model_policy.py and is direct Anthropic.
+    default_model: str = "claude-sonnet-5"
 
     # SwarmSync intelligent routing
     swarmsync_enabled: bool = True
