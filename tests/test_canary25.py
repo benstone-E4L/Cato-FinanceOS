@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from cato.canary25.contacts import ContactRow, detect_format, load_contacts_csv
 from cato.canary25.manifest import build_manifest, evaluate_pass, load_manifest, save_manifest
 from cato.canary25.select import dedupe_by_domain, select_batch
@@ -117,7 +115,7 @@ def test_select_batch_count_and_seed(tmp_path: Path) -> None:
 
 def test_manifest_roundtrip_and_pass_eval(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "cato.canary25.paths.default_canary_dir",
+        "cato.canary25.manifest.default_canary_dir",
         lambda: tmp_path,
     )
     selected = [
@@ -131,6 +129,7 @@ def test_manifest_roundtrip_and_pass_eval(tmp_path: Path, monkeypatch) -> None:
         batch_id="test-batch",
     )
     path = save_manifest(manifest)
+    assert path == tmp_path / "manifest.json"
     loaded = load_manifest(path)
     assert loaded["batch_id"] == "test-batch"
     assert loaded["g1_safety"]["live_outreach_via_cato"] is False
@@ -151,10 +150,10 @@ def test_manifest_roundtrip_and_pass_eval(tmp_path: Path, monkeypatch) -> None:
 
 def test_record_requires_contact_id(tmp_path: Path) -> None:
     from click.testing import CliRunner
-    from cato.cli import main
 
-    from cato.canary25.manifest import build_manifest, save_manifest
     from cato.canary25.contacts import ContactRow
+    from cato.canary25.manifest import build_manifest, save_manifest
+    from cato.cli import main
 
     out = tmp_path / "canary"
     out.mkdir()
@@ -175,10 +174,10 @@ def test_record_requires_contact_id(tmp_path: Path) -> None:
 
 def test_record_per_contact_updates_tracking(tmp_path: Path) -> None:
     from click.testing import CliRunner
-    from cato.cli import main
 
-    from cato.canary25.manifest import build_manifest, load_manifest, save_manifest
     from cato.canary25.contacts import ContactRow
+    from cato.canary25.manifest import build_manifest, load_manifest, save_manifest
+    from cato.cli import main
 
     out = tmp_path / "canary"
     out.mkdir()
@@ -269,6 +268,7 @@ def test_night_shift_still_blocks_live_outreach() -> None:
 
 def test_cli_canary_import_command(tmp_path: Path) -> None:
     from click.testing import CliRunner
+
     from cato.cli import main
 
     p = _validated_csv(
