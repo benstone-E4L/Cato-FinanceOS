@@ -961,6 +961,131 @@ class GenesisTool:
 
 
 # ---------------------------------------------------------------------------
+# Task 1 — live deploy probe + doctor
+#
+# The hardcoded "status": "deployed" on GENESIS_AGENTS entries is registry
+# metadata, not proof anything is reachable right now. probe_live_agents()
+# actually asks the gateway; build_doctor_report() combines that live truth
+# with the LOCAL allowlist config so an operator can see "allowlisted" vs
+# "live on gateway" vs "both" (only "both" is actually callable) instead of
+# trusting either signal alone.
+# ---------------------------------------------------------------------------
+
+def _extract_agent_slugs(parsed: Any) -> list[str] | None:
+    """Best-effort extraction of agent slugs from a GET /agents response.
+
+    Handles the response shapes actually seen from the gateway (a bare list
+    of slug strings, a list of {"slug": ...} objects, or an object with an
+    "agents" key wrapping either of those). Returns None if the shape is not
+    recognized -- callers must treat that as an inconclusive probe, not an
+    empty listing.
+    """
+    candidate = parsed
+    if isinstance(candidate, dict):
+        candidate = candidate.get("agents", candidate.get("data", candidate))
+    if not isinstance(candidate, list):
+        return None
+    slugs: list[str] = []
+    for item in candidate:
+        if isinstance(item, str):
+            slugs.append(item)
+        elif isinstance(item, dict):
+            slug = item.get("slug") or item.get("name") or item.get("id")
+            if isinstance(slug, str):
+                slugs.append(slug)
+    return slugs
+
+
+async def probe_live_agents(
+    endpoint: str, *, timeout_s: float = 10.0, session: Any = None,
+) -> dict[str, Any]:
+    """GET {endpoint}/agents and report which slugs the gateway actually
+    lists right now. Never raises -- every failure mode returns
+    ``{"ok": False, ...}`` so callers (the doctor command) can report a
+    truthful "gateway unreachable" state rather than crashing or, worse,
+    silently treating an unreachable gateway as an empty-but-valid listing.
+    """
+    url = f"{endpoint.rstrip('/')}/agents"
+    owns_session = session is None
+    if owns_session:
+        resolver = aiohttp.ThreadedResolver()
+        connector = aiohttp.TCPConnector(resolver=resolver, family=0, ssl=True, limit=10)
+        session = aiohttp.ClientSession(connector=connector)
+    try:
+        timeout = aiohttp.ClientTimeout(total=timeout_s)
+        async with session.get(url, timeout=timeout) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                return {
+                    "ok": False, "error": "upstream_error",
+                    "status": resp.status, "body": body[:_UPSTREAM_BODY_TRUNCATE],
+                }
+            try:
+                parsed = json.loads(body)
+            except (json.JSONDecodeError, ValueError):
+                return {"ok": False, "error": "invalid_response"}
+            slugs = _extract_agent_slugs(parsed)
+            if slugs is None:
+                return {"ok": False, "error": "unrecognized_response_shape"}
+            return {"ok": True, "slugs": slugs}
+    except asyncio.TimeoutError:
+        return {"ok": False, "error": "timeout", "outcome_unknown": True}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": "exception", "type": type(exc).__name__, "message": str(exc)}
+    finally:
+        if owns_session:
+            await session.close()
+
+
+def build_doctor_report(config: Any, live_result: dict[str, Any]) -> dict[str, Any]:
+    """Pure function: combine the LOCAL allowlist with a live gateway probe
+    result into one truthful report.
+
+    Separates three states per e4l slug: allowlisted (local config only),
+    live_on_gateway (remote probe only), and callable (both — the only state
+    in which GenesisTool.execute() would actually dispatch it). Exits the
+    caller should treat as failure (see cli.py's ``genesis doctor``) whenever
+    the allowlist is empty, the gateway could not be reached, OR any of the
+    14 e4l slugs is missing from the live listing.
+    """
+    allowlist = list(getattr(config, "genesis_agent_allowlist", None) or [])
+    canonical_allowlist = {_canonicalize_agent_slug(s) for s in allowlist}
+    allowlist_empty = len(canonical_allowlist) == 0
+
+    target_slugs = sorted(FAIL_CLOSED_ACCOUNTING_ALLOWLIST)
+    gateway_reachable = bool(live_result.get("ok"))
+    live_slugs_raw = live_result.get("slugs") or []
+    canonical_live = {_canonicalize_agent_slug(s) for s in live_slugs_raw}
+
+    rows: list[dict[str, Any]] = []
+    for slug in target_slugs:
+        canon = _canonicalize_agent_slug(slug)
+        allowlisted = canon in canonical_allowlist
+        live_on_gateway = gateway_reachable and canon in canonical_live
+        rows.append({
+            "slug": slug,
+            "allowlisted": allowlisted,
+            "live_on_gateway": live_on_gateway,
+            "callable": allowlisted and live_on_gateway,
+        })
+
+    missing_from_gateway = (
+        [r["slug"] for r in rows if not r["live_on_gateway"]] if gateway_reachable else list(target_slugs)
+    )
+    healthy = gateway_reachable and not allowlist_empty and not missing_from_gateway
+
+    return {
+        "allowlist_empty": allowlist_empty,
+        "gateway_reachable": gateway_reachable,
+        "gateway_error": None if gateway_reachable else live_result,
+        "rows": rows,
+        "missing_from_gateway": missing_from_gateway,
+        "callable_count": sum(1 for r in rows if r["callable"]),
+        "healthy": healthy,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Introspection helper
 # ---------------------------------------------------------------------------
 
@@ -1026,4 +1151,6 @@ __all__ = [
     "GenesisTool",
     "build_envelope",
     "list_agents",
+    "probe_live_agents",
+    "build_doctor_report",
 ]

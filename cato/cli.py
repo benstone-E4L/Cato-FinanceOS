@@ -38,7 +38,9 @@ from cato.platform import (
     setup_signal_handlers,
     terminate_pid,
 )
+from cato.tools.genesis import build_doctor_report as _genesis_build_doctor_report
 from cato.tools.genesis import list_agents as _genesis_list_agents
+from cato.tools.genesis import probe_live_agents as _genesis_probe_live_agents
 from cato.vault import Vault, VaultError, get_vault
 
 console = Console()
@@ -585,6 +587,88 @@ def genesis_health() -> None:
     safe_print(f"Body: {body[:500]}")
     if 200 <= status < 300:
         sys.exit(0)
+    sys.exit(1)
+
+
+@genesis_cmd.command("doctor")
+@click.option("--timeout", "timeout_s", default=10.0, show_default=True,
+              help="Seconds to wait for the live GET {genesis_endpoint}/agents probe.")
+def genesis_doctor(timeout_s: float) -> None:
+    """Truthfully report allowlist state INTERSECTED with a live gateway probe.
+
+    Task 1 of E4L_CATO_GENESIS_EXECUTION_PLAN.md: the hardcoded
+    ``"status": "deployed"`` field on GENESIS_AGENTS is registry metadata,
+    not proof anything is reachable right now. This command actually GETs
+    {genesis_endpoint}/agents and reports, per e4l slug, whether it is
+    allowlisted (local config), live on the gateway (remote probe), or both
+    (the only state in which Cato can actually dispatch to it).
+
+    Exits non-zero if the local allowlist is empty, the gateway could not be
+    reached, OR any of the 14 e4l slugs is missing from the live listing.
+    """
+    import asyncio
+
+    try:
+        cfg = CatoConfig.load()
+    except Exception as exc:
+        safe_print(f"Error: could not load config ({exc}).")
+        sys.exit(1)
+
+    endpoint = getattr(cfg, "genesis_endpoint", "https://swarmsync-agents.onrender.com")
+    safe_print(f"Genesis endpoint: {endpoint}")
+    safe_print("Probing GET {endpoint}/agents ...".format(endpoint=endpoint.rstrip("/")))
+
+    try:
+        live_result = asyncio.run(_genesis_probe_live_agents(endpoint, timeout_s=timeout_s))
+    except Exception as exc:
+        live_result = {"ok": False, "error": "exception", "type": type(exc).__name__, "message": str(exc)}
+
+    report = _genesis_build_doctor_report(cfg, live_result)
+
+    if report["allowlist_empty"]:
+        safe_print("Allowlist: EMPTY — deny-all. No Genesis agent is dispatchable, e4l or otherwise.")
+    else:
+        safe_print("Allowlist: populated.")
+
+    if report["gateway_reachable"]:
+        safe_print("Gateway: reachable.")
+    else:
+        safe_print(f"Gateway: UNREACHABLE — {report['gateway_error']}")
+
+    headers = ("slug", "allowlisted", "live_on_gateway", "callable")
+    widths = [len(h) for h in headers]
+    rows_fmt = []
+    for row in report["rows"]:
+        cells = (
+            str(row["slug"]),
+            "yes" if row["allowlisted"] else "no",
+            "yes" if row["live_on_gateway"] else "no",
+            "YES" if row["callable"] else "no",
+        )
+        rows_fmt.append(cells)
+        for i, cell in enumerate(cells):
+            widths[i] = max(widths[i], len(cell))
+
+    def _fmt(cells: tuple[str, ...]) -> str:
+        return "  ".join(cells[i].ljust(widths[i]) for i in range(len(cells)))
+
+    safe_print("")
+    safe_print(_fmt(headers))
+    safe_print("  ".join("-" * widths[i] for i in range(len(headers))))
+    for cells in rows_fmt:
+        safe_print(_fmt(cells))
+
+    safe_print("")
+    safe_print(f"Callable (allowlisted AND live): {report['callable_count']}/{len(report['rows'])}")
+    if report["missing_from_gateway"]:
+        safe_print(
+            "Missing from live gateway listing: " + ", ".join(report["missing_from_gateway"])
+        )
+
+    if report["healthy"]:
+        safe_print("\nOK: allowlist populated, gateway reachable, all 14 e4l slugs live.")
+        sys.exit(0)
+    safe_print("\nFAIL: see above — Cato cannot currently reach one or more e4l Genesis specialists.")
     sys.exit(1)
 
 

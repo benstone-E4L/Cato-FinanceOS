@@ -10,6 +10,7 @@ from .file import FileTool
 from .genesis import GENESIS_TOOL_SCHEMA, GenesisTool
 from .memory import MemoryTool
 from .shell import ShellTool
+from .xero_mcp import register_all_xero_demo_tools
 
 __all__ = ["ShellTool", "FileTool", "BrowserTool", "MemoryTool", "GenesisTool"]
 
@@ -25,6 +26,18 @@ def register_all_tools(agent_loop) -> None:
         GenesisTool(budget=getattr(agent_loop, "_budget", None)).execute,
         GENESIS_TOOL_SCHEMA,
     )
+
+    # Xero DEMO MCP adapter (Task 5) — 27 tools under xero_demo.<name>,
+    # tenant-locked server-side to c00a07d6-2681-45f9-a278-bacb418ff6c1.
+    # Only the 14 read tools are in config.auto_approved_tools by default
+    # (see cato/config.py); the 13 write tools stay per-call human-gated
+    # through the same cato.auth.token_checker.TokenChecker path every other
+    # unmapped sensitive tool uses.
+    try:
+        xero_cfg = getattr(agent_loop, "_cfg", None)
+    except Exception:
+        xero_cfg = None
+    register_all_xero_demo_tools(register_tool, config=xero_cfg)
 
     # Use Conduit browser engine if enabled in config, otherwise plain browser
     try:

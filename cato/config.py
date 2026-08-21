@@ -102,6 +102,16 @@ class CatoConfig:
     genesis_agent_denylist: list = field(default_factory=list)
     genesis_timeout_s: float = 30.0
 
+    # Xero DEMO MCP adapter (Task 5) — tenant-locked to demo org
+    # c00a07d6-2681-45f9-a278-bacb418ff6c1 at the credential AND code level
+    # on the server side; this config only points at it, it cannot widen
+    # what the server will accept. See cato/tools/xero_mcp.py.
+    xero_mcp_enabled: bool = True
+    xero_mcp_endpoint: str = "https://xero-mcp-demo.orangedune-dad71fcc.westus2.azurecontainerapps.io/mcp"
+    xero_mcp_keyvault_name: str = "fin-financeos-kv"
+    xero_mcp_keyvault_secret: str = "xero-mcp-bearer-demo"
+    xero_mcp_timeout_s: float = 30.0
+
     # Budget caps (USD)
     # DEPRECATED — no longer enforced; will be removed in v0.3.0.
     # Retained so existing config.yaml files that set session_cap keep loading
@@ -204,6 +214,21 @@ class CatoConfig:
         "conduit_navigate", "conduit_extract",
         # Time / config reads
         "get_time", "get_config", "list_files", "read_file",
+        # Xero DEMO MCP read tools ONLY (Task 5) — reversible/read-only,
+        # tenant-locked server-side to the demo org. The 13 write tools
+        # (create_account, create_contact, approve_invoice, approve_bill,
+        # post_manual_journal, create_draft_*, create_tracking_*,
+        # update_tracking_category, void_transaction, reverse_manual_journal)
+        # are deliberately NOT here — they stay per-call human-gated via
+        # TokenChecker's default "unmapped tool -> requires confirmation"
+        # path, same as every other irreversible action.
+        "xero_demo.list_entities", "xero_demo.get_organisation",
+        "xero_demo.get_chart_of_accounts", "xero_demo.get_trial_balance",
+        "xero_demo.get_profit_and_loss", "xero_demo.get_balance_sheet",
+        "xero_demo.get_bank_summary", "xero_demo.list_tracking_categories",
+        "xero_demo.list_open_payables", "xero_demo.list_open_receivables",
+        "xero_demo.list_contacts", "xero_demo.get_server_status",
+        "xero_demo.list_idempotency_log", "xero_demo.list_recent_write_audit_log",
     ])
     strict_approval: bool = False
 
