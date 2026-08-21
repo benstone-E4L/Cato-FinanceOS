@@ -47,9 +47,17 @@ export PHOENIX_TRACING="${PHOENIX_TRACING:-1}"
 # any prompt/tool text leaves this machine. Do not enable casually.
 
 # Presence-only report -- never the values.
+#
+# DO NOT use `${VAR:+set}${VAR:-MISSING}` here. It looks like a presence check
+# and is not: when VAR is set, `${VAR:-MISSING}` expands to the VALUE, so the
+# line prints "set<the actual secret>". That exact bug leaked the vault master
+# password into a session transcript on 2026-08-21 (password rotated after).
+# The only safe form is an explicit -n test that never expands the variable.
+_present() { if [ -n "$1" ]; then printf 'set'; else printf 'MISSING'; fi; }
 printf 'cato-env: CATO_VAULT_PASSWORD=%s PHOENIX_COLLECTOR_ENDPOINT=%s PHOENIX_PROJECT_NAME=%s\n' \
-  "${CATO_VAULT_PASSWORD:+set}${CATO_VAULT_PASSWORD:-MISSING}" \
-  "${PHOENIX_COLLECTOR_ENDPOINT:+set}${PHOENIX_COLLECTOR_ENDPOINT:-MISSING}" \
+  "$(_present "${CATO_VAULT_PASSWORD:-}")" \
+  "$(_present "${PHOENIX_COLLECTOR_ENDPOINT:-}")" \
   "$PHOENIX_PROJECT_NAME"
+unset -f _present
 
 unset _cato_repo _genesis_env
