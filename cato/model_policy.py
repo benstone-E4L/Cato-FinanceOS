@@ -961,27 +961,3 @@ def build_request_payload(
                 "budget_tokens": decision.thinking_budget_tokens,
             }
     return payload
-
-
-def build_openai_request_payload(
-    decision: RoutingDecision,
-    messages: list[dict],
-    *,
-    tools: Optional[list[dict]] = None,
-    stream: bool = False,
-) -> dict[str, Any]:
-    """Build a legacy OpenAI Chat Completions body.
-
-    This compatibility helper is not a sanctioned production model path. The
-    production router never calls it; new model-execution callers must use
-    ``build_request_payload`` through ``ModelRouter.complete_message``.
-    """
-    payload: dict[str, Any] = {
-        "model": decision.model_id,
-        "max_tokens": decision.max_output_tokens,
-        "messages": messages,
-        "stream": stream,
-    }
-    if tools:
-        payload["tools"] = tools
-    return payload

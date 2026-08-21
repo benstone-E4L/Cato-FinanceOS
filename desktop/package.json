@@ -11,7 +11,7 @@
     "test": "npm run test:chat-policy && npm run test:no-green && npm run test:work-inbox",
     "test:chat-policy": "node --experimental-strip-types --test src/hooks/chatStreamPolicy.test.mjs",
     "test:no-green": "node --test scripts/no-green-palette.test.mjs",
-    "test:work-inbox": "node --experimental-strip-types --test scripts/work-inbox-contract.test.mjs src/lib/catoFetchAuth.test.mjs",
+    "test:work-inbox": "node --experimental-strip-types --test scripts/work-inbox-contract.test.mjs src/lib/catoFetchAuth.test.mjs src/lib/configEditor.test.mjs",
     "test:work-inbox:browser": "python scripts/work_inbox_acceptance.py",
     "preview": "vite preview",
     "validate:frozen-sidecar": "python scripts/validate_frozen_bundle.py",

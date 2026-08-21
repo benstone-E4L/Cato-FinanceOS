@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED — NOT CURRENT OPERATING TRUTH.** This report preserves a 2026-08-01 point-in-time audit. Use `AGENTS.md`, `docs/ops/LIMITATIONS.md`, and `docs/ops/VERIFICATION.md` for current launch guidance.
+
 # Architecture Cartographer Report — Cato + Genesis Agents
 
 **Audited:** 2026-08-01 · **Mode:** FULL AUDIT, focus area = *fitness as the runtime for the E4L Finance OS*

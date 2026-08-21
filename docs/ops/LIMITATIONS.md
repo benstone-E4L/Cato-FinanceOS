@@ -12,17 +12,18 @@ cannot be mistaken for present state. Exact results live in
   third-party production deployment.
 - Exact-HEAD proof expires whenever source or packaged artifacts change. A
   clean source tree alone does not prove that the running executables match it.
-- The latest promoted proof before the current change set is `4199d19`; rerun
-  the acceptance package and promote new evidence for the final commit.
+- Evidence directories are named by short Git revision. The revision in the
+  live result, custody manifest, running health response, and Vault must match;
+  never hardcode a formerly current SHA in operating instructions.
 
 ## Model execution
 
 - Production chat, Ask E4L, forced-final turns, and session compaction must use
   `cato/model_policy.py` and the direct Anthropic client. Stored OpenAI,
   OpenRouter, Google, or SwarmSync credentials are not model-routing inputs.
-- The `default_model` config field and legacy multi-provider router utilities
-  remain for compatibility/diagnostic code. They are not sanctioned production
-  execution paths. Any new caller of those utilities is a launch blocker.
+- The `default_model` config field remains only as a legacy display/config
+  value. The former caller-selected multi-provider router is disabled and its
+  provider dispatch helpers have been removed.
 - A live direct-Anthropic round trip proves that sampled path and credential;
   deterministic negative tests are still required to prove other credentials
   cannot redirect classification, escalation, Ask E4L, or compaction.
@@ -62,9 +63,10 @@ cannot be mistaken for present state. Exact results live in
 
 ## Test and Vault interpretation
 
-- The last promoted exact-HEAD full suite reported 3,071 passed, 5 skipped,
-  4 deselected, and zero failures/errors. Skipped/deselected tests provide no
-  signal and must be reviewed by name in each new run.
+- The `1a6c535` exact-HEAD full suite reported 3,081 passed, 5 skipped,
+  4 deselected, and zero failures/errors. This is a historical example;
+  skipped/deselected tests provide no signal and must be reviewed by name in
+  each new run.
 - Global `vaultctl validate --strict` can report portfolio problems unrelated
   to Cato. At the last audit it reported 20 errors across other projects while
   `vaultctl context cato` was CURRENT/VERIFIED. Do not collapse those two facts

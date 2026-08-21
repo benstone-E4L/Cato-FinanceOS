@@ -1,14 +1,9 @@
 /**
  * AskE4LView — the master spec's §10 "Ask E4L" nav item.
  *
- * Per §10: "Vault-grounded chat via the Retrieval Contract — citations +
- * refusal path; also the command line for the assistant. Absorbs Chat,
- * Memory search." The chat surface itself is the existing ChatView — the
- * agent loop already registers the Ask-E4L retrieval-contract tools
- * (CHUNK_4_ASK_E4L's `_register_ask_e4l_tools`), so this is genuinely the
- * same "command line for the assistant" the spec describes, not a
- * relabeled unrelated chat. Memory search is absorbed as a second tab
- * inside this same nav item rather than kept as its own top-level slot.
+ * This surface mounts general ChatView plus Memory search. The agent loop
+ * offers an optional Ask-E4L Vault retrieval tool, but ordinary chat is not
+ * universally retrieval-grounded and does not imply citations or refusal.
  */
 import React, { useState } from "react";
 import { ChatView } from "./ChatView";

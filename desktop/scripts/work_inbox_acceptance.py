@@ -136,6 +136,9 @@ def run_acceptance(page: Page, origin: str, output: Path, expected_head: str) ->
     page.get_by_role("heading", name="Work Inbox", exact=True).wait_for(timeout=20_000)
     checks.append({"check": "default_landing", "result": "PASS"})
 
+    page.get_by_text("Cato daemon online", exact=True).wait_for()
+    checks.append({"check": "daemon_status_label_is_process_scoped", "result": "PASS"})
+
     nav = page.locator(".sidebar-nav-item")
     labels = [nav.nth(index).locator(".sidebar-nav-copy > span").inner_text() for index in range(nav.count())]
     require(labels == EXPECTED_NAV, f"navigation mismatch: {labels}")

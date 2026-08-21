@@ -39,12 +39,12 @@ clone — record actual HEAD with `git log --oneline -1`.
 
 ### Fact 1: Runtime proof is exact-revision evidence, not a permanent status
 
-The last promoted operator proof at `4199d19` observed a green `/health`, bound
-the daemon and desktop process images to the custody manifest, completed the
-rendered Work Inbox checks, and made a real direct-Anthropic call. That proof is
-valid only for those exact artifacts. After any source change, rebuild, restart,
-and rerun the bounded package in `VERIFICATION.md`; never infer currency from
-old file dates or an old PASS.
+An exact operator proof observes a green `/health`, binds the daemon and desktop
+process images to the custody manifest, completes the rendered Work Inbox
+checks, and makes a real direct-Anthropic call. It is valid only when every
+surface names the same current Git revision. After any source change, rebuild,
+restart, and rerun the bounded package in `VERIFICATION.md`; never infer
+currency from old file dates or an old PASS.
 
 ### Fact 2: Which Windows account you launch as decides which state tree is used
 
@@ -184,9 +184,9 @@ Real routing is deterministic and Anthropic-direct — see Section 7.
 
 ## 3. Startup — exact local path previously proven
 
-The Work-account launch path was proven at exact commit `4199d19`. Repeat the
-identity-bound checks in `VERIFICATION.md` for the current HEAD; a successful
-old launch does not certify a rebuilt artifact.
+The Work-account launch path has an identity-bound acceptance package. Repeat
+the checks in `VERIFICATION.md` for the current HEAD; a successful old launch
+does not certify a rebuilt artifact.
 
 ### 3.1 Decide which account you are starting as
 

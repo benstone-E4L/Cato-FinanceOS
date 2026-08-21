@@ -18,7 +18,7 @@ Findings covered:
   K-08  send_email draft_only coercion fails OPEN on null/0/[]
   K-09  Router circuit breaker state is written and never read
   K-10  Router fails over onto a partially-streamed answer
-  K-11  MODEL_TRANSLATIONS and MODEL_REGISTRY disagree on every anthropic id
+  K-11  Caller-selected multi-provider routing must be absent and fail closed
 """
 
 from __future__ import annotations
@@ -549,135 +549,20 @@ def _router(keys=None):
     )
 
 
-class TestRouterCircuitBreaker:
-    def test_breaker_opens_and_refuses(self):
-        """`_direct_cb_open_until` was written and never read anywhere in the
-        module, so the 'circuit breaker' counted failures forever and never
-        opened a circuit."""
-        router = _router()
-        router._direct_cb_failures = 0
+class TestLegacyRouterSurfaceFailsClosed:
+    def test_non_anthropic_streaming_surface_is_absent(self):
+        router = _router({"OPENAI_API_KEY": "stored-but-inert"})
+        assert not hasattr(router, "_complete_single")
+        assert not hasattr(router, "_openai_compat")
+        assert not hasattr(router, "select_model")
 
-        async def _boom(model, messages, tools=None):
-            raise RuntimeError("provider down")
-            yield  # pragma: no cover
-
-        router._complete_single = _boom
+    def test_complete_accepts_no_caller_model_and_never_dispatches(self):
+        router = _router({"OPENAI_API_KEY": "stored-but-inert"})
         loop = asyncio.get_event_loop_policy().new_event_loop()
-
-        async def drain():
-            async for _ in router.complete([{"role": "user", "content": "x"}], "claude-sonnet-5"):
-                pass
-
-        for _ in range(router._CB_THRESHOLD):
-            with pytest.raises(Exception):
-                loop.run_until_complete(drain())
-
-        assert router._direct_cb_open_until > 0
-        with pytest.raises(RuntimeError, match="circuit breaker open"):
-            loop.run_until_complete(drain())
-
-    def test_success_closes_the_breaker(self):
-        router = _router()
-        router._direct_cb_failures = 9
-        router._direct_cb_open_until = 0.0
-
-        async def _ok(model, messages, tools=None):
-            yield "hello"
-
-        router._complete_single = _ok
-        loop = asyncio.get_event_loop_policy().new_event_loop()
-
-        async def drain():
-            return [c async for c in router.complete([], "claude-sonnet-5")]
-
-        assert loop.run_until_complete(drain()) == ["hello"]
-        assert router._direct_cb_failures == 0
-        assert router._direct_cb_open_until == 0.0
-
-
-class TestRouterNoFailoverAfterFirstByte:
-    def test_partial_stream_is_not_concatenated_with_a_retry(self):
-        """`_stream_collect` joins whatever chunks arrive. Failing over after
-        the first byte handed it a truncated answer glued to a whole new one
-        and called the result the model's reply."""
-        router = _router({"ANTHROPIC_API_KEY": "k", "OPENROUTER_API_KEY": "k"})
-        attempts: list[str] = []
-
-        async def _flaky(model, messages, tools=None):
-            attempts.append(model)
-            if len(attempts) == 1:
-                yield "The answer is "
-                # A classified-retryable error: without the first-byte guard
-                # the router WILL rotate to the next model and append a whole
-                # second answer to this truncated one.
-                raise TimeoutError("upstream timed out mid-stream")
-            yield "COMPLETELY DIFFERENT ANSWER"
-
-        router._complete_single = _flaky
-        loop = asyncio.get_event_loop_policy().new_event_loop()
-        collected: list[str] = []
-
-        async def drain():
-            async for c in router.complete([], "claude-sonnet-5"):
-                collected.append(c)
-
-        with pytest.raises(TimeoutError):
-            loop.run_until_complete(drain())
-
-        assert len(attempts) == 1, "failed over on top of a partial answer"
-        assert "".join(collected) == "The answer is "
-
-    def test_failover_still_happens_before_the_first_byte(self):
-        router = _router({"ANTHROPIC_API_KEY": "k", "OPENROUTER_API_KEY": "k"})
-        attempts: list[str] = []
-
-        async def _flaky(model, messages, tools=None):
-            attempts.append(model)
-            if len(attempts) == 1:
-                raise TimeoutError("upstream timed out before first byte")
-                yield  # pragma: no cover
-            yield "recovered"
-
-        router._complete_single = _flaky
-        loop = asyncio.get_event_loop_policy().new_event_loop()
-
-        async def drain():
-            return [c async for c in router.complete([], "claude-sonnet-5")]
-
-        assert loop.run_until_complete(drain()) == ["recovered"]
-        assert len(attempts) == 2
-
-
-class TestRouterTranslationsMatchRegistry:
-    def test_router_translations_cover_registry(self):
-        """Two model tables that disagree is how the live HTTP 400 happened for
-        `openai/gpt-4o-mini`. Every anthropic entry in MODEL_TRANSLATIONS
-        pointed at an id MODEL_REGISTRY does not contain, and not one of the
-        registry's own anthropic ids had a translation at all."""
-        from cato.model_policy import MODEL_REGISTRY
-        from cato.router import MODEL_TRANSLATIONS
-
-        missing = [
-            m for m in MODEL_REGISTRY
-            if m.startswith("claude-") and f"anthropic/{m}" not in MODEL_TRANSLATIONS
-        ]
-        assert not missing, f"no provider-qualified translation for {missing}"
-
-        for model in MODEL_REGISTRY:
-            if model.startswith("claude-"):
-                assert MODEL_TRANSLATIONS[f"anthropic/{model}"] == model
-
-    def test_no_provider_prefix_survives_to_the_wire(self):
-        """The exact live failure: 'openai/gpt-4o-mini' -> HTTP 400
-        'invalid model ID'. Reproduced against api.openai.com on 2026-08-12."""
-        from cato.router import MODEL_TRANSLATIONS
-
-        for slug in ("openai/gpt-4o-mini", "openai/gpt-4o",
-                     "anthropic/claude-sonnet-5", "anthropic/claude-opus-5"):
-            resolved = MODEL_TRANSLATIONS.get(slug, slug)
-            assert "/" not in resolved, (
-                f"{slug!r} reaches a native provider as {resolved!r}"
-            )
+        with pytest.raises(RuntimeError, match="complete_message"):
+            loop.run_until_complete(router.complete([]))
+        with pytest.raises(TypeError):
+            loop.run_until_complete(router.complete([], "openai/gpt-4o-mini"))
 
 
 # ---------------------------------------------------------------------------

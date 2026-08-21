@@ -32,17 +32,6 @@ class _AnthropicStub:
         return None
 
 
-class _ForbiddenOpenAI:
-    def has_credentials(self) -> bool:
-        return True
-
-    async def call(self, *args, **kwargs):
-        raise AssertionError("OpenAI must never be called by complete_message")
-
-    async def close(self) -> None:
-        return None
-
-
 @pytest.mark.parametrize(
     ("task_type", "when", "escalation"),
     [
@@ -71,13 +60,20 @@ def test_policy_never_selects_non_anthropic(task_type, when, escalation):
 
 
 @pytest.mark.asyncio
-async def test_credential_bearing_openai_client_is_never_called():
+async def test_non_anthropic_client_artifacts_are_absent_and_never_called():
+    import importlib.util
+
+    import cato.model_policy as policy
+
+    assert importlib.util.find_spec("cato.openai_client") is None
+    assert not hasattr(policy, "build_openai_request_payload")
     anthropic = _AnthropicStub()
     router = ModelRouter(
         vault=None,
         anthropic_client=anthropic,
-        openai_client=_ForbiddenOpenAI(),
     )
+    assert not hasattr(router, "_openai")
+    assert not hasattr(router, "_complete_single")
 
     for task_type in (
         TaskType.DOCUMENT_CLASSIFICATION,

@@ -7,7 +7,7 @@ export const PRIMARY_NAV_ITEMS = [
   { id: "calendar", label: "Calendar", hint: "Reserved — not yet available" },
   { id: "company-tasks", label: "Company Tasks", hint: "Monday view not yet available" },
   { id: "finance", label: "Finance", hint: "FinanceOS control room (read-only)" },
-  { id: "ask-e4l", label: "Ask E4L", hint: "Vault-grounded chat + memory" },
+  { id: "ask-e4l", label: "Ask E4L", hint: "Chat with optional Vault lookup + memory" },
   { id: "activity-automations", label: "Activity/Automations", hint: "Audit, cron, sessions, budget" },
   { id: "settings-diagnostics", label: "Settings/Diagnostics", hint: "Operator/debug tier" },
 ] as const;

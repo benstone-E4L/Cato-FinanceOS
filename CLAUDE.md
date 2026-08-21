@@ -185,7 +185,7 @@ Fan-out to Claude/Codex/Gemini/Cursor in parallel (60s timeout each):
 ## WINDOWS-SPECIFIC NOTES
 
 * npm CLIs (codex, gemini) are .CMD files; resolved via `shutil.which()` + `\["cmd.exe", "/c", path]`
-* ANTHROPIC\_API\_KEY loaded from `.env` (python-dotenv); OpenRouter env key in `.env` is STALE — use vault
+* Operator credentials are loaded from encrypted `vault.enc`; repository `.env` is never a Cato launch source and must not be altered by automation without owner authorization
 * Cato is run as SEPARATE daemon — Claude CLI is NOT nested in production
 * PowerShell required for build scripts; bash available via Git Bash
 
@@ -193,7 +193,7 @@ Fan-out to Claude/Codex/Gemini/Cursor in parallel (60s timeout each):
 
 * pytest asyncio\_mode=auto, tests/ directory
 * Coverage via pytest-cov; `norecursedirs` excludes `.claude`, `BRAINSTORM`, `venv`
-* **1869 passed, 2 failed** as of 2026-05-22 (1 collection error in `tests/test\_conduit\_proof.py`; 4 skipped)
+* Exact results are revision-bound in `docs/ops/VERIFICATION.md` and the Cato Vault evidence record; do not treat historical counts as current
 
 ## AUDIT REPORT LOCATIONS
 

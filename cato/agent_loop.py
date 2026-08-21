@@ -2040,7 +2040,7 @@ class AgentLoop:
 
         ctx_tokens  = self._ctx.count_tokens(system_prompt)
         history_len = self._history_len(tpath)
-        complexity  = self._router.score_task(message, ctx_tokens, history_len)
+        self._router.score_task(message, ctx_tokens, history_len)
 
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
         messages.extend(self._recent_turns(tpath, limit=HISTORY_WINDOW))
@@ -2078,7 +2078,7 @@ class AgentLoop:
         logger.info("session=%s direct_anthropic=%s", session_id, use_direct)
         # `model` is only the label used for budget accounting and transcript
         # metadata; the executed model comes from the routing decision.
-        model = self._cfg.default_model if use_direct else self._router.select_model(complexity)
+        model = self._cfg.default_model
 
         await _aappend(tpath, {
             "ts": _now(), "role": "user",

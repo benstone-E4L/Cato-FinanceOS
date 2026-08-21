@@ -96,7 +96,7 @@ This command:
 What is NOT copied from OpenClaw / ClawdBot / MoltBot:
 - `config.json` — Cato uses YAML; re-run `cato init` to configure
 - `node_modules/`, Node binaries — not applicable to Cato
-- `.env` files — migrate API keys with the explicit `cato vault migrate-env` command, verify the vault, then remove the plaintext file before launch
+- `.env` files — migrate API keys with the explicit `cato vault migrate-env` command and verify the vault. Cato will report the source file; only the owner may decide whether to retain, encrypt, move, or delete it. Automation must not alter it without explicit authorization.
 
 After migration, run `cato doctor` to audit token budgets and `cato init` to configure API keys.
 
@@ -133,7 +133,7 @@ SwarmSync and does not change model selection.
 
 ---
 
-## Conduit — The Headless Browser Engine Nothing Else Has
+## Conduit — Local Browser Automation
 
 Conduit is Cato's built-in headless browser engine. Its behavior depends on local
 configuration and installed browser dependencies; the repository has not yet
@@ -144,7 +144,7 @@ proven the full feature set in a published production artifact.
 conduit_enabled: true
 ```
 
-### What makes Conduit different
+### Implemented Conduit capabilities
 
 #### 1. Cryptographic Agent Identity (Ed25519)
 The implementation can generate an **Ed25519 keypair**, stored at
@@ -196,26 +196,11 @@ Conduit includes a **reversibility safety gate** for the classified actions belo
 
 In daemon mode (no TTY), HIGH_STAKES actions fail safe — denied by default, logged with reason.
 
-#### 7. Free for Local Use
-Unlike Conduit's commercial deployment in SwarmSync (where per-action billing enables cost attribution across multi-tenant agent fleets), **all Conduit actions in Cato are free**. The full audit trail, identity signing, and VOIX support run at zero cost. The billing infrastructure is present in the codebase for SwarmSync compatibility but all costs are zeroed.
+#### 7. Local Execution
+Conduit browser actions run in the local Cato process. External websites and any configured integrations can still receive requests, and normal network/provider costs may apply outside Cato.
 
-#### 8. Zero External Dependencies for Browser Automation
-Conduit uses **Patchright** (a stealth Playwright fork) under the hood — one `patchright install chromium` and you're done. No Selenium server. No WebDriver binary management. No Docker container for the browser. No remote browser API. The browser runs locally, the audit log stays local, the identity key never leaves your machine.
-
-### Conduit vs everything else
-
-| Feature | Conduit (Cato) | OpenClaw browser | AutoGPT browser | AgentGPT | Playwright MCP |
-|---------|---------------|-----------------|-----------------|----------|----------------|
-| Ed25519 agent identity | ✅ | ❌ | ❌ | ❌ | ❌ |
-| SHA-256 hash-chained audit log | ✅ | ❌ | ❌ | ❌ | ❌ |
-| VOIX protocol stripping | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Budget enforcement before action | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Sensitive input redaction | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Tamper-evident audit trail | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Safety gate (reversibility tiers) | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Signed receipts per session | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Free for local use | ✅ | ✅ | ✅ | ✅ | ✅ |
-| No external server required | ✅ | ❌ | ❌ | ❌ | ✅ |
+#### 8. Local Browser Runtime
+Conduit uses **Patchright** and a locally installed Chromium runtime. It does not require a Selenium server, WebDriver binary, Docker browser container, or remote browser API. Cato model execution separately requires the Anthropic API.
 
 ### Using Conduit
 

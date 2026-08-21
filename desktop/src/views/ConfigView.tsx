@@ -2,26 +2,10 @@
  * ConfigView — Live config editor: form view + raw JSON, with PATCH save.
  */
 import React, { useState, useEffect, useCallback } from "react";
+import { patchCatoConfig, type ConfigData } from "../lib/configEditor";
 
 interface ConfigViewProps {
   httpPort: number;
-}
-
-interface ConfigData {
-  agent_name?: string;
-  default_model?: string;
-  swarmsync_enabled?: boolean;
-  swarmsync_api_url?: string;
-  session_cap?: number;
-  monthly_cap?: number;
-  log_level?: string;
-  telegram_enabled?: boolean;
-  telegram_bot_token?: string;
-  conduit_enabled?: boolean;
-  enabled_models?: string[];
-  subagent_enabled?: boolean;
-  subagent_coding_backend?: string;
-  [key: string]: unknown;
 }
 
 export const ConfigView: React.FC<ConfigViewProps> = ({ httpPort }) => {
@@ -59,15 +43,9 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ httpPort }) => {
   const saveForm = async () => {
     setSaving(true);
     try {
-      const r = await fetch(`${base}/api/config`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
-      });
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-      setConfig(data);
-      setRawJson(JSON.stringify(data, null, 2));
+      const saved = await patchCatoConfig(base, config);
+      setConfig(saved);
+      setRawJson(JSON.stringify(saved, null, 2));
       setSaveMsg({ ok: true, text: "Saved" });
     } catch (e) {
       setSaveMsg({ ok: false, text: String(e) });
@@ -87,14 +65,9 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ httpPort }) => {
     }
     setSaving(true);
     try {
-      const r = await fetch(`${base}/api/config`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed),
-      });
-      const data = await r.json();
-      setConfig(data);
-      setRawJson(JSON.stringify(data, null, 2));
+      const saved = await patchCatoConfig(base, parsed);
+      setConfig(saved);
+      setRawJson(JSON.stringify(saved, null, 2));
       setSaveMsg({ ok: true, text: "Saved" });
     } catch (e) {
       setSaveMsg({ ok: false, text: String(e) });
@@ -138,9 +111,8 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ httpPort }) => {
               onChange={(e) => setField("agent_name", e.target.value)} />
           </div>
           <div className="form-row">
-            <label>Default Model</label>
-            <input className="form-input" value={String(config.default_model ?? "")}
-              onChange={(e) => setField("default_model", e.target.value)} />
+            <label>Legacy display model (does not control execution)</label>
+            <input className="form-input" value={String(config.default_model ?? "")} readOnly />
           </div>
           <div className="form-row">
             <label>Log Level</label>
@@ -216,10 +188,7 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ httpPort }) => {
           </div>
           <div className="form-row">
             <label>Bot Token</label>
-            <input type="password" className="form-input form-input-wide"
-              value={String(config.telegram_bot_token ?? "")}
-              onChange={(e) => setField("telegram_bot_token", e.target.value)}
-              placeholder="1234567890:ABC..." />
+            <span>Store securely under Auth Keys; Config never accepts credential values.</span>
           </div>
 
           <div className="section-title">Conduit (Web Search)</div>

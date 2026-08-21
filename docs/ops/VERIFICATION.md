@@ -7,20 +7,21 @@ run. Never treat an old PASS as evidence for a new HEAD.
 
 ## Current evidence boundary
 
-The latest promoted proof before the current change set is commit
-`4199d19badb250f47ad2a42ce5e19c6756f5af0a`. Its retained evidence is in:
+Exact proof is named by the Git revision it certifies. Read the current short
+HEAD, then require these three locations to name that same revision:
 
-- `output/cato-live-e2e-4199d19/result.json`
-- `output/cato-live-e2e-4199d19/full-suite.xml`
-- `C:\Users\Work\Desktop\vault-next\projects\cato\proof-artifacts\operator-live-work-inbox-4199d19`
+- `output/cato-live-e2e-<short-head>/result.json`
+- `output/cato-live-e2e-<short-head>/full-suite.xml`
+- `C:\Users\Work\Desktop\vault-next\projects\cato\proof-artifacts\operator-live-work-inbox-<short-head>`
 
-That run proved a manifest-bound native desktop and adjacent daemon, matching
+A valid run proves a manifest-bound native desktop and adjacent daemon, matching
 live process images/hashes and `source_sha`, authenticated HTTP and WebSocket
 boundaries, ten rendered Work Inbox checks, encrypted credential custody, a
 safe FinanceOS control-room fallback, and one real direct-Anthropic response.
-The full offline suite reported 3,071 passed, 5 skipped, 4 deselected, and zero
-failures/errors. These are historical exact-HEAD facts, not a claim about a
-later dirty tree or unbuilt commit.
+For example, the completed `1a6c535` run reported 3,081 passed, 5 skipped,
+4 deselected, and zero failures/errors before its live result passed. That is a
+historical exact-HEAD fact, not a claim about a later dirty tree or unbuilt
+commit.
 
 No public installer publication, code-signing chain, live Telegram exchange,
 or FinanceOS/Xero mutation is claimed.

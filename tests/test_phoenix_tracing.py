@@ -288,53 +288,15 @@ def test_guarded_dispatch_still_runs_with_phoenix_down(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Router spans.
+# Removed caller-selected router surface.
 # ---------------------------------------------------------------------------
 
-def test_router_complete_emits_llm_span_with_routed_model(memory_spans):
-    from cato.router import ModelRouter
-
-    router = ModelRouter.__new__(ModelRouter)
-
-    async def fake_inner(messages, model, tools=None, stream=True):
-        yield "hello "
-        yield {"model": "claude-sonnet-4-5-20250929",
-               "usage": {"prompt_tokens": 11, "completion_tokens": 5,
-                         "total_tokens": 16}}
-
-    router._complete_inner = fake_inner  # type: ignore[method-assign]
-
-    async def drain():
-        return [c async for c in ModelRouter.complete(
-            router, [{"role": "user", "content": "hi"}], "claude-sonnet-4-5")]
-
-    chunks = asyncio.run(drain())
-    assert chunks[0] == "hello "
-
-    llm = next(s for s in memory_spans.get_finished_spans()
-               if s.name == "llm.completion")
-    assert llm.attributes[pt.SPAN_KIND] == "LLM"
-    assert llm.attributes[pt.LLM_MODEL_NAME] == "claude-sonnet-4-5"
-    assert llm.attributes["llm.model_name.routed"] == "claude-sonnet-4-5-20250929"
-    assert llm.attributes[pt.LLM_TOKEN_TOTAL] == 16
-    assert llm.attributes["llm.stream.chunks"] == 2
-
-
-def test_router_complete_streams_normally_with_phoenix_down(monkeypatch):
+def test_router_legacy_complete_fails_closed_even_with_phoenix_down(monkeypatch):
     from cato.router import ModelRouter
 
     monkeypatch.setenv("PHOENIX_COLLECTOR_ENDPOINT", "http://127.0.0.1:9")
     pt.reset_for_tests()
-
     router = ModelRouter.__new__(ModelRouter)
 
-    async def fake_inner(messages, model, tools=None, stream=True):
-        for part in ("a", "b", "c"):
-            yield part
-
-    router._complete_inner = fake_inner  # type: ignore[method-assign]
-
-    async def drain():
-        return [c async for c in ModelRouter.complete(router, [], "m")]
-
-    assert asyncio.run(drain()) == ["a", "b", "c"]
+    with pytest.raises(RuntimeError, match="complete_message"):
+        asyncio.run(ModelRouter.complete(router, []))

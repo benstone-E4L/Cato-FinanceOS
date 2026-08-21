@@ -32,7 +32,7 @@ function NavIcon({ children }: { children: React.ReactNode }) {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeView, onNavigate, daemonStatus }) => {
-  const statusLabel = daemonStatus === "ready" ? "Systems online" : daemonStatus === "starting" ? "Connecting" : daemonStatus === "error" ? "Needs attention" : "Offline";
+  const statusLabel = daemonStatus === "ready" ? "Cato daemon online" : daemonStatus === "starting" ? "Connecting to Cato daemon" : daemonStatus === "error" ? "Cato daemon needs attention" : "Cato daemon offline";
 
   return (
     <aside className="sidebar">

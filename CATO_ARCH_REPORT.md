@@ -1,3 +1,5 @@
+> **HISTORICAL / SUPERSEDED — NOT CURRENT OPERATING TRUTH.** This report preserves a 2026-06-13 point-in-time audit. Use `AGENTS.md`, `docs/ops/LIMITATIONS.md`, and `docs/ops/VERIFICATION.md` for current launch guidance.
+
 # Architecture Cartographer Report — Cato
 
 **Audited:** 2026-06-13  
