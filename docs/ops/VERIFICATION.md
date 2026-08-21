@@ -16,7 +16,7 @@ HEAD, then require these three locations to name that same revision:
 
 A valid run proves a manifest-bound native desktop and adjacent daemon, matching
 live process images/hashes and `source_sha`, authenticated HTTP and WebSocket
-boundaries, ten rendered Work Inbox checks, encrypted credential custody, a
+boundaries, eleven rendered Work Inbox checks, encrypted credential custody, a
 safe FinanceOS control-room fallback, and one real direct-Anthropic response.
 For example, the completed `1a6c535` run reported 3,081 passed, 5 skipped,
 4 deselected, and zero failures/errors before its live result passed. That is a
