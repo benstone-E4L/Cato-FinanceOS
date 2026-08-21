@@ -2167,7 +2167,7 @@ class AgentLoop:
                 # fallback).  llm_end fires in a finally so it always pairs.
                 await self._progress.llm_start(model=model, token_budget=input_tokens if isinstance(input_tokens, int) else 0)
                 try:
-                    if use_direct and not force:
+                    if use_direct:
                         try:
                             # Sanitize tool names in message history so they match
                             # the sanitized tool definitions we send.  Without this
@@ -2179,16 +2179,21 @@ class AgentLoop:
                                  if m.get("role") == "system"), "",
                             )
                             _convo = [m for m in api_messages if m.get("role") != "system"]
+                            # A forced-final turn is still a production model
+                            # turn and must stay on the direct Anthropic policy
+                            # path.  Disable tools for that call instead of
+                            # escaping to the legacy multi-provider collector.
+                            call_tools = [] if force else _tools_for_api
                             descriptor = TaskDescriptor(
                                 task_type=_classify_task_type(
-                                    message, bool(_tools_for_api)
+                                    message, bool(call_tools)
                                 ),
                                 input_tokens=int(input_tokens) if isinstance(input_tokens, int) else 0,
                                 max_output_tokens=int(getattr(self._cfg, "max_output_tokens", 16384)),
-                                requires_tools=bool(_tools_for_api),
+                                requires_tools=bool(call_tools),
                                 # Cato's planning loop reasons between tool calls,
                                 # which Haiku 4.5 cannot do.
-                                requires_interleaved_thinking=bool(_tools_for_api),
+                                requires_interleaved_thinking=bool(call_tools),
                                 cost_ceiling_usd=float(getattr(
                                     self._cfg, "per_call_cost_ceiling_usd", 2.50)),
                                 task_key=f"{session_id}:chat",
@@ -2198,7 +2203,7 @@ class AgentLoop:
                                     _convo,
                                     descriptor,
                                     system=_system or None,
-                                    tools=_anthropic_tool_defs(_tools_for_api),
+                                    tools=_anthropic_tool_defs(call_tools),
                                     idempotency_key=f"{session_id}:{planning_turns}",
                                 ),
                                 timeout=600,
@@ -2209,6 +2214,8 @@ class AgentLoop:
                             tool_calls = _parse_tool_calls_openai(api_response)
                             tool_calls.extend(_parse_tool_calls_text(text))
                             text = _strip_tool_call_blocks(text)
+                            if force:
+                                tool_calls = []
                             # Reverse-map sanitized tool names back to dotted originals
                             for tc in tool_calls:
                                 if tc.name in _api_name_map:

@@ -33,16 +33,37 @@ def main() -> int:
         raise SystemExit("[build-manifest] CATO_BUILD_SHA must equal the full current HEAD")
 
     executable = RELEASE / ("cato-desktop.exe" if os.name == "nt" else "cato-desktop")
-    sidecars = sorted((DESKTOP / "src-tauri" / "binaries").glob("cato-*"))
+    staged_sidecars = sorted((DESKTOP / "src-tauri" / "binaries").glob("cato-*"))
+    runtime_sidecar = RELEASE / ("cato.exe" if os.name == "nt" else "cato")
     dist_files = sorted(path for path in (DESKTOP / "dist").rglob("*") if path.is_file())
-    if not executable.is_file() or len(sidecars) != 1 or not dist_files:
-        raise SystemExit("[build-manifest] native executable, one sidecar, and dist are required")
+    if (
+        not executable.is_file()
+        or not runtime_sidecar.is_file()
+        or len(staged_sidecars) != 1
+        or not dist_files
+    ):
+        raise SystemExit(
+            "[build-manifest] native executable, runtime sidecar, one staged sidecar, and dist are required"
+        )
+    runtime_sha = sha256(runtime_sidecar)
+    staged_sha = sha256(staged_sidecars[0])
+    if runtime_sha != staged_sha or runtime_sidecar.stat().st_size != staged_sidecars[0].stat().st_size:
+        raise SystemExit("[build-manifest] runtime sidecar differs from the staged bundle sidecar")
 
     payload = {
-        "schema": 1,
+        "schema": 2,
         "source_sha": head,
         "native": {"path": executable.name, "sha256": sha256(executable), "bytes": executable.stat().st_size},
-        "sidecar": {"path": sidecars[0].name, "sha256": sha256(sidecars[0]), "bytes": sidecars[0].stat().st_size},
+        "sidecar": {
+            "path": runtime_sidecar.name,
+            "sha256": runtime_sha,
+            "bytes": runtime_sidecar.stat().st_size,
+        },
+        "staged_sidecar": {
+            "path": staged_sidecars[0].name,
+            "sha256": staged_sha,
+            "bytes": staged_sidecars[0].stat().st_size,
+        },
         "dist": {
             str(path.relative_to(DESKTOP / "dist")).replace("\\", "/"): sha256(path)
             for path in dist_files

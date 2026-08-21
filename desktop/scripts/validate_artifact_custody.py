@@ -91,7 +91,7 @@ def main() -> int:
     live_harness = live_harness_path.read_text(encoding="utf-8")
     require('option_env!("CATO_BUILD_SHA")' in native, "native binary does not embed source SHA")
     require("get_build_identity" in native, "native identity command is missing")
-    require('.env("CATO_BUILD_SHA", super::NATIVE_BUILD_SHA)' in sidecar, "sidecar does not inherit native source SHA")
+    require('env("CATO_BUILD_SHA"' not in sidecar, "desktop may not inject source identity into the sidecar")
     require("write_build_manifest.py" in release_script, "local release omits custody manifest")
     require(version_script_path.is_file(), "release version check script is missing")
     require("sync_version.py --check" in release_script, "release build mutates or skips version custody")

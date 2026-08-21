@@ -133,13 +133,27 @@ def validate_build_manifest(manifest_path: Path, executable: Path, head: str) ->
     sidecar = manifest.get("sidecar") or {}
     sidecar_name = sidecar.get("path")
     if not isinstance(sidecar_name, str) or Path(sidecar_name).name != sidecar_name:
-        raise AssertionError("Custody manifest has no safe staged-sidecar path")
-    sidecar_path = REPO / "desktop" / "src-tauri" / "binaries" / sidecar_name
+        raise AssertionError("Custody manifest has no safe runtime-sidecar path")
+    sidecar_path = manifest_path.parent / sidecar_name
     if not sidecar_path.is_file():
-        raise AssertionError("Staged sidecar from the custody manifest is missing")
+        raise AssertionError("Runtime sidecar from the custody manifest is missing")
     actual_sidecar_sha = sha256_file(sidecar_path)
     if sidecar.get("sha256") != actual_sidecar_sha or sidecar.get("bytes") != sidecar_path.stat().st_size:
-        raise AssertionError("Staged sidecar does not match the exact-HEAD custody manifest")
+        raise AssertionError("Runtime sidecar does not match the exact-HEAD custody manifest")
+    staged = manifest.get("staged_sidecar") or {}
+    staged_name = staged.get("path")
+    if not isinstance(staged_name, str) or Path(staged_name).name != staged_name:
+        raise AssertionError("Custody manifest has no safe staged-sidecar path")
+    staged_path = REPO / "desktop" / "src-tauri" / "binaries" / staged_name
+    if not staged_path.is_file():
+        raise AssertionError("Staged sidecar from the custody manifest is missing")
+    actual_staged_sha = sha256_file(staged_path)
+    if (
+        staged.get("sha256") != actual_staged_sha
+        or staged.get("bytes") != staged_path.stat().st_size
+        or actual_staged_sha != actual_sidecar_sha
+    ):
+        raise AssertionError("Staged and runtime sidecars do not match exact-HEAD custody")
     dist = manifest.get("dist")
     if not isinstance(dist, dict) or not dist:
         raise AssertionError("Custody manifest has no production-bundle hashes")
@@ -152,6 +166,8 @@ def validate_build_manifest(manifest_path: Path, executable: Path, head: str) ->
         "source_sha": head,
         "native_sha256": actual_native_sha,
         "sidecar_sha256": actual_sidecar_sha,
+        "runtime_sidecar": str(sidecar_path),
+        "staged_sidecar_sha256": actual_staged_sha,
         "dist_file_count": len(dist),
     }
 
@@ -170,6 +186,27 @@ def process_exists(pid: int) -> bool:
         return False
     ctypes.windll.kernel32.CloseHandle(process)
     return True
+
+
+def process_image_path(pid: int) -> Path:
+    if os.name != "nt":
+        return Path(f"/proc/{pid}/exe").resolve(strict=True)
+    import ctypes
+    from ctypes import wintypes
+
+    process = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+    if not process:
+        raise AssertionError("Unable to open the Cato daemon process for custody validation")
+    try:
+        size = wintypes.DWORD(32768)
+        buffer = ctypes.create_unicode_buffer(size.value)
+        if not ctypes.windll.kernel32.QueryFullProcessImageNameW(
+            process, 0, buffer, ctypes.byref(size)
+        ):
+            raise AssertionError("Unable to resolve the Cato daemon executable path")
+        return Path(buffer.value).resolve(strict=True)
+    finally:
+        ctypes.windll.kernel32.CloseHandle(process)
 
 
 def resolve_runtime(data_dir: Path) -> tuple[int, int, str]:
@@ -383,9 +420,23 @@ async def live_checks(
     do_model: bool,
     launch_desktop: bool,
     expected_head: str,
+    expected_runtime_sidecar: Path,
+    expected_runtime_sidecar_sha: str,
 ) -> None:
     port, pid, token = resolve_runtime(data_dir)
     add(checks, "operator_lifecycle_markers", port=port, pid=pid, token_length=len(token))
+    daemon_image = process_image_path(pid)
+    if daemon_image != expected_runtime_sidecar.resolve(strict=True):
+        raise AssertionError("Running daemon is not the custody-manifest runtime sidecar")
+    daemon_image_sha = sha256_file(daemon_image)
+    if daemon_image_sha != expected_runtime_sidecar_sha:
+        raise AssertionError("Running daemon executable differs from exact-HEAD custody")
+    add(
+        checks,
+        "live_daemon_artifact_identity",
+        executable=str(daemon_image),
+        sha256=daemon_image_sha,
+    )
 
     storage = validate_credential_storage(data_dir)
     add(checks, "encrypted_credential_storage", **storage)
@@ -532,6 +583,8 @@ def main() -> int:
                 do_model=args.exercise_model,
                 launch_desktop=not args.skip_desktop_launch,
                 expected_head=head,
+                expected_runtime_sidecar=Path(custody["runtime_sidecar"]),
+                expected_runtime_sidecar_sha=str(custody["sidecar_sha256"]),
             )
         )
         post_head = git("rev-parse", "HEAD")

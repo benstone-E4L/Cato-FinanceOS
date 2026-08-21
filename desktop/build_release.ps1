@@ -141,6 +141,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "tauri build failed"
 }
 
+$stagedSidecars = @(Get-ChildItem -LiteralPath (Join-Path $desktopDir "src-tauri\binaries") -Filter "cato-*" -File)
+if ($stagedSidecars.Count -ne 1) {
+    throw "exactly one staged Cato sidecar is required after bundling"
+}
+$runtimeSidecarName = if ($env:OS -eq "Windows_NT") { "cato.exe" } else { "cato" }
+$runtimeSidecar = Join-Path $desktopDir "src-tauri\target\release\$runtimeSidecarName"
+Copy-Item -LiteralPath $stagedSidecars[0].FullName -Destination $runtimeSidecar -Force
+
 python scripts\write_build_manifest.py
 if ($LASTEXITCODE -ne 0) {
     throw "build custody manifest failed"

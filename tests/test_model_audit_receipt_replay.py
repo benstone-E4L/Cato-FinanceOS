@@ -66,6 +66,45 @@ async def test_unexpected_direct_failure_never_uses_legacy_transport(
     assert legacy_calls == 0
 
 
+async def test_forced_final_turn_stays_on_direct_anthropic_without_tools(
+    tmp_path, monkeypatch,
+) -> None:
+    env = build_scheduler_gate_env(tmp_path, monkeypatch)
+    env.gateway._vault.set("ANTHROPIC_API_KEY", "test-anthropic-key")
+    env.loop._cfg.max_planning_turns = 0
+    direct_calls: list[tuple[object, object]] = []
+
+    async def complete_message(_messages, descriptor, **kwargs):
+        direct_calls.append((descriptor, kwargs.get("tools")))
+        return (
+            "test-model",
+            {"content": "Forced final answer.", "tool_calls": []},
+            SimpleNamespace(log_line=lambda: "test route"),
+        )
+
+    legacy_calls = 0
+
+    async def prohibited_legacy(*_args, **_kwargs):
+        nonlocal legacy_calls
+        legacy_calls += 1
+        return "unsafe fallback", []
+
+    monkeypatch.setattr(env.loop._router, "complete_message", complete_message)
+    monkeypatch.setattr(env.loop, "_stream_collect", prohibited_legacy)
+
+    final_text, _model, _agent = await env.loop.run(
+        "forced-final-direct", "Return a final status", "cato",
+    )
+
+    assert final_text == "Forced final answer."
+    assert legacy_calls == 0
+    assert len(direct_calls) == 1
+    descriptor, tools = direct_calls[0]
+    assert descriptor.requires_tools is False
+    assert descriptor.requires_interleaved_thinking is False
+    assert tools == []
+
+
 async def test_model_tool_call_produces_valid_audit_receipt_and_dry_replay(
     tmp_path, monkeypatch,
 ) -> None:

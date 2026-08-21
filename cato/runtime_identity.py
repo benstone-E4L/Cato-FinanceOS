@@ -45,8 +45,8 @@ def _repository_identity() -> str | None:
 # Capture exactly once. A process started at an older revision cannot become
 # "current" merely because the checkout changes underneath it.
 _STARTUP_SOURCE_SHA = (
-    _valid(os.environ.get("CATO_BUILD_SHA"))
-    or _packaged_identity()
+    _packaged_identity()
+    or _valid(os.environ.get("CATO_BUILD_SHA"))
     or _repository_identity()
     or "unknown"
 )
