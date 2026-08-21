@@ -1517,6 +1517,82 @@ def _sanitize_agent_id(agent_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# E4L accounting routing hint (Task 3, cato/accounting_router.py)
+#
+# This is a PLANNING HINT ONLY -- it injects an extra system message so the
+# model does not have to guess a genesis-e4l-* slug for an accounting
+# question. It has no authority: GenesisTool.execute()'s allow/deny chain
+# (immutable money-domain denylist, fail-closed allowlist, pending-status
+# gate) is completely unaffected by anything here, and a broken or missing
+# router module must never take down the main loop -- every failure path
+# below returns None (no hint injected) rather than raising.
+# ---------------------------------------------------------------------------
+
+# Below this score, a NeedClarification's top candidate is treated as noise
+# (the message almost certainly isn't an e4l accounting question at all) and
+# no hint is injected, so ordinary conversation isn't cluttered with
+# accounting-routing text on every turn. Set above the ~6-point ceiling that
+# pure common-word overlap (e.g. "what"/"today" shared with an unrelated
+# example prompt) can reach on its own -- a genuine partial keyword hit from
+# the matrix's explicit per-route hint list scores 35+ and clears this easily.
+_ROUTING_HINT_RELEVANCE_FLOOR = 20
+
+
+def _build_accounting_routing_hint(message: str) -> Optional[str]:
+    """Return an extra system-message string steering an e4l accounting
+    question to the matrix-selected genesis specialist(s), or None if the
+    message doesn't look like one (or the router is unavailable)."""
+    try:
+        from cato.accounting_router import NeedClarification, route_question
+    except Exception:  # noqa: BLE001 — router must never block the main loop
+        return None
+
+    try:
+        decision = route_question(message)
+    except NeedClarification as exc:
+        if not exc.candidates or exc.candidates[0][1] < _ROUTING_HINT_RELEVANCE_FLOOR:
+            return None
+        top = ", ".join(rid for rid, _score in exc.candidates[:3] if rid)
+        return (
+            "E4L ACCOUNTING ROUTING (cato/accounting_router.py): this may be an "
+            "E4L accounting question, but no specialist route matched confidently "
+            f"or unambiguously (closest candidates: {top or 'none'}). Do NOT guess "
+            "a genesis-e4l-* slug. Ask the user a clarifying question about which "
+            "entity/period/topic they mean before calling the genesis tool for "
+            "E4L accounting work."
+        )
+    except Exception:  # noqa: BLE001 — router must never block the main loop
+        return None
+
+    lines = [
+        "E4L ACCOUNTING ROUTING (cato/accounting_router.py -- matrix-selected, do not override):",
+        f"  scenario: {decision.scenario_id or 'n/a'}",
+        f"  call the genesis tool with agent in: {', '.join(decision.agents)}",
+    ]
+    if decision.then_fanout:
+        lines.append(f"  then fan out to (parallel calls ok): {', '.join(decision.then_fanout)}")
+    if decision.entities:
+        lines.append(f"  entities: {', '.join(decision.entities)}")
+    if decision.escalate_to:
+        lines.append(f"  on specialist disagreement, escalate to: {decision.escalate_to}")
+    if decision.announce:
+        lines.append(f"  announce to the user: {decision.announce}")
+    if decision.note:
+        lines.append(f"  note: {decision.note}")
+    if decision.write:
+        lines.append(f"  write mode: {decision.write}")
+    if decision.answer_constraint:
+        lines.append(f"  answer constraint: {decision.answer_constraint}")
+    lines.append(
+        "  NEVER call genesis-finance, genesis-billing, genesis-commerce, "
+        "genesis-pricing, or genesis-e4l-accounting for this — GenesisTool "
+        "will refuse them anyway, but do not attempt it. Only the slug(s) "
+        "listed above are correct for this question."
+    )
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # JSONL transcript helpers
 # ---------------------------------------------------------------------------
 
@@ -2043,6 +2119,9 @@ class AgentLoop:
         self._router.score_task(message, ctx_tokens, history_len)
 
         messages: list[dict] = [{"role": "system", "content": system_prompt}]
+        routing_hint = _build_accounting_routing_hint(message)
+        if routing_hint:
+            messages.append({"role": "system", "content": routing_hint})
         messages.extend(self._recent_turns(tpath, limit=HISTORY_WINDOW))
         messages.append({"role": "user", "content": message})
 
