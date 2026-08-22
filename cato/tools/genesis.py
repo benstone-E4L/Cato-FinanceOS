@@ -642,6 +642,43 @@ class GenesisTool:
     # ---- main entry point ----------------------------------------------
 
     async def execute(self, args: dict[str, Any]) -> str:
+        """Traced wrapper over :meth:`_execute_inner`.
+
+        Opens the ``genesis.dispatch`` span that is the Cato side of the
+        Cato -> specialist boundary, and binds the specialist slug into the
+        correlation context so the outbound HTTP span and anything the
+        dispatch triggers carry it too. Only Cato's own result envelope keys
+        (ok / error / elapsed) go on the span — never the task text, the
+        params, or the upstream body.
+        """
+        from cato.core import phoenix_tracing as _pt
+
+        slug = _canonicalize_agent_slug((args or {}).get("agent"))
+        with _pt.correlation(specialist=slug or None):
+            with _pt.span(
+                "genesis.dispatch",
+                kind="TOOL",
+                attributes={
+                    _pt.TOOL_NAME: "genesis",
+                    "genesis.agent.slug": slug or "",
+                    "genesis.task.chars": len(str((args or {}).get("task") or "")),
+                },
+            ) as sp:
+                result = await self._execute_inner(args)
+                try:
+                    parsed = json.loads(result) if isinstance(result, str) else None
+                except (json.JSONDecodeError, ValueError):
+                    parsed = None
+                if isinstance(parsed, dict):
+                    _pt.set_attributes(sp, {
+                        "genesis.ok": bool(parsed.get("ok")),
+                        "genesis.error": parsed.get("error"),
+                        "genesis.http.status": parsed.get("status"),
+                        "genesis.elapsed_s": parsed.get("elapsed_s"),
+                    })
+                return result
+
+    async def _execute_inner(self, args: dict[str, Any]) -> str:
         """Dispatch a call to a Genesis agent.
 
         Args:
@@ -690,7 +727,22 @@ class GenesisTool:
 
         agent = raw_agent.strip()
         task = raw_task
-        params = raw_params or {}
+        params = dict(raw_params or {})
+
+        # E4L scope map injection (2026-08-22 posting model) — fail closed
+        if _canonicalize_agent_slug(agent) in FAIL_CLOSED_ACCOUNTING_ALLOWLIST:
+            try:
+                from cato.xero_scope import build_dispatch_scope_params
+
+                params.update(build_dispatch_scope_params(_canonicalize_agent_slug(agent)))
+            except Exception as exc:  # noqa: BLE001
+                self._log.error("scope map injection failed for %s: %s", agent, exc)
+                return json.dumps({
+                    "ok": False,
+                    "error": "scope_map_injection_failed",
+                    "agent": agent,
+                    "reason": str(exc),
+                })
 
         config = self._get_config()
         canonical_agent = _canonicalize_agent_slug(agent)
@@ -841,6 +893,14 @@ class GenesisTool:
         }
         if isinstance(api_key, str) and api_key:
             headers["X-Agent-Api-Key"] = api_key
+
+        # W3C trace-context so the receiving service can continue this trace
+        # instead of rooting a new one. Adds `traceparent` only (Cato sets no
+        # baggage), so nothing but trace/span ids crosses the boundary. A
+        # no-op when tracing is off or no span is active.
+        from cato.core import phoenix_tracing as _phoenix_tracing
+
+        _phoenix_tracing.inject_trace_context(headers)
 
         # Cold-start path budgets 60s total even though config asks for 30s;
         # subsequent calls use config.genesis_timeout_s.
@@ -1072,12 +1132,29 @@ def build_doctor_report(config: Any, live_result: dict[str, Any]) -> dict[str, A
     missing_from_gateway = (
         [r["slug"] for r in rows if not r["live_on_gateway"]] if gateway_reachable else list(target_slugs)
     )
-    healthy = gateway_reachable and not allowlist_empty and not missing_from_gateway
+    scope_map_ok = False
+    scope_map_version = None
+    try:
+        from cato.xero_scope import SCOPE_MAP_PATH, scope_map_version as _smv
+
+        scope_map_ok = SCOPE_MAP_PATH.is_file()
+        scope_map_version = _smv()
+    except Exception:
+        scope_map_ok = False
+
+    healthy = (
+        gateway_reachable
+        and not allowlist_empty
+        and not missing_from_gateway
+        and scope_map_ok
+    )
 
     return {
         "allowlist_empty": allowlist_empty,
         "gateway_reachable": gateway_reachable,
         "gateway_error": None if gateway_reachable else live_result,
+        "scope_map_loaded": scope_map_ok,
+        "scope_map_version": scope_map_version,
         "rows": rows,
         "missing_from_gateway": missing_from_gateway,
         "callable_count": sum(1 for r in rows if r["callable"]),
