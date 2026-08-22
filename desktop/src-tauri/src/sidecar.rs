@@ -5,7 +5,7 @@
 //! Gracefully shuts down on app exit.
 
 use std::path::PathBuf;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::{
     process::{Command, CommandChild, CommandEvent},
     ShellExt,
@@ -120,10 +120,13 @@ impl SidecarManager {
             std::env::remove_var("CATO_VAULT_PASSWORD");
         }
 
-        // Clear any stale PID file through the same bundled executable.
+        // Clear any stale PID file WITHOUT unpacking the 378 MB PyInstaller
+        // sidecar a second time (measured ~46s of pure unpack cost on this
+        // build, before the daemon even starts). See
+        // `clear_stale_daemon_state` below for exactly what this reproduces
+        // and why it is safe to do natively.
         log::info!("Clearing any stale Cato daemon state...");
-        let _ = Self::sidecar_command(app)?.arg("stop").output().await;
-        sleep(Duration::from_millis(500)).await;
+        Self::clear_stale_daemon_state().await;
 
         log::info!("Starting Tauri-bundled Cato daemon: start --channel webchat");
 
@@ -166,6 +169,280 @@ impl SidecarManager {
             // is harmless if the graceful `stop` command already exited it.
             let _ = child.kill();
         }
+    }
+
+    /// Reproduce `cato stop`'s state-clearing effect for the pre-launch path
+    /// without spawning the bundled PyInstaller sidecar. `cato stop`
+    /// (cato/cli.py::cmd_stop, backed by cato/platform.py::terminate_pid /
+    /// `_run_taskkill`) does exactly two things: (1) if `cato.pid` names a
+    /// still-live process, tree-kill it — on Windows that is itself just a
+    /// shell-out to the native `taskkill` utility, since SIGTERM is not
+    /// deliverable there, so nothing is lost by doing that shell-out here
+    /// instead of inside the sidecar — and only then (2) delete the stale
+    /// `cato.pid` / `cato.port` files. Both are reproduced here directly.
+    /// Deleting the files without confirming the process actually exited
+    /// would recreate exactly the double-daemon-on-one-hash-chained-ledger
+    /// risk `cato stop` exists to avoid, so this waits for confirmed exit
+    /// via `terminate_pid` (below) before touching them; the untouched,
+    /// independent duplicate-start gates in `cato start` (PID-file check,
+    /// then a live `/health` probe on the configured port) remain the real
+    /// backstop either way.
+    ///
+    /// Known gap, shared with the Python it mirrors: neither this nor
+    /// `cato/platform.py::terminate_pid` confirms the PID still belongs to
+    /// a Cato process before signalling it, so an OS PID reuse after an
+    /// unclean exit could in theory hit an unrelated process. Not fixed
+    /// here — see the reasoning in the task report; this file has no
+    /// existing constant for the bundled sidecar's expected image name to
+    /// check against (that lives only in `tauri.conf.json`, out of scope
+    /// for this change and about to move under the follow-on --onedir
+    /// bundling task), and the Python source of truth for this behaviour
+    /// carries the identical gap today.
+    async fn clear_stale_daemon_state() {
+        let Some(data_dir) = Self::cato_data_dir() else {
+            return;
+        };
+        let pid_path = data_dir.join("cato.pid");
+        let port_path = data_dir.join("cato.port");
+
+        if !pid_path.exists() {
+            // No pid file recorded at all -- matches `_read_live_pid`'s own
+            // `not _PID_FILE.exists(): return None` no-op path, which does
+            // not touch the port file either.
+            return;
+        }
+
+        let pid: u32 = match std::fs::read_to_string(&pid_path) {
+            Ok(raw) => match raw.trim().parse::<u32>() {
+                Ok(pid) => pid,
+                Err(_) => {
+                    // Unparseable content. `_read_live_pid`'s
+                    // `except (OSError, ValueError)` catches this the same
+                    // way it catches an unreadable file, immediately below:
+                    // delete both files: there is no pid to signal.
+                    let _ = std::fs::remove_file(&pid_path);
+                    let _ = std::fs::remove_file(&port_path);
+                    return;
+                }
+            },
+            Err(_) => {
+                // File exists but could not be read (e.g. a permission
+                // error). `_read_live_pid` treats this the same as bad
+                // content -- unlink both, return None -- not the same as
+                // "not running", which only applies when the file is
+                // absent (handled above).
+                let _ = std::fs::remove_file(&pid_path);
+                let _ = std::fs::remove_file(&port_path);
+                return;
+            }
+        };
+
+        if !Self::terminate_pid(pid).await {
+            log::warn!(
+                "Cato daemon pid {} did not exit after a stop request; leaving \
+                 cato.pid/cato.port in place so the duplicate-start guard still sees it.",
+                pid
+            );
+            return;
+        }
+
+        let _ = std::fs::remove_file(&pid_path);
+        let _ = std::fs::remove_file(&port_path);
+    }
+
+    /// Terminate `pid` and wait for it to actually exit. Mirrors
+    /// `cato/platform.py::terminate_pid` exactly: a *graceful* stop request
+    /// first, escalating to a forced kill only if the process is still
+    /// alive at the halfway point of a 10-second timeout — the same
+    /// timeout, halfway-escalation point, and true "confirmed gone" return
+    /// contract the Python uses. Returns true once the process is
+    /// confirmed gone (or was never alive to begin with).
+    async fn terminate_pid(pid: u32) -> bool {
+        if !Self::pid_alive(pid).await {
+            return true;
+        }
+
+        let timeout = Duration::from_secs(10);
+        let poll_interval = Duration::from_millis(200);
+        let now = tokio::time::Instant::now();
+        let deadline = now + timeout;
+        let graceful_deadline = now + timeout / 2;
+
+        Self::send_stop_signal(pid, false).await;
+
+        let mut escalated = false;
+        while tokio::time::Instant::now() < deadline {
+            if !Self::pid_alive(pid).await {
+                return true;
+            }
+            if !escalated && tokio::time::Instant::now() >= graceful_deadline {
+                escalated = true;
+                Self::send_stop_signal(pid, true).await;
+            }
+            sleep(poll_interval).await;
+        }
+
+        !Self::pid_alive(pid).await
+    }
+
+    /// Send one stop signal to `pid`: graceful (`force = false`) or forced
+    /// (`force = true`). Windows has no deliverable SIGTERM, so both cases
+    /// shell out to `taskkill` there — the same native utility the Python
+    /// CLI itself calls for exactly this (`cato/platform.py::_run_taskkill`)
+    /// — never the sidecar. Elsewhere, `kill -TERM` then `kill -KILL`.
+    /// Bounded by a 10s timeout on the subprocess call itself, mirroring
+    /// `_run_taskkill`'s `subprocess.run(..., timeout=10)` /
+    /// `SubprocessError` catch: a hung OS command must not silently blow
+    /// past `terminate_pid`'s own advertised 10-second contract above.
+    async fn send_stop_signal(pid: u32, force: bool) {
+        let attempt = if cfg!(windows) {
+            let mut args: Vec<String> = vec!["/T".into(), "/PID".into(), pid.to_string()];
+            if force {
+                args.insert(0, "/F".into());
+            }
+            tokio::time::timeout(
+                Duration::from_secs(10),
+                tokio::process::Command::new("taskkill").args(&args).output(),
+            )
+            .await
+        } else {
+            let signal = if force { "-KILL" } else { "-TERM" };
+            tokio::time::timeout(
+                Duration::from_secs(10),
+                tokio::process::Command::new("kill")
+                    .args([signal, &pid.to_string()])
+                    .output(),
+            )
+            .await
+        };
+        // Best-effort either way -- the caller (`terminate_pid`) confirms
+        // the real outcome itself by polling `pid_alive`, not by trusting
+        // this call's exit status.
+        let _ = attempt;
+    }
+
+    /// Native liveness probe for `pid`, without adding a process-inspection
+    /// crate for this one narrow use. Mirrors `cato/platform.py::pid_alive`
+    /// field for field: the `pid <= 0` guard (a `u32` cannot be negative,
+    /// so only the `0` case — Windows' System Idle Process / POSIX's swapper
+    /// — remains and is checked explicitly), the Windows ctypes-failure
+    /// fail-closed stance, and the POSIX `ProcessLookupError` /
+    /// `PermissionError` / zombie split (see `posix_pid_alive` below for how
+    /// that split is reproduced without a crate).
+    async fn pid_alive(pid: u32) -> bool {
+        if pid == 0 {
+            return false;
+        }
+        if cfg!(windows) {
+            Self::win_pid_alive(pid).await
+        } else {
+            Self::posix_pid_alive(pid).await
+        }
+    }
+
+    /// Windows liveness probe via `tasklist`. Matches on the *quoted PID
+    /// field* of CSV output (`/FO CSV`), not a raw whole-line substring —
+    /// a plain `line.contains(pid.to_string())` can false-positive against
+    /// the memory-usage or session-number columns (e.g. a mem-usage value
+    /// like "12,345 K" contains the digits of an unrelated pid "345", and a
+    /// single-digit session number can equal a single-digit pid). Anchoring
+    /// on `,"<pid>",` (or `,"<pid>"` at line end) requires the value to
+    /// appear as its own comma-delimited field, not merely as a digit
+    /// sequence anywhere in the row.
+    async fn win_pid_alive(pid: u32) -> bool {
+        let output = match tokio::process::Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}"), "/NH", "/FO", "CSV"])
+            .output()
+            .await
+        {
+            Ok(output) => output,
+            Err(_) => return true, // fail closed, mirrors the ctypes-failure path
+        };
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mid = format!(",\"{pid}\",");
+        let end = format!(",\"{pid}\"");
+        stdout
+            .lines()
+            .any(|line| {
+                let line = line.trim_end();
+                line.contains(&mid) || line.ends_with(&end)
+            })
+    }
+
+    /// POSIX liveness probe. `kill -0`'s process exit status alone cannot
+    /// distinguish "genuinely gone" (`ESRCH`, Python's `ProcessLookupError`)
+    /// from "exists but not ours to signal" (`EPERM`, Python's
+    /// `PermissionError`) — both come back as a non-zero exit code from the
+    /// external `kill(1)` binary, unlike `os.kill`'s Python-level exception
+    /// types.
+    ///
+    /// Correctness boundary, stated plainly rather than claimed as
+    /// universal: this disambiguates the two cases — exactly finding 5's
+    /// requirement — ONLY on Linux, via `/proc/<pid>` existence (visible
+    /// for a process regardless of which user owns it on a normal,
+    /// non-`hidepid`-hardened mount; the same procfs surface
+    /// `posix_is_zombie` below already depends on). No bundled target ships
+    /// for any other POSIX platform today (the only artifact built is
+    /// `x86_64-pc-windows-msvc`, which never reaches this function at all),
+    /// but `tauri.conf.json` declares `"targets": "all"`, so this must not
+    /// silently misbehave if a macOS/BSD build is ever produced. Neither
+    /// has a procfs, so on anything other than Linux a `kill -0` failure is
+    /// left ambiguous — EPERM and ESRCH are indistinguishable there without
+    /// a process-inspection crate — and is answered by failing CLOSED
+    /// (reporting alive) rather than guessing dead, which is the one
+    /// property finding 5 actually requires (never let a live daemon we
+    /// merely couldn't identify get treated as absent). So:
+    ///   - `kill -0` succeeds -> exists and permitted -> Python's
+    ///     no-exception path -> still zombie-checked before calling it alive.
+    ///   - `kill -0` fails, target is Linux, `/proc/<pid>` exists -> exists,
+    ///     not ours (EPERM-equivalent) -> Python's `PermissionError` branch
+    ///     -> true, no zombie check, matching Python exactly.
+    ///   - `kill -0` fails, target is Linux, `/proc/<pid>` is absent ->
+    ///     genuinely gone (ESRCH-equivalent) -> Python's
+    ///     `ProcessLookupError` branch -> false, matching Python exactly.
+    ///   - `kill -0` fails, target is NOT Linux -> cannot distinguish EPERM
+    ///     from ESRCH at all -> true (fail closed; correct in the sense of
+    ///     "never wrongly reports dead", not in the sense of ever reporting
+    ///     a genuinely-gone process as gone).
+    /// Python's residual bare `except OSError: return False` (some other,
+    /// rarer errno) has no distinct branch here on any target; on Linux it
+    /// collapses into the `/proc/<pid>` check, an accurate approximation
+    /// for that already-rare tail case rather than an exact port of it.
+    async fn posix_pid_alive(pid: u32) -> bool {
+        let permitted = match tokio::process::Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .output()
+            .await
+        {
+            Ok(output) => output.status.success(),
+            Err(_) => return true, // fail closed: could not even run the probe
+        };
+
+        if !permitted {
+            if cfg!(target_os = "linux") {
+                return std::path::Path::new(&format!("/proc/{pid}")).is_dir();
+            }
+            // No procfs on this target to tell EPERM from ESRCH — fail
+            // closed rather than silently answering "dead" (see doc above).
+            return true;
+        }
+
+        !Self::posix_is_zombie(pid)
+    }
+
+    /// Mirrors `cato/platform.py::_posix_is_zombie`: true when
+    /// `/proc/<pid>/stat` exists but the process state field is `Z`. A
+    /// plain file read, not a process-inspection crate.
+    fn posix_is_zombie(pid: u32) -> bool {
+        let Ok(data) = std::fs::read_to_string(format!("/proc/{pid}/stat")) else {
+            return false;
+        };
+        // Format: "pid (comm) state ..." — comm may itself contain
+        // spaces/parens, so state is read relative to the LAST ')'.
+        let Some(rparen) = data.rfind(')') else {
+            return false;
+        };
+        matches!(data.get(rparen + 2..rparen + 3), Some("Z"))
     }
 
     /// Poll the health endpoint until the daemon is ready.
@@ -261,11 +538,38 @@ impl SidecarManager {
     /// sidecar API. The name is the configured filename, never an installed
     /// path guess or a PATH lookup.
     fn sidecar_command(app: &AppHandle) -> Result<Command, String> {
-        app.shell().sidecar("cato").map_err(|error| {
-            format!(
-                "Bundled Cato executable is unavailable: {error}. Reinstall the desktop app."
-            )
-        })
+        Ok(app.shell().command(Self::bundled_executable_path(app)?))
+    }
+
+    /// Absolute path to the real daemon executable inside the staged onedir
+    /// bundle.
+    ///
+    /// The daemon used to be an `externalBin` resolved by name through
+    /// `shell().sidecar("cato")`. It is now a PyInstaller **onedir** bundle,
+    /// because a onefile build re-extracts its whole archive to a temp
+    /// directory on every launch — measured at 46.273s just to print
+    /// `--version`, against 2.895s warm for onedir. `externalBin` takes a
+    /// single file and a onedir build is a directory, so the bundle ships as a
+    /// Tauri resource and the executable is resolved by path instead of by
+    /// name.
+    ///
+    /// The directory name is fixed (not target-triple-suffixed) because
+    /// `tauri.conf.json` is static JSON with no per-target substitution; the
+    /// triple that `externalBin` used to append lives in neither path now.
+    fn bundled_executable_path(app: &AppHandle) -> Result<PathBuf, String> {
+        let resource_dir = app.path().resource_dir().map_err(|error| {
+            format!("Cannot resolve the app resource directory: {error}. Reinstall the desktop app.")
+        })?;
+        let executable = resource_dir
+            .join("cato-sidecar")
+            .join(if cfg!(windows) { "cato.exe" } else { "cato" });
+        if !executable.is_file() {
+            return Err(format!(
+                "Bundled Cato executable is unavailable at {}. Reinstall the desktop app.",
+                executable.display()
+            ));
+        }
+        Ok(executable)
     }
 }
 

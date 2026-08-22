@@ -50,9 +50,21 @@ def run(
     )
 
 
+def staged_bundle_dir(desktop_dir: Path) -> Path:
+    """Directory of the staged onedir sidecar bundle."""
+    return stage_sidecar.output_bundle_dir(desktop_dir / "src-tauri" / "binaries")
+
+
 def staged_sidecar_path(desktop_dir: Path) -> Path:
+    """The real executable inside the staged bundle.
+
+    The sidecar is a PyInstaller **onedir** bundle, so the artifact on disk is
+    a directory and this points at the entrypoint within it. Anything copying
+    the sidecar must copy the whole directory — the executable alone will not
+    run without its sibling ``_internal`` payload.
+    """
     triple = stage_sidecar.target_triple()
-    return desktop_dir / "src-tauri" / "binaries" / stage_sidecar.output_name(triple)
+    return staged_bundle_dir(desktop_dir) / stage_sidecar.inner_executable_name(triple)
 
 
 def build_sidecar(desktop_dir: Path, build_timeout: int) -> Path:
@@ -286,8 +298,16 @@ def main() -> int:
         log_file = tmp_dir / "frozen-daemon.log"
         install_dir.mkdir(parents=True, exist_ok=True)
 
-        install_binary = install_dir / ("cato.exe" if sys.platform.startswith("win") else "cato")
-        shutil.copy2(sidecar_path, install_binary)
+        # The sidecar is a onedir bundle: copy the WHOLE directory. Copying the
+        # executable alone produces a binary that cannot start, because its
+        # sibling `_internal` payload (interpreter, stdlib, and the
+        # cato_build_identity.json that /health reports as source_sha) would be
+        # missing.
+        installed_bundle = install_dir / stage_sidecar.BUNDLE_DIR_NAME
+        shutil.copytree(staged_bundle_dir(desktop_dir), installed_bundle)
+        install_binary = installed_bundle / sidecar_path.name
+        if not install_binary.is_file():
+            fail(f"installed bundle is missing its executable: {install_binary}")
         if not sys.platform.startswith("win"):
             install_binary.chmod(0o755)
 

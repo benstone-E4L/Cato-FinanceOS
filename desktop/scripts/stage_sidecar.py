@@ -59,6 +59,32 @@ def output_name(triple: str) -> str:
     return f"cato-{triple}{suffix}"
 
 
+#: Fixed name of the staged onedir bundle under ``src-tauri/binaries``.
+#:
+#: Deliberately NOT triple-suffixed. ``tauri.conf.json`` bundles this directory
+#: as a *resource*, and that config is static JSON with no per-target
+#: substitution — a triple in the path would only resolve on one platform.
+#: ``externalBin`` used to handle the triple for us, but it takes a single file
+#: and a onedir build is a directory, so the triple moves out of the path and
+#: the folder name becomes constant instead.
+BUNDLE_DIR_NAME = "cato-sidecar"
+
+
+def inner_executable_name(triple: str) -> str:
+    """Name of the real executable *inside* the staged onedir bundle.
+
+    PyInstaller names the produced executable after ``--name``; we pass a
+    constant so Rust can join a fixed path under the resource directory
+    rather than reconstruct the target triple at runtime.
+    """
+    return "cato.exe" if triple.endswith("windows-msvc") else "cato"
+
+
+def output_bundle_dir(binaries_dir: Path) -> Path:
+    """Directory the onedir bundle is staged into."""
+    return binaries_dir / BUNDLE_DIR_NAME
+
+
 def main() -> int:
     desktop_dir = Path(__file__).resolve().parents[1]
     repo_root = desktop_dir.parent
@@ -66,18 +92,25 @@ def main() -> int:
     binaries_dir.mkdir(parents=True, exist_ok=True)
 
     triple = target_triple()
-    output_path = binaries_dir / output_name(triple)
+    bundle_dir = output_bundle_dir(binaries_dir)
+    inner_exe = bundle_dir / inner_executable_name(triple)
     source_override = os.environ.get("CATO_SIDECAR_SOURCE")
-
-    if output_path.exists():
-        output_path.unlink()
 
     if source_override:
         source = Path(source_override).expanduser().resolve()
         if not source.exists():
             fail(f"CATO_SIDECAR_SOURCE does not exist: {source}")
-        shutil.copy2(source, output_path)
-        print(f"[stage_sidecar] copied sidecar from {source} -> {output_path}")
+        if bundle_dir.exists():
+            shutil.rmtree(bundle_dir)
+        if source.is_dir():
+            shutil.copytree(source, bundle_dir)
+        else:
+            # A single file override still has to land as the inner executable
+            # of a onedir-shaped bundle, because that is the only layout the
+            # Tauri resource path and the Rust spawn path know how to resolve.
+            bundle_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, inner_exe)
+        print(f"[stage_sidecar] copied sidecar from {source} -> {bundle_dir}")
         return 0
 
     try:
@@ -105,19 +138,27 @@ def main() -> int:
         identity_path = tmp / "cato_build_identity.json"
         identity_path.write_text(json.dumps({"source_sha": source_sha}), encoding="utf-8")
         data_separator = ";" if sys.platform.startswith("win") else ":"
+        # --onedir, NOT --onefile. A onefile build re-extracts the entire
+        # archive to a fresh temp directory on EVERY launch; measured on this
+        # tree that cost 46.273s just to print `--version`, paid twice per app
+        # start. The same code as a onedir bundle measured 2.895s warm. The
+        # trade is disk layout (a directory instead of one file), which is why
+        # the bundle ships as a Tauri *resource* rather than an externalBin.
+        staged_name = Path(inner_executable_name(triple)).stem
+        build_dist = tmp / "dist"
         cmd = [
             sys.executable,
             "-m",
             "PyInstaller",
             "--noconfirm",
             "--clean",
-            "--onefile",
+            "--onedir",
             "--name",
-            output_path.stem,
+            staged_name,
             "--add-data",
             f"{identity_path}{data_separator}.",
             "--distpath",
-            str(binaries_dir),
+            str(build_dist),
             "--workpath",
             str(tmp / "build"),
             "--specpath",
@@ -125,13 +166,26 @@ def main() -> int:
             str(cli_entry),
         ]
 
-        print(f"[stage_sidecar] building {output_path.name}")
+        print(f"[stage_sidecar] building {BUNDLE_DIR_NAME}/ ({staged_name})")
         subprocess.run(cmd, cwd=repo_root, check=True)
 
-    if not output_path.exists():
-        fail(f"PyInstaller completed but no sidecar was produced at {output_path}")
+        produced = build_dist / staged_name
+        produced_exe = produced / inner_executable_name(triple)
+        if not produced_exe.is_file():
+            fail(f"PyInstaller completed but no sidecar executable was produced at {produced_exe}")
 
-    print(f"[stage_sidecar] staged {output_path}")
+        # Only now replace whatever was staged before. Building into a temp
+        # distpath first means a failed build leaves the previously working
+        # bundle intact instead of deleting it up front.
+        if bundle_dir.exists():
+            shutil.rmtree(bundle_dir)
+        bundle_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(produced), str(bundle_dir))
+
+    if not inner_exe.is_file():
+        fail(f"staged bundle is missing its executable: {inner_exe}")
+
+    print(f"[stage_sidecar] staged {bundle_dir} (entrypoint: {inner_exe.name})")
     return 0
 
 

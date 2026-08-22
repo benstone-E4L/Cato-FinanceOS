@@ -60,21 +60,38 @@ def test_packaging_fails_closed_when_no_installer_is_produced():
 def test_packaged_sidecar_launches_bundled_binary_without_system_python():
     """The installer must not depend on the user having Python on PATH.
 
-    The daemon is declared as a Tauri externalBin and resolved through the
-    shell plugin's sidecar API, so the launched program is the artifact the
+    The daemon ships as a PyInstaller **onedir** bundle declared in Tauri's
+    `resources`, and is launched by an absolute path resolved under the app's
+    own resource directory. So the launched program is still the artifact the
     installer shipped — never an interpreter discovered at runtime.
+
+    It used to be an `externalBin` resolved by name via `shell().sidecar()`.
+    That changed because `externalBin` takes a single file and a onedir bundle
+    is a directory; a onefile build re-extracted its whole archive on every
+    launch (46.273s just to print `--version`, versus 2.895s warm for onedir).
+    The property under test is unchanged — only how the path is resolved.
     """
     sidecar = _source("desktop/src-tauri/src/sidecar.rs")
     config = _source("desktop/src-tauri/tauri.conf.json")
     lib = _source("desktop/src-tauri/src/lib.rs")
     cargo = _source("desktop/src-tauri/Cargo.toml")
 
-    assert '"binaries/cato"' in config
+    # The bundle the installer ships, and the name Rust joins onto the
+    # resource dir, must be the same string.
+    assert '"binaries/cato-sidecar"' in config
+    assert '"cato-sidecar"' in config
     assert "tauri-plugin-shell" in cargo
-    # The plugin must actually be registered, or shell().sidecar() fails at runtime.
+    # The plugin must actually be registered, or shell().command() fails at runtime.
     assert "tauri_plugin_shell::init()" in lib
 
-    assert 'app.shell().sidecar("cato")' in sidecar
+    # Resolved from the app's own resource directory — not PATH, not a guess.
+    assert "app.path().resource_dir()" in sidecar
+    assert '.join("cato-sidecar")' in sidecar
+    # Still launched through the shell plugin, so argv is passed as a vector
+    # rather than a shell string (see the command-string test below).
+    assert "app.shell().command(" in sidecar
+    # A missing bundle must be a hard error, never a silent fallback.
+    assert "is_file()" in sidecar
     assert '.args(["start", "--channel", "webchat"])' in sidecar
 
     # No interpreter discovery of any kind on the release start path.
@@ -175,7 +192,7 @@ def test_vault_password_is_a_single_start_child_handoff():
     assert body.count('std::env::var_os("CATO_VAULT_PASSWORD")') == 1
     assert body.count('std::env::remove_var("CATO_VAULT_PASSWORD")') == 1
     assert body.count('.env("CATO_VAULT_PASSWORD", password)') == 1
-    assert body.index('.arg("stop").output().await') < body.index(
+    assert body.index('Self::clear_stale_daemon_state().await') < body.index(
         '.env("CATO_VAULT_PASSWORD", password)'
     )
     assert "log::" not in "\n".join(
