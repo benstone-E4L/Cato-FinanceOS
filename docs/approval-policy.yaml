@@ -244,10 +244,35 @@ tools:
     aliases: ["telegram.send", "telegramSend"]
 
   # --- dispatch ------------------------------------------------------------
-  # genesis is gated unconditionally. The previous implementation decided this
-  # by substring-matching a model-written task string for "send"/"campaign",
-  # which "dispatch"/"deliver"/"blast" walked straight past. A dispatcher is
-  # dangerous because of what it can reach, not because of how it was described.
+  # genesis is gated unconditionally BY THIS ROW. The previous implementation
+  # decided this by substring-matching a model-written task string for
+  # "send"/"campaign", which "dispatch"/"deliver"/"blast" walked straight past.
+  # A dispatcher is dangerous because of what it can reach, not because of how
+  # it was described.
+  #
+  # SUB-CAPABILITY TIERING FOR genesis IS CODE-SIDE AND CANNOT BE WIDENED HERE.
+  # A genesis dispatch may resolve to an ungated read row
+  # (`genesis_read_only_specialist`, tier read_only) instead of the `dispatch`
+  # tier below, but ONLY via approval_policy.py::_resolve_genesis_rule, which
+  # requires the addressed agent to be declared write-forbidden by Cato-side
+  # data (cato/tools/genesis.py FAIL_CLOSED_ACCOUNTING_ALLOWLIST +
+  # cato/xero_scope.py specialist_writes_forbidden, backed by
+  # accounting/XERO_SCOPE_TO_AGENT_MAP.yaml `specialist_overrides`).
+  #
+  # Consequences for anyone editing THIS file:
+  #   * `dispatcher: true` on genesis does NOTHING. The resolver is keyed on the
+  #     canonical id and runs BEFORE the generic args["action"] dispatcher path,
+  #     precisely so a policy-file edit cannot route genesis through the generic
+  #     path and skip the agent-capability check.
+  #   * Widening the ungated set means editing the scope map or the allowlist in
+  #     code and passing tests/test_genesis_subaction_tiering.py. It cannot be
+  #     done by adding aliases or lowering the tier here.
+  #   * Lowering `tier:` below still works and still applies to every dispatch
+  #     that does NOT take the read path — i.e. this file can only make genesis
+  #     LESS gated across the board, never selectively ungate a new agent.
+  #   * IMMUTABLE_DENIED_AGENTS (the money-domain slugs plus genesis-deploy) is
+  #     enforced in code and is disjoint from the read-eligible set. No edit to
+  #     this file can put a denied slug on the ungated path.
   genesis:
     tier: dispatch
     aliases:

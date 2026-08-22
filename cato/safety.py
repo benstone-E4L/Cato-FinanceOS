@@ -265,15 +265,75 @@ def _requests_unsandboxed_root(inputs: dict) -> bool:
     return isinstance(root, str) and root.strip().lower() == "absolute"
 
 
-def _policy_tier(tool_name: str) -> RiskTier:
-    """Fall back to the declarative approval policy, which is itself fail-closed.
+def _canonical_tool_name(tool_name: str) -> str:
+    """Alias-resolved canonical capability id, or the raw name if unresolvable.
 
-    Any failure to reach or read the policy yields the most restrictive tier —
-    we never downgrade a tool because a lookup broke.
+    ``_DISPATCHER_TOOLS`` is matched against THIS, not against the raw
+    model-supplied name. Matching the raw name meant a spelling variant of a
+    dispatcher (``File``, ``BROWSER``, ``"file "``) escaped interception and was
+    classified by ``_policy_tier`` instead — a different code path reaching the
+    same answer only because both happen to consult the same policy. "Not
+    exploitable" then rested on ``agent_loop._TOOL_REGISTRY`` staying an exact
+    lowercase dict lookup forever: a property of an unrelated module, unenforced,
+    one refactor away from making this classifier answer READ for a name it does
+    not recognise. A safety classifier must not depend on another module's
+    key-casing discipline.
+
+    Fails closed by falling back to the raw name: an unresolvable name is not
+    in ``_DISPATCHER_TOOLS``, so it proceeds to the reviewed table and then to
+    ``UNCLASSIFIED_TIER``.
+
+    Deliberately NOT applied to the shell branch above it. ``shell_exec``'s
+    alias list includes ``bash`` and ``exec``, which today classify HIGH_STAKES
+    flat; routing them into ``_classify_shell`` would let a benign command
+    string LOWER them. That is a downgrade, so the shell check stays keyed on
+    the raw name.
     """
     try:
         from .core.approval_policy import resolve_tool
         rule = resolve_tool(tool_name)
+        if getattr(rule, "known", False):
+            return str(rule.canonical)
+    except Exception:  # pragma: no cover — defensive, falls back to raw name
+        pass
+    return tool_name
+
+
+def _policy_tier(tool_name: str, inputs: Optional[dict] = None) -> RiskTier:
+    """Fall back to the declarative approval policy, which is itself fail-closed.
+
+    Any failure to reach or read the policy yields the most restrictive tier —
+    we never downgrade a tool because a lookup broke.
+
+    ``inputs`` is forwarded so this engine resolves a call to the SAME policy
+    row the approval engine does. Without it the two disagree on any tool whose
+    real capability lives in its arguments (``genesis``), and the disagreement
+    is not benign: ``check_and_confirm`` DENIES OUTRIGHT in a non-interactive
+    context when the policy does not require an approval ticket, so a call the
+    policy had deliberately ungated would be refused by the daemon instead of
+    running.
+
+    Forwarding is safe because of an INVARIANT, not because sub-action
+    resolution is escalate-only — it is not; ``file`` + ``action=read`` really
+    does resolve lower than the ``file`` row itself. The invariant is that every
+    policy row which consumes ``args`` is intercepted by ``_DISPATCHER_TOOLS``
+    in ``classify_action`` before reaching here — under EVERY spelling, since
+    that interception is keyed on the alias-resolved canonical
+    (``_canonical_tool_name``) — with exactly one reviewed exemption:
+    ``genesis``, whose resolver is ``approval_policy._resolve_genesis_rule``.
+    ``genesis`` is therefore the only capability for which ``inputs`` changes
+    anything here.
+
+    Two independently-maintained sets have to agree for that to hold
+    (``_DISPATCHER_TOOLS`` and the ``dispatcher: true`` rows in
+    docs/approval-policy.yaml), so it is pinned by
+    tests/test_safety_policy_dispatcher_invariant.py rather than left to
+    coincidence — add a ``dispatcher: true`` row to that YAML without adding
+    the tool to ``_DISPATCHER_TOOLS`` and that test fails.
+    """
+    try:
+        from .core.approval_policy import resolve_tool
+        rule = resolve_tool(tool_name, args=inputs if isinstance(inputs, dict) else None)
     except Exception as exc:  # pragma: no cover — defensive
         logger.warning(
             "Risk classification: approval policy unavailable for %r (%s); "
@@ -339,8 +399,12 @@ class SafetyGuard:
         if name in ("shell", "shell.exec", "shell.run"):
             return _classify_shell(inputs if isinstance(inputs, dict) else {})
 
-        if name in _DISPATCHER_TOOLS:
-            key = _dispatcher_key(name, inputs)
+        # Intercept on the alias-resolved canonical so every spelling of a
+        # dispatcher lands on the REVIEWED _TOOL_TIER table rather than leaking
+        # to _policy_tier. See _canonical_tool_name.
+        canonical = _canonical_tool_name(name)
+        if canonical in _DISPATCHER_TOOLS:
+            key = _dispatcher_key(canonical, inputs)
             if key is None:
                 logger.warning(
                     "Risk classification: %r called without a readable action; "
@@ -372,7 +436,7 @@ class SafetyGuard:
         if tier is not None:
             return tier
 
-        return _policy_tier(name)
+        return _policy_tier(name, inputs)
 
     def is_classified(self, tool_name: str, inputs: Optional[dict] = None) -> bool:
         """True when this tool was positively identified (not fail-closed default).
@@ -385,14 +449,18 @@ class SafetyGuard:
             return False
         if name in ("shell", "shell.exec", "shell.run"):
             return True
-        if name in _DISPATCHER_TOOLS:
-            key = _dispatcher_key(name, inputs or {})
+        canonical = _canonical_tool_name(name)
+        if canonical in _DISPATCHER_TOOLS:
+            key = _dispatcher_key(canonical, inputs or {})
             return key is not None and key in _TOOL_TIER
         if name in _TOOL_TIER:
             return True
         try:
             from .core.approval_policy import resolve_tool
-            return bool(getattr(resolve_tool(name), "known", False))
+            return bool(getattr(
+                resolve_tool(name, args=inputs if isinstance(inputs, dict) else None),
+                "known", False,
+            ))
         except Exception:  # pragma: no cover — defensive
             return False
 

@@ -12,6 +12,7 @@ with the vault's long-lived Ed25519 identity key, then POSTed to the agent's
 Public symbols:
     GENESIS_AGENTS         -- registry dict
     GENESIS_TOOL_SCHEMA    -- tool registry schema for task-03 wiring
+    GENESIS_OPERATION_ENUM -- closed set of declarable Xero operations
     AP2_ENVELOPE_VERSION   -- wire protocol version (1)
     MONEY_DOMAIN_AGENTS    -- hardcoded money-domain slugs
     IMMUTABLE_DENIED_AGENTS -- money-domain slugs plus deployment
@@ -732,9 +733,30 @@ class GenesisTool:
         # E4L scope map injection (2026-08-22 posting model) — fail closed
         if _canonicalize_agent_slug(agent) in FAIL_CLOSED_ACCOUNTING_ALLOWLIST:
             try:
-                from cato.xero_scope import build_dispatch_scope_params
+                from cato.core.approval_policy import declared_genesis_operation
+                from cato.xero_scope import build_dispatch_scope_params, operation_allowed
 
-                params.update(build_dispatch_scope_params(_canonicalize_agent_slug(agent)))
+                slug_for_scope = _canonicalize_agent_slug(agent)
+                params.update(build_dispatch_scope_params(slug_for_scope))
+
+                # NARROWING ONLY. `operation` is model-written, so it is used
+                # here exclusively to SHRINK the grant Cato ships: the declared
+                # operation must already be on the list this specialist would
+                # have received anyway, and the result is a subset of that list.
+                # A model cannot add an operation the scope map did not grant,
+                # and an unreadable/contradictory declaration simply leaves the
+                # full per-agent list in place (and gates upstream). This does
+                # not by itself constrain the remote — see
+                # docs/GENESIS_PAIR_LEVEL_UNGATING_REQUIREMENTS.md — it is the
+                # Cato half of the per-operation grant that a remote enforcing
+                # `allowed_xero_operations` would consume.
+                declared = declared_genesis_operation(args)
+                granted = params.get("allowed_xero_operations")
+                if declared and isinstance(granted, list) and declared in granted:
+                    allowed, _reason = operation_allowed(slug_for_scope, declared)
+                    if allowed:
+                        params["declared_xero_operation"] = declared
+                        params["allowed_xero_operations"] = [declared]
             except Exception as exc:  # noqa: BLE001
                 self._log.error("scope map injection failed for %s: %s", agent, exc)
                 return json.dumps({
@@ -1186,41 +1208,105 @@ def list_agents(include_pending: bool = False) -> list[dict[str, Any]]:
 # Tool schema (consumed by task-03 when wiring into the registry)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# `operation` — the declarable Xero sub-action.
+#
+# WHY IT IS ADVERTISED AT ALL. cato/core/approval_policy.py::_resolve_genesis_rule
+# has, since the sub-action tiering work, been able to tier a genesis dispatch
+# per (agent, operation). It was unreachable in practice: the schema below
+# declared ``additionalProperties: False`` and did not name ``operation``, so a
+# top-level declaration was schema-illegal and the model was never told the key
+# existed at all. The tiering path was therefore dead code. Advertising the key
+# is what makes it reachable.
+#
+# WHY THAT IS NOT A WIDENING. `operation` is consulted by the policy engine ONLY
+# AFTER the addressed agent has already been proven structurally write-incapable
+# by Cato-side data (approval_policy Q1). It can turn an otherwise-ungated call
+# INTO a gated one (declare a write op and you gate) and can never do the
+# reverse. Declaring `operation=get_trial_balance` on a write-capable specialist
+# changes nothing: that call still gates. See
+# docs/GENESIS_PAIR_LEVEL_UNGATING_REQUIREMENTS.md for the evidence behind that
+# ordering, and tests/test_genesis_operation_declaration.py for the proof.
+#
+# The enum is sourced from cato.xero_scope.OPERATION_SCOPE_FAMILY so the schema
+# and the policy engine can never drift into two different closed sets. If that
+# import fails the key is simply not advertised, which is the fail-closed
+# outcome (the model cannot emit it, so every dispatch keeps the `dispatch`
+# tier and gates).
+# ---------------------------------------------------------------------------
+try:  # pragma: no cover - exercised via GENESIS_OPERATION_ENUM below
+    from cato.xero_scope import OPERATION_SCOPE_FAMILY as _XERO_OPERATION_FAMILY
+except Exception:  # pragma: no cover - defensive; fails closed
+    _XERO_OPERATION_FAMILY = {}
+
+GENESIS_OPERATION_ENUM: tuple[str, ...] = tuple(sorted(_XERO_OPERATION_FAMILY))
+
+_OPERATION_PARAM_DESCRIPTION = (
+    "Optional. The single Xero operation this dispatch is for, from the closed "
+    "set above. Declaring it NARROWS the call: Cato forwards only that "
+    "operation on the specialist's allowed-operation list, and the approval "
+    "gate uses it to distinguish a query from a post. It NEVER lowers an "
+    "approval requirement for a specialist that holds Xero write scopes — such "
+    "a dispatch requires approval whatever is declared here. Omit it rather "
+    "than guess; an unrecognised or contradictory value gates."
+)
+
+
+def _build_genesis_tool_schema() -> dict[str, Any]:
+    """Assemble the function-calling schema.
+
+    Kept a function so the `operation` enum is built from live scope-map data
+    at import time and can be re-derived in tests without restating the set.
+    """
+    properties: dict[str, Any] = {
+        "agent": {"type": "string", "description": "Agent slug, e.g. 'genesis-research'."},
+        "task": {"type": "string", "description": "Plain-text task for the agent to perform."},
+        "params": {"type": "object", "description": "Optional structured parameters.", "additionalProperties": True},
+    }
+    if GENESIS_OPERATION_ENUM:
+        properties["operation"] = {
+            "type": "string",
+            "enum": list(GENESIS_OPERATION_ENUM),
+            "description": _OPERATION_PARAM_DESCRIPTION,
+        }
+    return {
+        "type": "function",
+        "function": {
+            "name": "genesis",
+            "description": (
+                "Call a hosted Genesis Agent on SwarmSync. The agent slug must be in "
+                "GENESIS_AGENTS. E4L books use the 14 genesis-e4l-* specialists "
+                "(revenue, shopify, stripe, cash, ap, ar, cogs-cm, commissions, "
+                "intercompany, close, journals, fs-integrity, controller, treasury). "
+                "Never genesis-finance/billing/commerce/pricing and never "
+                "genesis-e4l-accounting. Returns the agent's response. "
+                "Agents not cleared for dispatch return a 'pending_deployment' error. "
+                "For E4L accounting work, declare the single Xero `operation` this "
+                "dispatch is for when one applies -- it narrows what Cato authorises "
+                "downstream and never widens it."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": properties,
+                "required": ["agent", "task"],
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
 # OpenAI function-calling format — matches sibling entries in
 # cato.agent_loop._BUILTIN_SCHEMAS so _sanitize_tool_defs (which reads
 # ``d["function"]["name"]``) can normalize this schema uniformly with the
 # rest of the tool registry. Anthropic-style ``{"name", "input_schema"}``
 # at the top level breaks _sanitize_tool_defs with KeyError: 'function'.
-GENESIS_TOOL_SCHEMA: dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "genesis",
-        "description": (
-            "Call a hosted Genesis Agent on SwarmSync. The agent slug must be in "
-            "GENESIS_AGENTS. E4L books use the 14 genesis-e4l-* specialists "
-            "(revenue, shopify, stripe, cash, ap, ar, cogs-cm, commissions, "
-            "intercompany, close, journals, fs-integrity, controller, treasury). "
-            "Never genesis-finance/billing/commerce/pricing and never "
-            "genesis-e4l-accounting. Returns the agent's response. "
-            "Agents not cleared for dispatch return a 'pending_deployment' error."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "agent": {"type": "string", "description": "Agent slug, e.g. 'genesis-research'."},
-                "task": {"type": "string", "description": "Plain-text task for the agent to perform."},
-                "params": {"type": "object", "description": "Optional structured parameters.", "additionalProperties": True},
-            },
-            "required": ["agent", "task"],
-            "additionalProperties": False,
-        },
-    },
-}
+GENESIS_TOOL_SCHEMA: dict[str, Any] = _build_genesis_tool_schema()
 
 
 __all__ = [
     "GENESIS_AGENTS",
     "GENESIS_TOOL_SCHEMA",
+    "GENESIS_OPERATION_ENUM",
     "AP2_ENVELOPE_VERSION",
     "MONEY_DOMAIN_AGENTS",
     "IMMUTABLE_DENIED_AGENTS",

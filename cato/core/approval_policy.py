@@ -459,6 +459,222 @@ def requests_unsandboxed_root(args: Any) -> bool:
     return isinstance(root, str) and root.strip().lower() in _UNSANDBOXED_ROOTS
 
 
+# ---------------------------------------------------------------------------
+# `genesis` sub-capability tiering
+#
+# WHY THIS IS NOT THE OLD SUBSTRING BUG (see design rule 4 in the header).
+#
+# The old gate asked "does the model's task string contain 'send'?" — a
+# question about model-written prose, which "dispatch" walked straight past.
+# This resolver never reads `task`. It asks two questions, both answered
+# entirely by Cato-side code:
+#
+#   Q1 (load-bearing, unforgeable): is the agent this call is addressed to
+#       STRUCTURALLY INCAPABLE of writing?  `agent` is model-written, but it
+#       only ever SELECTS an element of a closed set Cato defines
+#       (cato.tools.genesis.FAIL_CLOSED_ACCOUNTING_ALLOWLIST) whose
+#       write-capability is declared Cato-side
+#       (cato.xero_scope.specialist_writes_forbidden, backed by
+#       XERO_SCOPE_TO_AGENT_MAP.yaml `specialist_overrides`). The model can
+#       pick which specialist; it cannot give a write-forbidden specialist
+#       Xero write scopes. Today exactly one slug qualifies:
+#       genesis-e4l-fs-integrity ("writes_forbidden: true", constitution test
+#       `fs_integrity_write`). Blast radius is bounded by the credential the
+#       remote holds, not by what the model asked it to do.
+#
+#   Q2 (granularity only, never widening): is the DECLARED operation a member
+#       of the closed operation enum cato.xero_scope.OPERATION_SCOPE_FAMILY,
+#       and does Cato's own scope map classify that (agent, operation) pair as
+#       a read?  This is a model-supplied token, so it is deliberately
+#       consulted ONLY AFTER Q1 already proved the call cannot write. It can
+#       therefore make an ungated call gated (declare a write op and you gate)
+#       and can never make a gated call ungated. Declaring
+#       `operation=get_trial_balance` on genesis-e4l-ap — an agent that DOES
+#       hold write scopes — fails Q1 and gates, which is precisely the forgery
+#       this ordering exists to defeat.
+#
+# Everything else fails closed to the `genesis` row's own tier (`dispatch`,
+# always gated): unknown slug, denylisted slug, non-allowlisted slug,
+# unreadable/absent/contradictory operation, unknown operation, malformed
+# args, or any import/lookup failure resolving the capability facts.
+#
+# IMMUTABILITY: IMMUTABLE_DENIED_AGENTS (the money-domain slugs plus
+# genesis-deploy) is checked before anything else here AND is disjoint from
+# the allowlist, so a denied slug is unreachable on the ungated path twice
+# over. See tests/test_genesis_subaction_tiering.py.
+#
+# This resolver keys on the canonical id, NOT on the rule's `dispatcher`
+# flag, so `docs/approval-policy.yaml` cannot turn `genesis` into a generic
+# `args["action"]` dispatcher and thereby skip Q1.
+# ---------------------------------------------------------------------------
+
+GENESIS_CANONICAL = "genesis"
+
+#: Canonical id reported for a genesis dispatch that resolved to the ungated
+#: read path. Distinct from `genesis` so audit rows, tickets and execution
+#: grants never confuse the two capabilities.
+GENESIS_READ_ONLY_CANONICAL = "genesis_read_only_specialist"
+_GENESIS_READ_ONLY_TIER = "read_only"
+
+#: Keys the declared Xero operation may be carried under. Top level and inside
+#: `params` are both accepted (GENESIS_TOOL_SCHEMA declares `params` as an open
+#: object, so `params.operation` is schema-legal today). Order does not matter:
+#: two DIFFERENT values anywhere is treated as unreadable and gates.
+_GENESIS_OPERATION_KEYS = ("operation", "action", "op")
+
+#: `operation_allowed()` reasons that mean "this agent cannot write at all and
+#: this is one of its reads". Any other reason — including a permissive
+#: `primary_write` — gates.
+_GENESIS_READ_REASONS = frozenset({"read_only_specialist"})
+
+_genesis_facts_cache: Optional[dict[str, Any]] = None
+_genesis_facts_failed = False
+
+
+def _genesis_facts() -> Optional[dict[str, Any]]:
+    """Cato-side capability facts for genesis, or None (=> gate everything).
+
+    Imported lazily: `cato.tools.genesis` pulls in aiohttp and the vault, and
+    the policy engine must stay importable without them. Any failure here is
+    an unresolvable capability, which fails closed.
+    """
+    global _genesis_facts_cache, _genesis_facts_failed
+    if _genesis_facts_cache is not None or _genesis_facts_failed:
+        return _genesis_facts_cache
+    try:
+        from cato.tools.genesis import (
+            FAIL_CLOSED_ACCOUNTING_ALLOWLIST,
+            IMMUTABLE_DENIED_AGENTS,
+            _canonicalize_agent_slug,
+        )
+        from cato.xero_scope import (
+            OPERATION_SCOPE_FAMILY,
+            operation_allowed,
+            specialist_writes_forbidden,
+        )
+    except Exception as exc:  # pragma: no cover — defensive, fails closed
+        _genesis_facts_failed = True
+        logger.error(
+            "genesis capability facts unavailable (%s); every genesis dispatch "
+            "will require approval", exc,
+        )
+        return None
+    _genesis_facts_cache = {
+        "canonicalize": _canonicalize_agent_slug,
+        "denied": frozenset(IMMUTABLE_DENIED_AGENTS),
+        "allowlist": frozenset(FAIL_CLOSED_ACCOUNTING_ALLOWLIST),
+        "operations": frozenset(OPERATION_SCOPE_FAMILY),
+        "writes_forbidden": specialist_writes_forbidden,
+        "operation_allowed": operation_allowed,
+    }
+    return _genesis_facts_cache
+
+
+def _reset_genesis_facts_cache() -> None:
+    """Test hook. Drops the memoised capability facts."""
+    global _genesis_facts_cache, _genesis_facts_failed
+    _genesis_facts_cache = None
+    _genesis_facts_failed = False
+
+
+def _genesis_declared_operation(args: Any) -> Optional[str]:
+    """The single declared Xero operation, or None when it is unreadable.
+
+    None is returned for: non-dict args, no operation key anywhere, a
+    non-string/blank value, or two different values across the accepted keys.
+    Every one of those gates.
+    """
+    if not isinstance(args, dict):
+        return None
+    containers: list[dict[str, Any]] = [args]
+    params = args.get("params")
+    if isinstance(params, dict):
+        containers.append(params)
+    found: set[str] = set()
+    for container in containers:
+        for key in _GENESIS_OPERATION_KEYS:
+            value = container.get(key)
+            if isinstance(value, str) and value.strip():
+                found.add(value.strip().lower())
+    if len(found) != 1:
+        return None
+    return found.pop()
+
+
+def declared_genesis_operation(args: Any) -> Optional[str]:
+    """Public reader for the declared Xero operation on a genesis dispatch.
+
+    Exists so `cato.tools.genesis` narrows the outbound scope grant using the
+    EXACT same parse the gate used. Two readers would eventually disagree, and
+    a disagreement here means the operator approved one call while a different
+    one went on the wire.
+    """
+    return _genesis_declared_operation(args)
+
+
+def _resolve_genesis_rule(rule: ToolRule, args: Any) -> ToolRule:
+    """Resolve a `genesis` dispatch to its sub-capability row.
+
+    Returns *rule* unchanged (tier `dispatch`, always gated) unless every
+    fail-closed condition for the read path is met. See the block comment
+    above for why the ordering of the checks is the security property.
+    """
+    if not isinstance(args, dict):
+        return rule
+
+    facts = _genesis_facts()
+    if facts is None:
+        return rule
+
+    raw_agent = args.get("agent")
+    if not isinstance(raw_agent, str) or not raw_agent.strip():
+        return rule
+
+    try:
+        slug = facts["canonicalize"](raw_agent)
+    except Exception:  # pragma: no cover — defensive
+        return rule
+    if not slug:
+        return rule
+
+    # Immutable denylist first, and independently of everything below, so the
+    # ungated path can never become a route around it.
+    if slug in facts["denied"]:
+        return rule
+
+    # Only the fail-closed E4L specialist set is eligible at all. An unknown or
+    # unlisted slug gates.
+    if slug not in facts["allowlist"]:
+        return rule
+
+    # Q1 — LOAD-BEARING. The specialist must be declared write-forbidden.
+    try:
+        if not facts["writes_forbidden"](slug):
+            return rule
+    except Exception:  # pragma: no cover — defensive
+        return rule
+
+    # Q2 — granularity only. Reached only when Q1 already proved no write is
+    # possible, so this can narrow but never widen.
+    operation = _genesis_declared_operation(args)
+    if operation is None or operation not in facts["operations"]:
+        return rule
+    try:
+        allowed, reason = facts["operation_allowed"](slug, operation)
+    except Exception:  # pragma: no cover — defensive
+        return rule
+    if not allowed or reason not in _GENESIS_READ_REASONS:
+        return rule
+
+    return ToolRule(
+        canonical=GENESIS_READ_ONLY_CANONICAL,
+        tier=_GENESIS_READ_ONLY_TIER,
+        simulation_exempt=False,
+        known=True,
+        dispatcher=False,
+    )
+
+
 @dataclass
 class ApprovalPolicy:
     version: str = "1.0"
@@ -782,6 +998,11 @@ def resolve_tool(
       * an unrecognised sub-action -> unknown, therefore gated.
       * only rules declared ``dispatcher`` ever consult ``args``, so adding
         ``action`` to a non-dispatcher call cannot redirect its policy row.
+
+    ``genesis`` is tiered per sub-capability by a dedicated resolver rather
+    than the generic dispatcher path, because its ``action`` is a claim about
+    what a REMOTE agent will do rather than a description of what this process
+    will do. See ``_resolve_genesis_rule``.
     """
     pol = policy or load_policy()
     normalized = normalize_tool_name(tool_name)
@@ -791,6 +1012,12 @@ def resolve_tool(
     rule = pol.tools.get(canonical)
     if rule is None:
         return ToolRule(canonical=canonical, tier="critical", known=False)
+
+    # Keyed on the canonical id, not on rule.dispatcher: a policy FILE must not
+    # be able to route `genesis` through the generic args["action"] dispatcher
+    # and skip the agent-capability check.
+    if canonical == GENESIS_CANONICAL:
+        return _resolve_genesis_rule(rule, args)
 
     if rule.dispatcher:
         action = _dispatch_action(args)
@@ -1032,6 +1259,8 @@ def verify_ticket(
 
 __all__ = [
     "ALLOW",
+    "GENESIS_CANONICAL",
+    "GENESIS_READ_ONLY_CANONICAL",
     "REQUIRE",
     "ApprovalContext",
     "ApprovalPolicy",

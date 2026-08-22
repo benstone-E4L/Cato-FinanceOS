@@ -1507,6 +1507,23 @@ def _sanitize_path_component(s: str) -> str:
     return re.sub(r'[^a-zA-Z0-9_\-\.]', '_', s)[:64]
 
 
+def _configured_tenant_id(config: Any = None) -> Optional[str]:
+    """Tenant id for trace correlation, or None.
+
+    Not a secret and not an authorization input: it labels spans so a trace can
+    be filtered to one tenant. Nothing downstream reads it to choose a tenant —
+    the Xero demo server enforces its own tenant lock server-side.
+    """
+    for attr in ("trace_tenant_id", "tenant_id"):
+        value = getattr(config, attr, None)
+        if value:
+            return str(value)
+    import os
+
+    env_value = (os.getenv("CATO_TENANT_ID") or "").strip()
+    return env_value or None
+
+
 def _sanitize_agent_id(agent_id: str) -> str:
     """Sanitize agent_id for safe filesystem use — no path traversal possible."""
     # Allow only alphanumeric, hyphen, underscore, dot
@@ -1590,6 +1607,253 @@ def _build_accounting_routing_hint(message: str) -> Optional[str]:
         "listed above are correct for this question."
     )
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Phantom-action detection
+# ---------------------------------------------------------------------------
+#
+# A "phantom action" is a turn where the model *narrates* doing something
+# ("Let me pull the current cash balance") but emits no tool_call.  The
+# planning loop re-prompts once when it sees one so the model actually
+# executes instead of only describing.
+#
+# The original detector was a bare substring test over hints that included
+# ``"i can "`` and ``"let's "``, matched anywhere in the answer.  It fired on
+# purely *descriptive* prose.  Observed regression: the (correct, complete)
+# answer to "who is your best genesis agent?" contained
+#
+#     ... the genesis agents I can dispatch are specialized ...
+#
+# which matched ``"i can "``.  The re-prompt fired, the next turn abandoned the
+# user's question and returned a gate error, and because ``final_text`` keeps
+# only the last turn the correct answer was destroyed.
+#
+# Three properties separate a *commitment to act* from a *description*:
+#
+#   1. MOOD.  "I'll X" / "I'm going to X" / "Let me X" are commissive -- the
+#      speaker binds themselves to a future act.  "I can X" / "I could X" /
+#      "I'm able to X" are capability modals: description, or an offer still
+#      awaiting the user's consent.  Auto-executing an offer is a bug in its
+#      own right, so capability modals are no longer hints at all.
+#   2. CLAUSE POSITION.  A commissive heads its clause.  In "the genesis agents
+#      I can dispatch" the first-person construction is embedded in a relative
+#      clause modifying "agents" -- preceded by a bare noun with no clause
+#      boundary.  Requiring the construction to be clause-initial kills the
+#      embedded-description case even for markers that survive rule 1.
+#   3. COMPLEMENT.  The construction must be followed by a *tool-shaped* action
+#      verb, so "let me know if ...", "I'll be honest", "let me explain" and
+#      "let's start with the basics" do not fire.
+#
+# Rules 1 and 2 each independently reject the regression above, and rule 3
+# independently rejects the most common narration-shaped false positives.
+
+# Commissive first-person constructions.  Capability modals ("i can",
+# "i could", "i may", "i might", "i am able to") are deliberately absent:
+# they describe or offer, they do not commit.
+_COMMITMENT_RE = re.compile(
+    r"\b(?:"
+    r"i['’]?ll"
+    r"|i will"
+    r"|i(?:['’]?m| am)(?: \w+ly| now| just| already| also)? (?:(?:going|about) to|gonna)"
+    r"|let me"
+    r"|let['’]s"
+    r"|let us"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# What may legally sit immediately before a commissive for it to count as
+# heading its own clause: start of text, sentence/clause punctuation, a list
+# bullet, or a discourse connective.  A bare noun ("... agents |I can ...")
+# matches nothing here, which is exactly the false positive being killed.
+_CLAUSE_START_RE = re.compile(
+    r"(?:^|[.!?;:,()\[\]{}\"“”‘’'`*>\n–—-]"
+    r"|\b(?:and|then|so|but|now|next|first|also|ok|okay|sure|alright|"
+    r"actually|instead|therefore|meanwhile|finally|second|secondly|thirdly)\b)"
+    r"[\s*•\-.)\]\d]*$",
+    re.IGNORECASE,
+)
+
+# Verbs that imply reaching for a tool.  Deliberately excludes speech-act and
+# stance verbs ("explain", "know", "be", "admit", "say", "keep") so narration
+# about the conversation itself never fires the detector.
+_ACTION_VERBS = frozenset({
+    "add", "analyse", "analyze", "apply", "archive", "audit", "browse",
+    "build", "calculate", "call", "check", "collect", "commit", "compare",
+    "compile", "compute", "confirm", "copy", "count", "crawl", "create",
+    "cross-check", "crosscheck", "delegate", "delete", "deploy", "dig",
+    "dispatch", "download", "draft", "edit", "email", "examine", "execute",
+    "export", "extract", "fetch", "find", "gather", "generate", "grab",
+    "import", "insert", "inspect", "invoke", "kick", "launch", "list", "load",
+    "log", "look", "modify", "move", "navigate", "open", "parse", "poll",
+    "post", "probe", "pull", "push", "query", "read", "recompute",
+    "reconcile", "record", "refresh", "reload", "remove", "re-run", "rerun",
+    "retrieve", "review", "run", "save", "scan", "schedule", "search", "send",
+    "spin", "store", "submit", "sync", "tally",
+    "trace", "trigger", "update", "upload", "validate", "verify",
+    "write",
+})
+
+# Multi-word action complements ("I'll take a look" / "let me pull up ...").
+_ACTION_PHRASES = (
+    "take a look", "have a look", "go through", "pull up", "look up",
+    "look into", "check on", "kick off", "spin up", "reach out",
+    "double check", "double-check",
+)
+
+# Consumed between the commissive and its action verb.  "start"/"begin"/"go"
+# live here rather than in _ACTION_VERBS so "I'll start by pulling ..." fires
+# on "pull" while "let's start with the basics" does not fire at all.
+#
+# This closed list is a *supplement*, not the whole rule.  Manner and stance
+# adverbs are an open class ("certainly", "definitely", "gladly", "happily",
+# "surely"), so enumerating them is a losing game and every miss is a FALSE
+# NEGATIVE -- "I'll gladly pull the ledger" with no tool call shipping as the
+# final answer.  :func:`_is_complement_filler` therefore also skips -ly
+# adverbs generically.  That widens only what may sit *between* a commitment
+# and its verb; it does not widen what counts as a commitment, and it does not
+# widen what counts as an action.
+_COMPLEMENT_FILLERS = frozenset({
+    "actually", "ahead", "also", "and", "away", "begin", "briefly", "by",
+    "course", "first", "go", "just", "next", "now", "of", "only", "please",
+    "quick", "right", "start", "still", "sure", "then", "to", "try",
+})
+
+_NEGATORS = frozenset({"not", "never", "no", "rather", "instead"})
+
+# The user explicitly asked for description only.  Narration is then the
+# correct behaviour and must not be escalated into execution.
+_EXPLICIT_NO_ACTION_RE = re.compile(
+    r"(?:\b(?:do\s*not|don['’]?t)\s+(?:actually\s+)?"
+    r"(?:do|run|call|execute|dispatch|change|touch|write|send|create|modify|"
+    r"fetch|pull|query)\b"
+    r"|\bjust\s+(?:tell|explain|describe|say|answer|list)\b"
+    r"|\bwithout\s+(?:running|calling|executing|doing|touching)\b"
+    r"|\bno\s+tool\s+calls?\b"
+    r"|\bdry[-\s]run\b"
+    r"|\bread[-\s]only\b)",
+    re.IGNORECASE,
+)
+
+# A conditional only turns a commitment into an offer when it *governs* the
+# clause the commitment heads -- i.e. when the clause immediately before it is
+# the conditional's own ("If you'd like, I'll pull it").  Searching the whole
+# sentence head for bare "should"/"once" also suppressed genuine commitments
+# such as "You should know, I'll pull the trial balance now", so the test is
+# anchored to the start of the governing clause.
+_CONDITIONAL_LEAD_RE = re.compile(
+    r"^(?:if|unless|whenever|once|assuming|provided|"
+    r"should you|when you|in case)\b",
+    re.IGNORECASE,
+)
+
+# Clause boundaries *within* a single sentence.
+_CLAUSE_BOUNDARY_RE = re.compile(r"[,;:()\[\]–—]|\s-\s")
+
+_SENTENCE_SPLIT_RE = re.compile(r"[.!?\n]")
+_WORD_RE = re.compile(r"[A-Za-z][A-Za-z'’\-]*")
+
+_MAX_COMPLEMENT_FILLERS = 6
+
+
+def _is_action_word(word: str) -> bool:
+    """True for a tool-shaped action verb in bare or common inflected form.
+
+    "I'll start by *pulling* the bank feed" is the same commitment as
+    "I'll *pull* the bank feed", so a small suffix-stripper is applied rather
+    than enumerating every inflection in :data:`_ACTION_VERBS`.
+    """
+    if word in _ACTION_VERBS:
+        return True
+    for suffix, stems in (("ing", 3), ("ed", 2), ("es", 2), ("s", 1)):
+        if len(word) > stems + 2 and word.endswith(suffix):
+            stem = word[:-stems]
+            if stem in _ACTION_VERBS or (stem + "e") in _ACTION_VERBS:
+                return True
+    return False
+
+
+def _is_complement_filler(word: str) -> bool:
+    """True for a word that may sit between a commitment and its verb without
+    changing the fact that a commitment was made.
+
+    The closed list plus -ly adverbs generically ("certainly", "definitely",
+    "gladly").  Callers test :func:`_is_action_word` first, so a verb that
+    merely ends in -ly ("apply") is never swallowed; the membership check here
+    is belt-and-braces for that.
+    """
+    if word in _COMPLEMENT_FILLERS:
+        return True
+    return len(word) > 4 and word.endswith("ly") and not _is_action_word(word)
+
+
+def _complement_is_action(rest: str) -> bool:
+    """True when *rest* -- the text right after a commissive -- reaches a
+    tool-shaped action verb (or action phrase) across nothing but adverbial
+    fillers.
+
+    Single-word verbs and multi-word phrases are tested at the *same*
+    positions: "I'll go ahead and pull it" and "I'll go ahead and take a look"
+    are the same commitment and must classify the same way.  The scan still
+    stops at the first word that is neither filler, negator, verb, nor the
+    start of an action phrase -- it never roams the sentence looking for a
+    verb, which is what keeps this from degenerating into substring matching.
+    """
+    rest = rest.lstrip(" \t,:-–—")
+    # Never look past the end of the sentence the commissive lives in.
+    rest = _SENTENCE_SPLIT_RE.split(rest, 1)[0]
+    lowered = rest.lower()
+    skipped = 0
+    for match in _WORD_RE.finditer(lowered):
+        word = match.group(0)
+        tail = lowered[match.start():]
+        if any(tail.startswith(phrase) for phrase in _ACTION_PHRASES):
+            return True
+        if word in _NEGATORS:
+            return False
+        if _is_action_word(word):
+            return True
+        if _is_complement_filler(word) and skipped < _MAX_COMPLEMENT_FILLERS:
+            skipped += 1
+            continue
+        return False
+    return False
+
+
+def _is_phantom_action(text: str, user_message: str = "") -> bool:
+    """True when *text* commits to performing an action that no tool call
+    carried out.
+
+    ``text`` is an assistant turn that produced no ``tool_calls``;
+    ``user_message`` is the request that turn is answering.  See the block
+    comment above for why the predicate is mood + clause position +
+    complement rather than a substring match.
+    """
+    if not text:
+        return False
+    if user_message and _EXPLICIT_NO_ACTION_RE.search(user_message):
+        return False
+
+    for match in _COMMITMENT_RE.finditer(text):
+        prefix = text[: match.start()]
+        if prefix and not _CLAUSE_START_RE.search(prefix):
+            # Embedded inside a larger clause -- descriptive, not a commitment.
+            continue
+        # "If you'd like, I'll pull it" is a conditional offer, not a
+        # commitment; executing it would act without the user's consent.
+        # Only the clause immediately governing this one can do that.
+        sentence_head = _SENTENCE_SPLIT_RE.split(prefix)[-1]
+        clauses = [
+            c.strip(" \t\"'*-–—•")
+            for c in _CLAUSE_BOUNDARY_RE.split(sentence_head)
+        ]
+        clauses = [c for c in clauses if c]
+        if clauses and _CONDITIONAL_LEAD_RE.match(clauses[-1]):
+            continue
+        if _complement_is_action(text[match.end():]):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -2038,6 +2302,43 @@ class AgentLoop:
                     logger.critical("Audit chain verification failed: %s", exc)
 
     async def run(self, session_id: str, message: str, agent_id: str) -> tuple[str, str, str]:
+        """Traced intake wrapper over :meth:`_run_inner`.
+
+        This is where a request becomes a *trace*. One root span per run, plus
+        the correlation ids (workflow, request, tenant) every span opened
+        underneath inherits automatically — including spans opened inside the
+        tool adapters, because the correlation is context-local and asyncio
+        copies the context into every task this run awaits.
+
+        Wrapping rather than instrumenting in-place keeps the planning loop and
+        its budget/progress invariants byte-identical; the same pattern is used
+        by :meth:`_guarded_dispatch`. Tracing failures degrade to no span and
+        the run proceeds; :class:`BudgetExceeded` and every other exception
+        propagate unchanged.
+        """
+        from .core import phoenix_tracing as _pt
+
+        with _pt.intake(
+            session_id=session_id,
+            agent_id=agent_id,
+            tenant_id=_configured_tenant_id(getattr(self, "_cfg", None)),
+            message=message,
+        ) as (sp, corr):
+            self._trace_workflow_id = corr.get(_pt.WORKFLOW_ID)
+            self._trace_request_id = corr.get(_pt.REQUEST_ID)
+            outcome = await self._run_inner(session_id, message, agent_id)
+            try:
+                final_text, _footer, model_used = outcome
+                _pt.set_attributes(sp, {
+                    "cato.model.used": model_used,
+                    "cato.answer.chars": len(final_text or ""),
+                    _pt.OUTPUT_VALUE: _pt.safe_content(final_text),
+                })
+            except Exception:
+                pass
+            return outcome
+
+    async def _run_inner(self, session_id: str, message: str, agent_id: str) -> tuple[str, str, str]:
         """
         Process *message* and return (final_text, cost_footer, model_used).
 
@@ -2383,19 +2684,17 @@ class AgentLoop:
                 messages.append(_assistant_message_with_tool_calls(text, tool_calls))
 
                 if not tool_calls or force:
-                    # Detect "phantom action" — model described doing something but
-                    # never emitted a tool_call.  Re-prompt once so it actually
-                    # executes instead of just narrating.
-                    _ACTION_HINTS = (
-                        "i'll ", "i will ", "let me ", "i'm going to ",
-                        "i am going to ", "let's ", "i can ",
-                        "i'll now ", "let me now ",
-                    )
-                    _text_lower = (text or "").lower()
+                    # Detect "phantom action" — model *committed to* doing
+                    # something but never emitted a tool_call.  Re-prompt once
+                    # so it actually executes instead of just narrating.
+                    # `_is_phantom_action` is mood + clause-position +
+                    # complement, not a substring match: a descriptive clause
+                    # ("the agents I can dispatch are specialized") must not
+                    # cost the user a correct answer.  See its block comment.
                     if (
                         not force
                         and planning_turns == 0
-                        and any(h in _text_lower for h in _ACTION_HINTS)
+                        and _is_phantom_action(text, message)
                         and not getattr(self, "_continuation_retried", False)
                     ):
                         logger.warning(
